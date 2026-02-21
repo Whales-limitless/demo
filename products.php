@@ -1,10 +1,40 @@
+<?php
+require_once 'dbconnection.php';
+
+$cat_id = isset($_GET['cat']) ? intval($_GET['cat']) : 0;
+
+// Fetch category
+$cat_result = mysqli_query($connect, "SELECT id, name FROM inv_categories WHERE id = " . intval($cat_id));
+$category = mysqli_fetch_assoc($cat_result);
+
+if (!$category) {
+    header('Location: index.php');
+    exit;
+}
+
+// Fetch subcategories with products
+$sub_result = mysqli_query($connect, "SELECT id, name FROM inv_subcategories WHERE category_id = " . intval($cat_id) . " ORDER BY sort_order ASC, id ASC");
+$subcategories = [];
+while ($sub = mysqli_fetch_assoc($sub_result)) {
+    $prod_result = mysqli_query($connect, "SELECT id, name, sku, barcode, image, rack_location, quantity FROM inv_products WHERE subcategory_id = " . intval($sub['id']) . " ORDER BY name ASC");
+    $products = [];
+    while ($prod = mysqli_fetch_assoc($prod_result)) {
+        $prod['id'] = intval($prod['id']);
+        $prod['quantity'] = intval($prod['quantity']);
+        $prod['inStock'] = $prod['quantity'] > 0;
+        $products[] = $prod;
+    }
+    $sub['products'] = $products;
+    $subcategories[] = $sub;
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Products</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,400&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+<title><?php echo htmlspecialchars($category['name']); ?> - Inventory</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="components.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,6 +65,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .back-link:hover { color: var(--primary); }
 
 .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+
 .filter-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 16px; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: all var(--transition); color: var(--text); flex-shrink: 0; }
 .filter-btn:hover { border-color: var(--primary); color: var(--primary); }
 .filter-btn .count-pill { background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; margin-left: 2px; }
@@ -48,6 +79,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .filter-tag { display: inline-flex; align-items: center; gap: 6px; background: #fef2f2; color: var(--primary); border: 1px solid #fecaca; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; animation: fadeUp 0.2s ease; }
 .filter-tag button { background: none; border: none; cursor: pointer; color: var(--primary); font-size: 14px; line-height: 1; padding: 0; }
 
+/* Modal */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; justify-content: center; align-items: center; padding: 16px; }
 .modal-overlay.active { display: flex; }
 .modal { background: var(--surface); border-radius: var(--radius); width: 100%; max-width: 440px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: var(--shadow-lg); animation: modalIn 0.25s ease; }
@@ -74,6 +106,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-ghost { background: none; color: var(--text-muted); }
 .btn-ghost:hover { background: var(--bg); }
 
+/* Products */
 .category-title { font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 800; margin-bottom: 20px; text-transform: uppercase; }
 .subcat-section { margin-bottom: 32px; }
 .subcat-heading { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid var(--primary); display: inline-block; }
@@ -89,8 +122,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .product-card { background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; transition: box-shadow var(--transition), transform var(--transition); }
 .product-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
 .product-img-wrap { position: relative; overflow: hidden; }
-.product-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; transition: transform 0.4s ease; }
+.product-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; transition: transform 0.4s ease; background: var(--bg); }
 .product-card:hover .product-img { transform: scale(1.03); }
+
+.no-img-product { width: 100%; aspect-ratio: 1; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 11px; font-weight: 600; text-align: center; padding: 12px; font-family: 'DM Sans', sans-serif; }
 
 .stock-badge { position: absolute; top: 8px; right: 8px; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.03em; }
 .stock-badge.in-stock { background: var(--green-light); color: var(--green); border: 1px solid #bbf7d0; }
@@ -98,13 +133,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 .product-info { padding: 12px; display: flex; flex-direction: column; flex: 1; }
 .product-name { font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.product-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 
-.rack-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 6px; background: #fef3c7; color: #92400e; cursor: pointer; border: none; transition: background var(--transition); }
-.rack-tag:hover { background: #fde68a; }
-.rack-tag.unset { background: var(--bg); color: var(--text-muted); }
+.product-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.tag { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+.tag-sku { background: #ede9fe; color: #6d28d9; }
+.tag-barcode { background: #e0f2fe; color: #0369a1; }
+.tag-rack { background: #fef3c7; color: #92400e; }
+.tag-rack.unset { background: var(--bg); color: var(--text-muted); }
 
-.qty-label { font-size: 12px; color: var(--text-muted); }
+.qty-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
 .qty-label span { font-weight: 700; color: var(--text); }
 
 .product-actions { margin-top: auto; padding-top: 8px; }
@@ -138,7 +175,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     Back to Categories
   </a>
 
-  <h1 class="category-title" id="categoryTitle"></h1>
+  <h1 class="category-title" id="categoryTitle"><?php echo htmlspecialchars($category['name']); ?></h1>
 
   <div class="toolbar">
     <button class="filter-btn" id="subcatFilterBtn">
@@ -148,7 +185,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </button>
     <div class="product-search">
       <svg class="search-icon" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" placeholder="Search products from all subcategory…" id="productSearchInput">
+      <input type="text" placeholder="Search products…" id="productSearchInput">
     </div>
   </div>
 
@@ -156,6 +193,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <div id="productSections"></div>
 </main>
 
+<!-- Subcategory filter modal -->
 <div class="modal-overlay" id="filterModal">
   <div class="modal">
     <div class="modal-header">
@@ -177,60 +215,94 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <?php include('mobile-bottombar.php'); ?>
 
 <script>
-const categoryName = 'Plastic Cup / Mould / Pet Container';
-const subcategories = [
-  { code: 'ice_cream_mould', name: 'Plastic Ice Cream Mould', products: [
-    { id: 1, name: 'VT PW 20-9436 227-356 ICE CREAM MOULD (1PCS)', img: 'https://picsum.photos/seed/p1/400/400', rack: 'O 06', qty: 0, inStock: false },
-    { id: 2, name: 'VT PW 20-9437 227-322-1 ICE CREAM MOULD (1PC)', img: 'https://picsum.photos/seed/p2/400/400', rack: 'O 07', qty: 0, inStock: false },
-    { id: 3, name: 'VT PW 20-9438 ICE CREAM MOULD SET (3PCS)', img: 'https://picsum.photos/seed/p3/400/400', rack: null, qty: 12, inStock: true },
-  ]},
-  { code: 'take_away_box', name: 'Take Away Box', products: [
-    { id: 4, name: 'TAKE AWAY LUNCH BOX 750ML (50PCS/PKT)', img: 'https://picsum.photos/seed/p4/400/400', rack: 'A 12', qty: 45, inStock: true },
-    { id: 5, name: 'TAKE AWAY ROUND CONTAINER 500ML (25PCS)', img: 'https://picsum.photos/seed/p5/400/400', rack: 'A 13', qty: 8, inStock: true },
-  ]},
-  { code: 'plastic_cup', name: 'Plastic Cup', products: [
-    { id: 6, name: 'PP CUP 16OZ (50PCS/PKT)', img: 'https://picsum.photos/seed/p6/400/400', rack: 'B 01', qty: 200, inStock: true },
-    { id: 7, name: 'PET CUP 12OZ DOME LID (50PCS)', img: 'https://picsum.photos/seed/p7/400/400', rack: 'B 02', qty: 0, inStock: false },
-    { id: 8, name: 'PP CUP 22OZ WITH LID (25PCS/PKT)', img: 'https://picsum.photos/seed/p8/400/400', rack: 'B 01', qty: 55, inStock: true },
-    { id: 9, name: 'PAPER CUP 8OZ HOT DRINK (50PCS)', img: 'https://picsum.photos/seed/p9/400/400', rack: null, qty: 30, inStock: true },
-  ]},
-  { code: 'water_jug', name: 'Water Jug', products: [
-    { id: 10, name: 'ELIANWARE WATER JUG 2.5L (1PC)', img: 'https://picsum.photos/seed/p10/400/400', rack: 'C 05', qty: 15, inStock: true },
-    { id: 11, name: 'CRYSTAL WATER JUG 1.8L WITH LID', img: 'https://picsum.photos/seed/p11/400/400', rack: 'C 06', qty: 3, inStock: true },
-  ]},
-  { code: 'onesall_container', name: 'Onesall Container', products: [
-    { id: 12, name: 'ONESALL SQUARE CONTAINER 500ML', img: 'https://picsum.photos/seed/p12/400/400', rack: 'D 01', qty: 96, inStock: true },
-    { id: 13, name: 'ONESALL ROUND CONTAINER 1L', img: 'https://picsum.photos/seed/p13/400/400', rack: 'D 02', qty: 48, inStock: true },
-    { id: 14, name: 'ONESALL RECTANGLE CONTAINER 750ML', img: 'https://picsum.photos/seed/p14/400/400', rack: 'D 01', qty: 0, inStock: false },
-  ]},
-];
+var subcategories = <?php echo json_encode($subcategories); ?>;
 
-let selectedSubcats = new Set(subcategories.map(function(sc){ return sc.code; }));
+// All subcategories selected by default
+var selectedSubcats = {};
+subcategories.forEach(function(sc) { selectedSubcats[sc.id] = true; });
+
+function getProductImage(p) {
+  if (p.image) return p.image;
+  return null;
+}
+
+function renderProductCard(p, index) {
+  var sc = p.inStock ? 'in-stock' : 'out-of-stock';
+  var st = p.inStock ? 'In Stock' : 'Out of Stock';
+
+  var imgHtml;
+  if (p.image) {
+    imgHtml = '<img class="product-img" src="' + p.image + '" alt="' + p.name + '" loading="lazy">';
+  } else {
+    imgHtml = '<div class="no-img-product">' + (p.sku || 'NO IMAGE') + '</div>';
+  }
+
+  var tags = '';
+  if (p.sku) tags += '<span class="tag tag-sku">SKU: ' + p.sku + '</span>';
+  if (p.barcode) tags += '<span class="tag tag-barcode">BC: ' + p.barcode + '</span>';
+  if (p.rack_location) {
+    tags += '<span class="tag tag-rack">Rack: ' + p.rack_location + '</span>';
+  } else {
+    tags += '<span class="tag tag-rack unset">No Rack</span>';
+  }
+
+  var bc = p.inStock ? 'active' : 'disabled';
+  var bt = p.inStock ? 'Add to Cart' : 'Out of Stock';
+
+  return '<div class="product-card" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" style="animation-delay:' + (index+1)*0.05 + 's">' +
+    '<div class="product-img-wrap">' + imgHtml + '<span class="stock-badge ' + sc + '">' + st + '</span></div>' +
+    '<div class="product-info">' +
+      '<div class="product-name">' + p.name + '</div>' +
+      '<div class="product-tags">' + tags + '</div>' +
+      '<div class="qty-label">Qty: <span>' + p.quantity + '</span></div>' +
+      '<div class="product-actions">' +
+        '<div class="qty-row">' +
+          '<button class="qty-btn" onclick="updateQty(\'minus\',' + p.id + ')">−</button>' +
+          '<input type="number" class="qty-input" id="qty_' + p.id + '" value="1" min="1" max="99">' +
+          '<button class="qty-btn" onclick="updateQty(\'plus\',' + p.id + ')">+</button>' +
+        '</div>' +
+        '<button class="btn-add-cart ' + bc + '" ' + (p.inStock ? '' : 'disabled') + ' onclick="addToCart(' + p.id + ')">' + bt + '</button>' +
+        '<div class="cart-feedback" id="feedback_' + p.id + '"></div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
 
 function renderSections(filteredSubs) {
   var list = filteredSubs || subcategories;
   var sections = document.getElementById('productSections');
-  if (list.length === 0) { sections.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-muted);font-size:14px;">No subcategories selected.</div>'; return; }
+
+  if (list.length === 0) {
+    sections.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-muted);font-size:14px;">No subcategories selected.</div>';
+    return;
+  }
+
   var allOOS = [];
   var html = list.map(function(sc) {
-    var inStock = sc.products.filter(function(p){ return p.inStock; });
-    sc.products.filter(function(p){ return !p.inStock; }).forEach(function(p){ allOOS.push(Object.assign({}, p, {subcategory: sc.name})); });
+    var inStock = sc.products.filter(function(p) { return p.inStock; });
+    sc.products.filter(function(p) { return !p.inStock; }).forEach(function(p) {
+      allOOS.push(Object.assign({}, p, {subcategory: sc.name}));
+    });
     if (inStock.length === 0) return '';
-    return '<div class="subcat-section" id="sub_'+sc.code+'"><h3 class="subcat-heading">'+sc.name+'</h3><div class="product-grid">'+inStock.map(function(p,i){ return renderProductCard(p,i); }).join('')+'</div></div>';
+    return '<div class="subcat-section" id="sub_' + sc.id + '">' +
+      '<h3 class="subcat-heading">' + sc.name + '</h3>' +
+      '<div class="product-grid">' + inStock.map(function(p, i) { return renderProductCard(p, i); }).join('') + '</div>' +
+    '</div>';
   }).join('');
-  var oosHtml = allOOS.length > 0 ? '<div class="oos-section"><div class="oos-heading">Out of Stock <span class="oos-count">'+allOOS.length+'</span></div><div class="product-grid">'+allOOS.map(function(p,i){ return renderProductCard(p,i); }).join('')+'</div></div>' : '';
+
+  var oosHtml = '';
+  if (allOOS.length > 0) {
+    oosHtml = '<div class="oos-section"><div class="oos-heading">Out of Stock <span class="oos-count">' + allOOS.length + '</span></div>' +
+      '<div class="product-grid">' + allOOS.map(function(p, i) { return renderProductCard(p, i); }).join('') + '</div></div>';
+  }
+
   sections.innerHTML = html + oosHtml;
+
   var q = document.getElementById('productSearchInput').value;
   if (q) filterProducts(q);
 }
 
-function renderProductCard(p, index) {
-  var sc = p.inStock ? 'in-stock' : 'out-of-stock', st = p.inStock ? 'In Stock' : 'Out of Stock';
-  var rk = p.rack ? '<button class="rack-tag">📍 Rack: '+p.rack+'</button>' : '<button class="rack-tag unset">Set Rack</button>';
-  var bc = p.inStock ? 'active' : 'disabled', bt = p.inStock ? 'Add to Cart' : 'Out of Stock';
-  return '<div class="product-card" data-name="'+p.name.toLowerCase()+'" style="animation-delay:'+(index+1)*0.05+'s"><div class="product-img-wrap"><img class="product-img" src="'+p.img+'" alt="'+p.name+'" loading="lazy"><span class="stock-badge '+sc+'">'+st+'</span></div><div class="product-info"><div class="product-name">'+p.name+'</div><div class="product-meta">'+rk+'</div><div class="qty-label">Quantity: <span>'+p.qty+'</span></div><div class="product-actions"><div class="qty-row"><button class="qty-btn" onclick="updateQty(\'minus\','+p.id+')">−</button><input type="number" class="qty-input" id="qty_'+p.id+'" value="1" min="1" max="99"><button class="qty-btn" onclick="updateQty(\'plus\','+p.id+')">+</button></div><button class="btn-add-cart '+bc+'" '+(p.inStock?'':'disabled')+' onclick="addToCart('+p.id+')">'+bt+'</button><div class="cart-feedback" id="feedback_'+p.id+'"></div></div></div></div>';
-}
-
+// Subcategory filter modal
 var filterModal = document.getElementById('filterModal');
 var modalBody = document.getElementById('modalBody');
 var modalSearch = document.getElementById('modalSearchInput');
@@ -240,56 +312,160 @@ function openModal() { renderModalList(); filterModal.classList.add('active'); m
 function closeModal() { filterModal.classList.remove('active'); }
 
 function renderModalList(query) {
-  var q = (query||'').toLowerCase();
-  var filtered = subcategories.filter(function(sc){ return sc.name.toLowerCase().includes(q); });
-  modalBody.innerHTML = filtered.map(function(sc){ return '<div class="modal-item" onclick="this.querySelector(\'input\').click()"><input type="checkbox" id="chk_'+sc.code+'" '+(selectedSubcats.has(sc.code)?'checked':'')+' onclick="event.stopPropagation(); toggleSubcat(\''+sc.code+'\', this.checked)"><label for="chk_'+sc.code+'" onclick="event.preventDefault()">'+sc.name+'</label><span class="subcat-count">'+sc.products.length+'</span></div>'; }).join('');
+  var q = (query || '').toLowerCase();
+  var filtered = subcategories.filter(function(sc) { return sc.name.toLowerCase().indexOf(q) !== -1; });
+  modalBody.innerHTML = filtered.map(function(sc) {
+    return '<div class="modal-item" onclick="this.querySelector(\'input\').click()">' +
+      '<input type="checkbox" id="chk_' + sc.id + '" ' + (selectedSubcats[sc.id] ? 'checked' : '') + ' onclick="event.stopPropagation(); toggleSubcat(' + sc.id + ', this.checked)">' +
+      '<label for="chk_' + sc.id + '" onclick="event.preventDefault()">' + sc.name + '</label>' +
+      '<span class="subcat-count">' + sc.products.length + '</span>' +
+    '</div>';
+  }).join('');
   if (!filtered.length) modalBody.innerHTML = '<p style="padding:20px 0;text-align:center;color:var(--text-muted);">No subcategories found</p>';
 }
 
-function toggleSubcat(code, checked) { if (checked) selectedSubcats.add(code); else selectedSubcats.delete(code); }
+function toggleSubcat(id, checked) { if (checked) selectedSubcats[id] = true; else delete selectedSubcats[id]; }
 
 function applySubcatFilter() {
-  if (selectedSubcats.size === subcategories.length) renderSections();
-  else if (selectedSubcats.size === 0) renderSections([]);
-  else renderSections(subcategories.filter(function(sc){ return selectedSubcats.has(sc.code); }));
-  renderFilterTags(); updateFilterCount(); closeModal();
+  var selectedCount = Object.keys(selectedSubcats).length;
+  if (selectedCount === subcategories.length || selectedCount === 0) {
+    if (selectedCount === 0) renderSections([]);
+    else renderSections();
+  } else {
+    renderSections(subcategories.filter(function(sc) { return selectedSubcats[sc.id]; }));
+  }
+  renderFilterTags();
+  updateFilterCount();
+  closeModal();
 }
 
 function renderFilterTags() {
   var c = document.getElementById('activeFilters');
-  if (selectedSubcats.size === 0 || selectedSubcats.size === subcategories.length) { c.innerHTML = ''; return; }
-  c.innerHTML = Array.from(selectedSubcats).map(function(code){ var sc = subcategories.find(function(s){ return s.code === code; }); return '<span class="filter-tag">'+sc.name+'<button onclick="removeSubcatFilter(\''+code+'\')">×</button></span>'; }).join('');
+  var selectedCount = Object.keys(selectedSubcats).length;
+  if (selectedCount === 0 || selectedCount === subcategories.length) { c.innerHTML = ''; return; }
+  c.innerHTML = Object.keys(selectedSubcats).map(function(id) {
+    var sc = subcategories.find(function(s) { return s.id == id; });
+    if (!sc) return '';
+    return '<span class="filter-tag">' + sc.name + '<button onclick="removeSubcatFilter(' + id + ')">×</button></span>';
+  }).join('');
 }
 
 function updateFilterCount() {
-  if (selectedSubcats.size > 0 && selectedSubcats.size < subcategories.length) { filterCountPill.textContent = selectedSubcats.size; filterCountPill.style.display = 'inline'; }
-  else { filterCountPill.style.display = 'none'; }
+  var selectedCount = Object.keys(selectedSubcats).length;
+  if (selectedCount > 0 && selectedCount < subcategories.length) {
+    filterCountPill.textContent = selectedCount;
+    filterCountPill.style.display = 'inline';
+  } else {
+    filterCountPill.style.display = 'none';
+  }
 }
 
-function removeSubcatFilter(code) { selectedSubcats.delete(code); applySubcatFilter(); }
+function removeSubcatFilter(id) { delete selectedSubcats[id]; applySubcatFilter(); }
 
 document.getElementById('subcatFilterBtn').addEventListener('click', openModal);
 document.getElementById('modalClose').addEventListener('click', closeModal);
-filterModal.addEventListener('click', function(e){ if (e.target === filterModal) closeModal(); });
-modalSearch.addEventListener('input', function(){ renderModalList(this.value); });
+filterModal.addEventListener('click', function(e) { if (e.target === filterModal) closeModal(); });
+modalSearch.addEventListener('input', function() { renderModalList(this.value); });
 document.getElementById('applyFilter').addEventListener('click', applySubcatFilter);
-document.getElementById('clearAll').addEventListener('click', function(){ selectedSubcats.clear(); renderModalList(modalSearch.value); });
-document.getElementById('selectAll').addEventListener('click', function(){ selectedSubcats = new Set(subcategories.map(function(sc){ return sc.code; })); renderModalList(modalSearch.value); });
+document.getElementById('clearAll').addEventListener('click', function() { selectedSubcats = {}; renderModalList(modalSearch.value); });
+document.getElementById('selectAll').addEventListener('click', function() { subcategories.forEach(function(sc) { selectedSubcats[sc.id] = true; }); renderModalList(modalSearch.value); });
 
+// Product search
 function filterProducts(query) {
   var q = query.toLowerCase();
-  document.querySelectorAll('.product-card').forEach(function(card){ card.style.display = card.getAttribute('data-name').includes(q) ? '' : 'none'; });
-  document.querySelectorAll('.subcat-section, .oos-section').forEach(function(sec){ var any = Array.from(sec.querySelectorAll('.product-card')).some(function(c){ return c.style.display !== 'none'; }); sec.style.display = any ? '' : 'none'; });
+  document.querySelectorAll('.product-card').forEach(function(card) {
+    var nameMatch = card.getAttribute('data-name').indexOf(q) !== -1;
+    var skuMatch = card.getAttribute('data-sku').indexOf(q) !== -1;
+    card.style.display = (nameMatch || skuMatch) ? '' : 'none';
+  });
+  document.querySelectorAll('.subcat-section, .oos-section').forEach(function(sec) {
+    var any = Array.from(sec.querySelectorAll('.product-card')).some(function(c) { return c.style.display !== 'none'; });
+    sec.style.display = any ? '' : 'none';
+  });
 }
 
-document.getElementById('productSearchInput').addEventListener('input', function(){ filterProducts(this.value); });
-document.getElementById('searchInput').addEventListener('input', function(){ document.getElementById('productSearchInput').value = this.value; filterProducts(this.value); });
+document.getElementById('productSearchInput').addEventListener('input', function() { filterProducts(this.value); });
+document.getElementById('searchInput').addEventListener('input', function() {
+  document.getElementById('productSearchInput').value = this.value;
+  filterProducts(this.value);
+});
 
-function updateQty(action, id) { var input = document.getElementById('qty_'+id); var val = parseInt(input.value)||1; if (action==='plus'&&val<99) input.value=val+1; if (action==='minus'&&val>1) input.value=val-1; }
-function addToCart(id) { var fb = document.getElementById('feedback_'+id); fb.style.color='green'; fb.textContent='✓ Added!'; var badge = document.getElementById('cartBadge'); badge.textContent = parseInt(badge.textContent)+1; setTimeout(function(){ fb.textContent=''; },2000); }
+// Cart functionality
+function updateQty(action, id) {
+  var input = document.getElementById('qty_' + id);
+  var val = parseInt(input.value) || 1;
+  if (action === 'plus' && val < 99) input.value = val + 1;
+  if (action === 'minus' && val > 1) input.value = val - 1;
+}
 
-document.getElementById('categoryTitle').textContent = categoryName;
-renderSections(); updateFilterCount(); renderFilterTags();
+function findProduct(id) {
+  var found = null;
+  subcategories.forEach(function(sc) {
+    sc.products.forEach(function(p) {
+      if (p.id === id) found = p;
+    });
+  });
+  return found;
+}
+
+function addToCart(productId) {
+  var product = findProduct(productId);
+  if (!product || !product.inStock) return;
+
+  var qty = parseInt(document.getElementById('qty_' + productId).value) || 1;
+
+  // Read existing cart from sessionStorage
+  var cart = [];
+  try { cart = JSON.parse(sessionStorage.getItem('cart') || '[]'); } catch(e) {}
+
+  // Check if product already in cart
+  var existing = null;
+  for (var i = 0; i < cart.length; i++) {
+    if (cart[i].id === productId) { existing = cart[i]; break; }
+  }
+
+  if (existing) {
+    existing.qty = Math.min(existing.qty + qty, product.quantity);
+  } else {
+    cart.push({
+      id: product.id,
+      name: product.name,
+      sku: product.sku || '',
+      barcode: product.barcode || '',
+      img: product.image || '',
+      rack: product.rack_location || null,
+      qty: qty,
+      maxQty: product.quantity,
+      checked: true
+    });
+  }
+
+  sessionStorage.setItem('cart', JSON.stringify(cart));
+
+  // Visual feedback
+  var fb = document.getElementById('feedback_' + productId);
+  fb.style.color = '#16a34a';
+  fb.textContent = 'Added to cart!';
+
+  // Update cart badge
+  var badge = document.getElementById('cartBadge');
+  badge.textContent = cart.length;
+
+  setTimeout(function() { fb.textContent = ''; }, 2000);
+}
+
+// Init cart badge from sessionStorage
+(function() {
+  try {
+    var cart = JSON.parse(sessionStorage.getItem('cart') || '[]');
+    document.getElementById('cartBadge').textContent = cart.length;
+  } catch(e) {}
+})();
+
+// Render
+renderSections();
+updateFilterCount();
+renderFilterTags();
 </script>
 </body>
 </html>

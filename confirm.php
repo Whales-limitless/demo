@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Confirm Order</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,400&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+<title>Confirm Order - Inventory</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="components.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,7 +40,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .type-toggle input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
 .type-toggle label:has(input:checked) { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(200,16,46,0.3); }
 .type-toggle label:hover:not(:has(input:checked)) { background: var(--bg); }
-.type-toggle .type-icon { display: block; font-size: 20px; margin-bottom: 2px; }
 
 .section-label { font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
 .section-label .badge { background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
@@ -49,11 +48,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .summary-item { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; box-shadow: var(--shadow-sm); animation: fadeUp 0.3s ease both; }
 .summary-item .s-num { width: 28px; height: 28px; border-radius: 50%; background: var(--bg); display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; }
 .summary-item .s-img { width: 52px; height: 52px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: var(--bg); }
+.summary-item .s-no-img { width: 52px; height: 52px; border-radius: 8px; flex-shrink: 0; background: linear-gradient(135deg, #e5e7eb, #d1d5db); display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 600; color: #9ca3af; text-align: center; }
 .summary-item .s-details { flex: 1; min-width: 0; }
 .summary-item .s-name { font-size: 13px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.summary-item .s-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; font-size: 11px; color: var(--text-muted); }
-.summary-item .s-rack { background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 4px; font-weight: 600; }
-.summary-item .s-rack.unset { background: var(--bg); color: var(--text-muted); }
+.summary-item .s-meta { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 10px; flex-wrap: wrap; }
+.summary-item .s-tag { padding: 1px 6px; border-radius: 3px; font-weight: 600; }
+.summary-item .s-tag-sku { background: #ede9fe; color: #6d28d9; }
+.summary-item .s-tag-rack { background: #fef3c7; color: #92400e; }
+.summary-item .s-tag-rack.unset { background: var(--bg); color: var(--text-muted); }
 .summary-item .s-qty { font-size: 15px; font-weight: 800; color: var(--text); flex-shrink: 0; min-width: 40px; text-align: right; }
 
 .summary-card { background: var(--surface); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow-sm); margin-bottom: 16px; }
@@ -68,9 +70,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-confirm:hover { background: var(--primary-dark); transform: translateY(-1px); }
 .btn-confirm.stock-in { background: var(--blue); }
 .btn-confirm.stock-in:hover { background: #1d4ed8; }
-.btn-confirm .btn-icon { font-size: 18px; }
 
-/* ── COUNTDOWN PROGRESS ── */
 .countdown-bar { display: none; margin-bottom: 10px; }
 .countdown-bar.active { display: block; }
 .countdown-label { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
@@ -79,7 +79,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .progress-fill { height: 100%; border-radius: 3px; background: var(--primary); width: 0%; transition: none; }
 .progress-fill.stock-in { background: var(--blue); }
 .progress-fill.running { transition: width 2s linear; }
-
 .btn-confirm.cancelling { background: #6b7280; }
 .btn-confirm.cancelling:hover { background: #4b5563; }
 
@@ -94,7 +93,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .success-modal .btn-done:hover { background: var(--primary-dark); }
 
 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-@media (max-width: 480px) { .summary-item .s-img { width: 44px; height: 44px; } .summary-item .s-name { font-size: 12px; } .type-toggle label { padding: 10px 12px; font-size: 13px; } }
+@media (max-width: 480px) { .summary-item .s-img, .summary-item .s-no-img { width: 44px; height: 44px; } .summary-item .s-name { font-size: 12px; } .type-toggle label { padding: 10px 12px; font-size: 13px; } }
 </style>
 </head>
 <body>
@@ -111,12 +110,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <div class="type-toggle" id="typeToggle">
     <label>
       <input type="radio" name="orderType" value="purchase" checked onchange="updateType()">
-      <span class="type-icon">🛒</span>
       Purchase
     </label>
     <label>
       <input type="radio" name="orderType" value="stockin" onchange="updateType()">
-      <span class="type-icon">📦</span>
       Stock In
     </label>
   </div>
@@ -143,7 +140,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
       </div>
     </div>
     <button class="btn-confirm" id="btnConfirm" onclick="handleConfirmClick()">
-      <span class="btn-icon">🛒</span>
       <span id="btnText">Purchase</span>
     </button>
   </div>
@@ -161,35 +157,49 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 </div>
 
 <script>
-// Default dummy data
-var items = [
-  { id: 1, name: 'VT PW 20-9438 ICE CREAM MOULD SET (3PCS)', img: 'https://picsum.photos/seed/p3/400/400', rack: null, qty: 2 },
-  { id: 4, name: 'TAKE AWAY LUNCH BOX 750ML (50PCS/PKT)', img: 'https://picsum.photos/seed/p4/400/400', rack: 'A 12', qty: 5 },
-  { id: 6, name: 'PP CUP 16OZ (50PCS/PKT)', img: 'https://picsum.photos/seed/p6/400/400', rack: 'B 01', qty: 10 },
-  { id: 10, name: 'ELIANWARE WATER JUG 2.5L (1PC)', img: 'https://picsum.photos/seed/p10/400/400', rack: 'C 05', qty: 1 },
-  { id: 12, name: 'ONESALL SQUARE CONTAINER 500ML', img: 'https://picsum.photos/seed/p12/400/400', rack: 'D 01', qty: 3 },
-];
-
-// Override with sessionStorage data if available
+// Load items from sessionStorage
+var items = [];
 try {
   var stored = sessionStorage.getItem('confirmItems');
   if (stored) {
     var parsed = JSON.parse(stored);
     if (parsed && parsed.length > 0) items = parsed;
   }
-} catch(e) { /* use defaults */ }
+} catch(e) {}
+
+// Redirect if no items
+if (items.length === 0) {
+  window.location.href = 'cart.php';
+}
 
 var orderType = 'purchase';
 
 function render() {
   var list = document.getElementById('summaryList');
   list.innerHTML = items.map(function(item, i) {
-    var rackHtml = item.rack ? '<span class="s-rack">📍 '+item.rack+'</span>' : '<span class="s-rack unset">No Rack</span>';
-    return '<div class="summary-item" style="animation-delay:'+i*0.04+'s"><span class="s-num">'+(i+1)+'</span><img class="s-img" src="'+item.img+'" alt="'+item.name+'"><div class="s-details"><div class="s-name">'+item.name+'</div><div class="s-meta">'+rackHtml+'</div></div><div class="s-qty">×'+item.qty+'</div></div>';
+    var imgHtml = item.img
+      ? '<img class="s-img" src="' + item.img + '" alt="' + item.name + '">'
+      : '<div class="s-no-img">' + (item.sku || 'N/A') + '</div>';
+
+    var metaHtml = '';
+    if (item.sku) metaHtml += '<span class="s-tag s-tag-sku">SKU: ' + item.sku + '</span>';
+    if (item.rack) metaHtml += '<span class="s-tag s-tag-rack">Rack: ' + item.rack + '</span>';
+    else metaHtml += '<span class="s-tag s-tag-rack unset">No Rack</span>';
+
+    return '<div class="summary-item" style="animation-delay:' + i*0.04 + 's">' +
+      '<span class="s-num">' + (i+1) + '</span>' +
+      imgHtml +
+      '<div class="s-details">' +
+        '<div class="s-name">' + item.name + '</div>' +
+        '<div class="s-meta">' + metaHtml + '</div>' +
+      '</div>' +
+      '<div class="s-qty">&times;' + item.qty + '</div>' +
+    '</div>';
   }).join('');
+
   document.getElementById('totalBadge').textContent = items.length;
   document.getElementById('totalItems').textContent = items.length;
-  document.getElementById('totalQty').textContent = items.reduce(function(s,i){ return s+i.qty; }, 0);
+  document.getElementById('totalQty').textContent = items.reduce(function(s, i) { return s + i.qty; }, 0);
 }
 
 function updateType() {
@@ -198,11 +208,13 @@ function updateType() {
   var btnText = document.getElementById('btnText');
   var typeLabel = document.getElementById('orderTypeLabel');
   if (orderType === 'purchase') {
-    btnText.textContent = 'Purchase'; btn.className = 'btn-confirm';
-    btn.querySelector('.btn-icon').textContent = '🛒'; typeLabel.textContent = 'Purchase';
+    btnText.textContent = 'Purchase';
+    btn.className = 'btn-confirm';
+    typeLabel.textContent = 'Purchase';
   } else {
-    btnText.textContent = 'Stock In'; btn.className = 'btn-confirm stock-in';
-    btn.querySelector('.btn-icon').textContent = '📦'; typeLabel.textContent = 'Stock In';
+    btnText.textContent = 'Stock In';
+    btn.className = 'btn-confirm stock-in';
+    typeLabel.textContent = 'Stock In';
   }
 }
 
@@ -210,17 +222,13 @@ var countdownTimer = null;
 var isCounting = false;
 
 function handleConfirmClick() {
-  if (isCounting) {
-    cancelCountdown();
-  } else {
-    startCountdown();
-  }
+  if (isCounting) cancelCountdown();
+  else startCountdown();
 }
 
 function startCountdown() {
   var btn = document.getElementById('btnConfirm');
   var btnText = document.getElementById('btnText');
-  var btnIcon = btn.querySelector('.btn-icon');
   var bar = document.getElementById('countdownBar');
   var fill = document.getElementById('progressFill');
   var countLabel = document.getElementById('countdownLabel');
@@ -229,7 +237,6 @@ function startCountdown() {
 
   isCounting = true;
 
-  // Reset and start smooth fill
   fill.classList.remove('running');
   fill.className = 'progress-fill' + (orderType === 'stockin' ? ' stock-in' : '');
   fill.style.width = '0%';
@@ -238,14 +245,11 @@ function startCountdown() {
   fill.classList.add('running');
   fill.style.width = '100%';
 
-  // Update label and button
   countLabel.textContent = label + ' in ' + count + '…';
-  btnIcon.textContent = '✕';
   btnText.textContent = 'Cancel';
   btn.className = 'btn-confirm cancelling';
 
-  // Disable type toggle
-  document.querySelectorAll('input[name="orderType"]').forEach(function(r){ r.disabled = true; });
+  document.querySelectorAll('input[name="orderType"]').forEach(function(r) { r.disabled = true; });
 
   countdownTimer = setInterval(function() {
     count--;
@@ -256,9 +260,8 @@ function startCountdown() {
       countdownTimer = null;
       countLabel.textContent = 'Submitting…';
       btnText.textContent = 'Submitting…';
-      btnIcon.textContent = '';
       isCounting = false;
-      setTimeout(function(){ finishOrder(); }, 300);
+      setTimeout(function() { finishOrder(); }, 300);
     }
   }, 1000);
 }
@@ -270,22 +273,19 @@ function cancelCountdown() {
 
   var btn = document.getElementById('btnConfirm');
   var btnText = document.getElementById('btnText');
-  var btnIcon = btn.querySelector('.btn-icon');
   var bar = document.getElementById('countdownBar');
   var fill = document.getElementById('progressFill');
 
-  // Hide bar
   bar.classList.remove('active');
   fill.classList.remove('running');
   fill.style.width = '0%';
 
-  // Restore button
-  document.querySelectorAll('input[name="orderType"]').forEach(function(r){ r.disabled = false; });
+  document.querySelectorAll('input[name="orderType"]').forEach(function(r) { r.disabled = false; });
   if (orderType === 'purchase') {
-    btnIcon.textContent = '🛒'; btnText.textContent = 'Purchase';
+    btnText.textContent = 'Purchase';
     btn.className = 'btn-confirm';
   } else {
-    btnIcon.textContent = '📦'; btnText.textContent = 'Stock In';
+    btnText.textContent = 'Stock In';
     btn.className = 'btn-confirm stock-in';
   }
 }
@@ -297,15 +297,23 @@ function finishOrder() {
   fill.classList.remove('running');
   fill.style.width = '0%';
 
-  var btn = document.getElementById('btnConfirm');
   var overlay = document.getElementById('successOverlay');
   var title = document.getElementById('successTitle');
   var msg = document.getElementById('successMsg');
-  if (orderType === 'purchase') { title.textContent = 'Purchase Submitted!'; msg.textContent = 'Your purchase order has been placed successfully.'; }
-  else { title.textContent = 'Stock In Submitted!'; msg.textContent = 'Your stock in order has been recorded successfully.'; }
-  document.querySelectorAll('input[name="orderType"]').forEach(function(r){ r.disabled = false; });
+  if (orderType === 'purchase') {
+    title.textContent = 'Purchase Submitted!';
+    msg.textContent = 'Your purchase order has been placed successfully.';
+  } else {
+    title.textContent = 'Stock In Submitted!';
+    msg.textContent = 'Your stock in order has been recorded successfully.';
+  }
+
+  document.querySelectorAll('input[name="orderType"]').forEach(function(r) { r.disabled = false; });
   overlay.classList.add('active');
+
+  // Clear cart and confirm data
   sessionStorage.removeItem('confirmItems');
+  sessionStorage.removeItem('cart');
 }
 
 render();
