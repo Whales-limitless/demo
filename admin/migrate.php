@@ -189,6 +189,39 @@ if ($colCheck5 && $colCheck5->num_rows === 0) {
 } else {
     $results[] = ['skip', 'Add GRN_NUM to parafile (already exists)'];
 }
+
+// --- Product Category ---
+runMigration($connect, 'Create product_category table', "
+CREATE TABLE IF NOT EXISTS `product_category` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(50) NOT NULL UNIQUE,
+  `status` ENUM('ACTIVE','INACTIVE') DEFAULT 'ACTIVE',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+// --- Product Sub Category ---
+runMigration($connect, 'Create product_sub_category table', "
+CREATE TABLE IF NOT EXISTS `product_sub_category` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `category_id` INT NOT NULL,
+  `name` VARCHAR(50) NOT NULL,
+  `status` ENUM('ACTIVE','INACTIVE') DEFAULT 'ACTIVE',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_cat_sub` (`category_id`, `name`),
+  FOREIGN KEY (`category_id`) REFERENCES `product_category`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+// --- Product UOM ---
+runMigration($connect, 'Create product_uom table', "
+CREATE TABLE IF NOT EXISTS `product_uom` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(50) NOT NULL UNIQUE,
+  `status` ENUM('ACTIVE','INACTIVE') DEFAULT 'ACTIVE',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
 ?>
 <!DOCTYPE html>
 <html lang="en">
