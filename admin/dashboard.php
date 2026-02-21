@@ -303,8 +303,11 @@ body {
 /* Orders Table */
 .orders-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 13px;
+    border-radius: var(--radius);
+    overflow: hidden;
 }
 
 .orders-table thead th {
@@ -314,18 +317,25 @@ body {
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    padding: 10px 12px;
+    padding: 12px 14px;
     white-space: nowrap;
     text-align: left;
 }
 
+.orders-table thead th:first-child { border-top-left-radius: var(--radius); }
+.orders-table thead th:last-child { border-top-right-radius: var(--radius); }
+
 .orders-table tbody td {
-    padding: 10px 12px;
+    padding: 11px 14px;
     vertical-align: middle;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid #f0f1f3;
 }
 
 .orders-table tbody tr:hover { background: #f9fafb; }
+
+.orders-table tbody tr:last-child td { border-bottom: none; }
+.orders-table tbody tr:last-child td:first-child { border-bottom-left-radius: var(--radius); }
+.orders-table tbody tr:last-child td:last-child { border-bottom-right-radius: var(--radius); }
 
 .orders-table tbody tr.no-results td {
     text-align: center;
@@ -440,7 +450,6 @@ audio { display: none; }
                         <th>Time</th>
                         <th>Order No</th>
                         <th>Name</th>
-                        <th>Contact</th>
                         <th>Qty</th>
                         <th>To / Remark</th>
                         <th>Admin Remark</th>
@@ -450,7 +459,7 @@ audio { display: none; }
                 <tbody id="ordersBody">
                     <?php if (count($orders) === 0): ?>
                     <tr class="no-results">
-                        <td colspan="10"><i class="fas fa-inbox" style="font-size:24px;margin-bottom:8px;display:block;"></i>No orders found</td>
+                        <td colspan="9"><i class="fas fa-inbox" style="font-size:24px;margin-bottom:8px;display:block;"></i>No orders found</td>
                     </tr>
                     <?php else: ?>
                     <?php foreach ($orders as $i => $order): ?>
@@ -458,7 +467,6 @@ audio { display: none; }
                         ($order['SDATE'] ?? '') . ' ' .
                         ($order['SALNUM'] ?? '') . ' ' .
                         ($order['NAME'] ?? '') . ' ' .
-                        ($order['HP'] ?? '') . ' ' .
                         ($order['TXTTO'] ?? '') . ' ' .
                         ($order['ADMINRMK'] ?? '')
                     )); ?>">
@@ -467,7 +475,6 @@ audio { display: none; }
                         <td><?php echo htmlspecialchars($order['TTIME'] ?? ''); ?></td>
                         <td><strong><?php echo htmlspecialchars($order['SALNUM'] ?? ''); ?></strong></td>
                         <td><?php echo htmlspecialchars($order['NAME'] ?? ''); ?></td>
-                        <td><?php echo htmlspecialchars($order['HP'] ?? ''); ?></td>
                         <td><?php echo htmlspecialchars($order['SUMQTY'] ?? '0'); ?></td>
                         <td><?php echo htmlspecialchars($order['TXTTO'] ?? ''); ?></td>
                         <td><?php echo htmlspecialchars($order['ADMINRMK'] ?? ''); ?></td>

@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once 'dbconnection.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
@@ -9,6 +10,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'error' => 'Invalid request method']);
     exit;
 }
+
+// Get logged-in user info for ACCODE and NAME
+$userAccode = $_SESSION['user_code'] ?? '';
+$userName = $_SESSION['user_name'] ?? '';
 
 // Read JSON body
 $input = json_decode(file_get_contents('php://input'), true);
@@ -56,12 +61,15 @@ foreach ($items as $item) {
         }
     }
 
+    $escapedAccode = mysqli_real_escape_string($connect, $userAccode);
+    $escapedUserName = mysqli_real_escape_string($connect, $userName);
+
     $sql = "INSERT INTO `orderlist` (OUTLET, SDATE, ACCODE, NAME, SALNUM, BARCODE, PDESC, QTY, RETAIL, AMOUNT, REMARK, REDEEM, BILL, DELIVERY, PTYPE, TRANSNO, TDATE, TTIME, STATUS, PRINT, view_status, ADMINRMK, SOUND, TXTTO)
             VALUES (
                 '$outlet',
                 '$curDate',
-                '',
-                '',
+                '$escapedAccode',
+                '$escapedUserName',
                 '$salnum',
                 '" . mysqli_real_escape_string($connect, $barcode) . "',
                 '" . mysqli_real_escape_string($connect, $name) . "',

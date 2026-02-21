@@ -30,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_id'] = $user['ID'] ?? '';
             $_SESSION['user_username'] = $username;
             $_SESSION['user_name'] = $user['USER_NAME'] ?? $user['USERNAME'] ?? $username;
+            $_SESSION['user_code'] = $user['USERNAME'] ?? '';
             $_SESSION['user_level'] = $user['LEVEL'] ?? 0;
             $_SESSION['user_outlet'] = $user['OUTLET'] ?? '';
             $_SESSION['user_dept'] = $user['DEPT'] ?? '';
