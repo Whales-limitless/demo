@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === '' || $password === '') {
         $error = 'Please enter both username and password.';
     } else {
-        $stmt = $connect->prepare("SELECT * FROM `sysfile` WHERE `USER1` = ? AND `USER2` = ? AND (`TYPE` IS NULL OR `TYPE` != 'A') LIMIT 1");
+        $stmt = $connect->prepare("SELECT * FROM `sysfile` WHERE `USER1` = ? AND `USER2` = ? AND `TYPE` = 'S' LIMIT 1");
         $stmt->bind_param("ss", $username, $password);
         $stmt->execute();
         $result = $stmt->get_result();

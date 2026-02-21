@@ -250,18 +250,8 @@ body {
 }
 
 .badge-admin { background: #fef2f2; color: #dc2626; }
-.badge-user { background: #eff6ff; color: #2563eb; }
-
-.badge-status {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 700;
-}
-
-.badge-active { background: #f0fdf4; color: #16a34a; }
-.badge-inactive { background: #f3f4f6; color: #6b7280; }
+.badge-staff { background: #eff6ff; color: #2563eb; }
+.badge-delivery { background: #fefce8; color: #ca8a04; }
 
 .btn-action {
     padding: 5px 12px;
@@ -282,6 +272,15 @@ body {
 .btn-delete { background: #ef4444; }
 .btn-delete:hover { background: #dc2626; }
 .btn-delete:disabled { background: #d1d5db; cursor: not-allowed; }
+
+.code-tag {
+    font-family: monospace;
+    background: #f3f4f6;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
 
 .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
 .modal-header { border-bottom: 1px solid #e5e7eb; }
@@ -341,47 +340,42 @@ body {
                 <thead>
                     <tr>
                         <th style="width:40px">No</th>
+                        <th>Code</th>
                         <th>Username</th>
                         <th>Name</th>
                         <th>Type</th>
-                        <th>Status</th>
-                        <th>Outlet</th>
-                        <th>Department</th>
-                        <th>Level</th>
                         <th style="width:1%">Action</th>
                     </tr>
                 </thead>
                 <tbody id="usersBody">
                     <?php if (count($users) === 0): ?>
                     <tr class="no-results">
-                        <td colspan="9"><i class="fas fa-users-slash" style="font-size:24px;margin-bottom:8px;display:block;"></i>No users found</td>
+                        <td colspan="6"><i class="fas fa-users-slash" style="font-size:24px;margin-bottom:8px;display:block;"></i>No users found</td>
                     </tr>
                     <?php else: ?>
                     <?php foreach ($users as $i => $u): ?>
                     <?php
-                        $isAdmin = ($u['TYPE'] ?? '') === 'A';
-                        $isActive = ($u['STATUS'] ?? '') === 'Y';
+                        $typeVal = $u['TYPE'] ?? '';
+                        if ($typeVal === 'A') { $typeName = 'Admin'; $badgeClass = 'badge-admin'; }
+                        elseif ($typeVal === 'D') { $typeName = 'Delivery'; $badgeClass = 'badge-delivery'; }
+                        else { $typeName = 'Staff'; $badgeClass = 'badge-staff'; }
                     ?>
                     <tr data-search="<?php echo htmlspecialchars(strtolower(
+                        ($u['USERNAME'] ?? '') . ' ' .
                         ($u['USER1'] ?? '') . ' ' .
                         ($u['USER_NAME'] ?? '') . ' ' .
-                        ($u['USERNAME'] ?? '') . ' ' .
-                        ($u['OUTLET'] ?? '') . ' ' .
-                        ($u['DEPT'] ?? '')
+                        $typeName
                     )); ?>">
                         <td><?php echo $i + 1; ?></td>
+                        <td><span class="code-tag"><?php echo htmlspecialchars($u['USERNAME'] ?? ''); ?></span></td>
                         <td><strong><?php echo htmlspecialchars($u['USER1'] ?? ''); ?></strong></td>
-                        <td><?php echo htmlspecialchars($u['USER_NAME'] ?? $u['USERNAME'] ?? ''); ?></td>
-                        <td><span class="badge-type <?php echo $isAdmin ? 'badge-admin' : 'badge-user'; ?>"><?php echo $isAdmin ? 'Admin' : 'User'; ?></span></td>
-                        <td><span class="badge-status <?php echo $isActive ? 'badge-active' : 'badge-inactive'; ?>"><?php echo $isActive ? 'Active' : 'Inactive'; ?></span></td>
-                        <td><?php echo htmlspecialchars($u['OUTLET'] ?? ''); ?></td>
-                        <td><?php echo htmlspecialchars($u['DEPT'] ?? ''); ?></td>
-                        <td><?php echo htmlspecialchars($u['LEVEL'] ?? '0'); ?></td>
+                        <td><?php echo htmlspecialchars($u['USER_NAME'] ?? ''); ?></td>
+                        <td><span class="badge-type <?php echo $badgeClass; ?>"><?php echo $typeName; ?></span></td>
                         <td style="white-space:nowrap">
                             <button type="button" class="btn-action btn-edit" onclick="openEditModal(<?php echo (int)$u['ID']; ?>);">
                                 <i class="fas fa-pen"></i> Edit
                             </button>
-                            <?php if ($isAdmin): ?>
+                            <?php if ($typeVal === 'A'): ?>
                             <button type="button" class="btn-action btn-delete" disabled title="Admin users cannot be deleted">
                                 <i class="fas fa-trash"></i> Delete
                             </button>
@@ -410,6 +404,10 @@ body {
             </div>
             <div class="modal-body">
                 <input type="hidden" id="editId" value="">
+                <div class="mb-3" id="codeGroup" style="display:none;">
+                    <label class="form-label fw-semibold">Code</label>
+                    <input type="text" id="fCode" class="form-control" disabled style="background:#f3f4f6;font-family:monospace;">
+                </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold" for="fUsername">Username <span class="text-danger">*</span></label>
                     <input type="text" id="fUsername" class="form-control" placeholder="Login username" autocomplete="off">
@@ -423,40 +421,18 @@ body {
                     <label class="form-label fw-semibold" for="fName">Full Name</label>
                     <input type="text" id="fName" class="form-control" placeholder="Display name">
                 </div>
-                <div class="row">
-                    <div class="col-6 mb-3">
-                        <label class="form-label fw-semibold" for="fType">Type <span class="text-danger">*</span></label>
-                        <select id="fType" class="form-select">
-                            <option value="U">User</option>
-                            <option value="A">Admin</option>
-                        </select>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <label class="form-label fw-semibold" for="fStatus">Status</label>
-                        <select id="fStatus" class="form-select">
-                            <option value="Y">Active</option>
-                            <option value="N">Inactive</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-6 mb-3">
-                        <label class="form-label fw-semibold" for="fOutlet">Outlet</label>
-                        <input type="text" id="fOutlet" class="form-control" placeholder="e.g. HQ">
-                    </div>
-                    <div class="col-6 mb-3">
-                        <label class="form-label fw-semibold" for="fLevel">Level</label>
-                        <input type="number" id="fLevel" class="form-control" placeholder="0" step="0.01" value="1">
-                    </div>
-                </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold" for="fDept">Department</label>
-                    <input type="text" id="fDept" class="form-control" placeholder="e.g. Sales">
+                    <label class="form-label fw-semibold" for="fType">Type <span class="text-danger">*</span></label>
+                    <select id="fType" class="form-select">
+                        <option value="S">Staff</option>
+                        <option value="A">Admin</option>
+                        <option value="D">Delivery</option>
+                    </select>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success w-50" id="saveBtn" onclick="saveUser();">
+                <button type="button" class="btn btn-success w-50" onclick="saveUser();">
                     <i class="fas fa-check"></i> Save
                 </button>
             </div>
@@ -506,17 +482,15 @@ document.getElementById('searchInput').addEventListener('input', function() {
 function openCreateModal() {
     document.getElementById('modalTitle').innerHTML = '<i class="fas fa-user-plus"></i> Add User';
     document.getElementById('editId').value = '';
+    document.getElementById('codeGroup').style.display = 'none';
+    document.getElementById('fCode').value = '';
     document.getElementById('fUsername').value = '';
     document.getElementById('fUsername').disabled = false;
     document.getElementById('fPassword').value = '';
     document.getElementById('fPassword').placeholder = 'Login password';
     document.getElementById('passwordHint').style.display = 'none';
     document.getElementById('fName').value = '';
-    document.getElementById('fType').value = 'U';
-    document.getElementById('fStatus').value = 'Y';
-    document.getElementById('fOutlet').value = '';
-    document.getElementById('fLevel').value = '1';
-    document.getElementById('fDept').value = '';
+    document.getElementById('fType').value = 'S';
     userModal.show();
 }
 
@@ -537,15 +511,13 @@ function openEditModal(id) {
                 Swal.fire({ icon: 'error', title: 'Error', text: data.error });
                 return;
             }
+            document.getElementById('codeGroup').style.display = 'block';
+            document.getElementById('fCode').value = data.USERNAME || '';
             document.getElementById('fUsername').value = data.USER1 || '';
             document.getElementById('fUsername').disabled = true;
             document.getElementById('fPassword').value = '';
             document.getElementById('fName').value = data.USER_NAME || '';
-            document.getElementById('fType').value = data.TYPE || 'U';
-            document.getElementById('fStatus').value = data.STATUS || 'Y';
-            document.getElementById('fOutlet').value = data.OUTLET || '';
-            document.getElementById('fLevel').value = data.LEVEL || '0';
-            document.getElementById('fDept').value = data.DEPT || '';
+            document.getElementById('fType').value = data.TYPE || 'S';
             userModal.show();
         }
     });
@@ -558,10 +530,6 @@ function saveUser() {
     var password = document.getElementById('fPassword').value.trim();
     var name = document.getElementById('fName').value.trim();
     var type = document.getElementById('fType').value;
-    var status = document.getElementById('fStatus').value;
-    var outlet = document.getElementById('fOutlet').value.trim();
-    var level = document.getElementById('fLevel').value;
-    var dept = document.getElementById('fDept').value.trim();
 
     if (username === '') {
         Swal.fire({ icon: 'warning', text: 'Username is required.' });
@@ -578,11 +546,7 @@ function saveUser() {
         username: username,
         password: password,
         name: name,
-        type: type,
-        status: status,
-        outlet: outlet,
-        level: level,
-        dept: dept
+        type: type
     };
 
     if (editId) {
