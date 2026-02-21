@@ -7,36 +7,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
-include('../dbconnection.php');
-$connect->set_charset("utf8mb4");
-
-// Fetch all products
-$products = [];
-$result = $connect->query("SELECT id, barcode, code, name, cat, sub_cat, oriprice, disprice, cost, COALESCE(qoh, 0) AS qoh, uom, rack, min_qty, max_qty, checked FROM PRODUCTS ORDER BY checked DESC, name ASC");
-if ($result) {
-    while ($r = $result->fetch_assoc()) {
-        $products[] = $r;
-    }
-}
-
-// Fetch distinct categories for filter
-$categories = [];
-$catResult = $connect->query("SELECT DISTINCT `cat` FROM `PRODUCTS` WHERE `cat` IS NOT NULL AND `cat` != '' ORDER BY `cat` ASC");
-if ($catResult) {
-    while ($r = $catResult->fetch_assoc()) {
-        $categories[] = $r['cat'];
-    }
-}
-
-// Fetch distinct racks for dropdown
-$racks = [];
-$rackResult = $connect->query("SELECT DISTINCT `rack` FROM `PRODUCTS` WHERE `rack` IS NOT NULL AND `rack` != '' ORDER BY `rack` ASC");
-if ($rackResult) {
-    while ($r = $rackResult->fetch_assoc()) {
-        $racks[] = $r['rack'];
-    }
-}
-
 $currentPage = 'product';
 ?>
 <!DOCTYPE html>
@@ -98,6 +68,36 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .modal-header { border-bottom: 1px solid #e5e7eb; }
 .modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
 .modal-footer { border-top: 1px solid #e5e7eb; }
+
+/* Pagination */
+.pagination-wrap { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; flex-wrap: wrap; gap: 8px; }
+.pagination-info { font-size: 13px; color: var(--text-muted); }
+.pagination-btns { display: flex; gap: 4px; }
+.pagination-btns button { padding: 6px 12px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); color: var(--text); }
+.pagination-btns button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.pagination-btns button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.pagination-btns button:disabled { opacity: 0.4; cursor: default; }
+
+/* Manage list inside modals */
+.manage-list { max-height: 300px; overflow-y: auto; }
+.manage-list .manage-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #f3f4f6; gap: 8px; }
+.manage-list .manage-item:last-child { border-bottom: none; }
+.manage-list .manage-item .item-name { flex: 1; font-size: 13px; }
+.manage-list .manage-item .item-name.inactive { text-decoration: line-through; color: var(--text-muted); }
+.manage-list .manage-item .item-actions { display: flex; gap: 4px; }
+.manage-list .manage-item .item-actions button { padding: 3px 8px; border: none; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; color: #fff; }
+.manage-add-row { display: flex; gap: 8px; padding: 12px 0; }
+.manage-add-row input, .manage-add-row select { flex: 1; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 13px; }
+.manage-add-row button { padding: 7px 14px; }
+.btn-manage { background: none; border: 1px solid #d1d5db; padding: 0 8px; height: 38px; border-radius: 0 8px 8px 0; cursor: pointer; color: var(--text-muted); font-size: 13px; transition: all var(--transition); display: flex; align-items: center; }
+.btn-manage:hover { border-color: var(--primary); color: var(--primary); }
+.select-with-manage { display: flex; }
+.select-with-manage select { border-radius: 8px 0 0 8px; border-right: none; flex: 1; }
+
+/* Loading spinner */
+.table-loading { text-align: center; padding: 40px; color: var(--text-muted); }
+.table-loading i { font-size: 24px; margin-bottom: 8px; display: block; }
+
 @media (max-width: 768px) {
     .admin-topbar { padding: 0 16px; }
     .admin-topbar .nav-links { display: none; }
@@ -117,9 +117,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="page-content">
     <div class="page-header">
         <h1><i class="fas fa-boxes-stacked" style="color:var(--primary);margin-right:8px;"></i>Product Management</h1>
-        <button class="btn-add" onclick="openCreateModal();">
-            <i class="fas fa-plus"></i> Add Product
-        </button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-add" onclick="openManageCatModal();" style="background:#6366f1;">
+                <i class="fas fa-tags"></i> Manage Categories
+            </button>
+            <button class="btn-add" onclick="openManageUomModal();" style="background:#0891b2;">
+                <i class="fas fa-ruler"></i> Manage UOM
+            </button>
+            <button class="btn-add" onclick="openCreateModal();">
+                <i class="fas fa-plus"></i> Add Product
+            </button>
+        </div>
     </div>
 
     <div class="table-card">
@@ -127,21 +135,18 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             <div class="toolbar-filters">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Search products..." oninput="filterTable();">
+                    <input type="text" id="searchInput" placeholder="Search products..." oninput="debouncedFetch();">
                 </div>
-                <select id="filterCategory" class="filter-select" onchange="filterTable();">
+                <select id="filterCategory" class="filter-select" onchange="fetchProducts(1);">
                     <option value="">All Categories</option>
-                    <?php foreach ($categories as $cat): ?>
-                    <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
-                    <?php endforeach; ?>
                 </select>
-                <select id="filterStatus" class="filter-select" onchange="filterTable();">
+                <select id="filterStatus" class="filter-select" onchange="fetchProducts(1);">
                     <option value="">All Status</option>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                 </select>
             </div>
-            <div class="item-count" id="itemCount"><?php echo count($products); ?> product(s)</div>
+            <div class="item-count" id="itemCount">Loading...</div>
         </div>
 
         <div style="overflow-x:auto;">
@@ -152,7 +157,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>Barcode</th>
                         <th>Name</th>
                         <th>Category</th>
-                        <th>Cost</th>
                         <th>Price</th>
                         <th>QOH</th>
                         <th>Min Qty</th>
@@ -162,52 +166,19 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     </tr>
                 </thead>
                 <tbody id="dataBody">
-                    <?php if (count($products) === 0): ?>
-                    <tr class="no-results"><td colspan="11"><i class="fas fa-boxes-stacked" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products found</td></tr>
-                    <?php else: ?>
-                    <?php foreach ($products as $i => $p): ?>
-                    <?php
-                        $isActive = ($p['checked'] ?? 'Y') === 'Y';
-                        $qoh = floatval($p['qoh'] ?? 0);
-                        $minQty = intval($p['min_qty'] ?? 0);
-                        $isLowStock = ($qoh <= $minQty && $isActive);
-                    ?>
-                    <tr data-search="<?php echo htmlspecialchars(strtolower(
-                        ($p['barcode'] ?? '') . ' ' . ($p['code'] ?? '') . ' ' . ($p['name'] ?? '') . ' ' . ($p['cat'] ?? '') . ' ' . ($p['sub_cat'] ?? '') . ' ' . ($p['rack'] ?? '')
-                    )); ?>"
-                    data-cat="<?php echo htmlspecialchars($p['cat'] ?? ''); ?>"
-                    data-status="<?php echo $isActive ? 'active' : 'inactive'; ?>">
-                        <td><?php echo $i + 1; ?></td>
-                        <td><strong><?php echo htmlspecialchars($p['barcode'] ?? ''); ?></strong></td>
-                        <td><?php echo htmlspecialchars($p['name'] ?? ''); ?></td>
-                        <td><?php echo htmlspecialchars($p['cat'] ?? ''); ?></td>
-                        <td><?php echo number_format(floatval($p['cost'] ?? 0), 2); ?></td>
-                        <td><?php echo number_format(floatval($p['disprice'] ?? $p['oriprice'] ?? 0), 2); ?></td>
-                        <td>
-                            <?php echo number_format($qoh, 0); ?>
-                            <?php if ($isLowStock): ?>
-                            <span class="badge-low">Low</span>
-                            <?php endif; ?>
-                        </td>
-                        <td><?php echo intval($p['min_qty'] ?? 0); ?></td>
-                        <td><?php echo htmlspecialchars($p['rack'] ?? ''); ?></td>
-                        <td><span class="badge-status <?php echo $isActive ? 'badge-active' : 'badge-inactive'; ?>"><?php echo $isActive ? 'Active' : 'Inactive'; ?></span></td>
-                        <td style="white-space:nowrap">
-                            <button class="btn-action btn-edit" onclick="openEditModal(<?php echo (int)$p['id']; ?>);"><i class="fas fa-pen"></i> Edit</button>
-                            <?php if ($isActive): ?>
-                            <button class="btn-action btn-delete" onclick="deactivateProduct(<?php echo (int)$p['id']; ?>, '<?php echo htmlspecialchars($p['name'] ?? '', ENT_QUOTES); ?>');"><i class="fas fa-ban"></i></button>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                    <?php endif; ?>
+                    <tr class="no-results"><td colspan="10" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
                 </tbody>
             </table>
+        </div>
+
+        <div class="pagination-wrap" id="paginationWrap" style="display:none;">
+            <div class="pagination-info" id="paginationInfo"></div>
+            <div class="pagination-btns" id="paginationBtns"></div>
         </div>
     </div>
 </div>
 
-<!-- Create/Edit Modal -->
+<!-- Create/Edit Product Modal -->
 <div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -238,37 +209,28 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-semibold">Category</label>
-                        <input type="text" id="fCat" class="form-control" list="catList" placeholder="Category">
-                        <datalist id="catList">
-                            <?php foreach ($categories as $cat): ?>
-                            <option value="<?php echo htmlspecialchars($cat); ?>">
-                            <?php endforeach; ?>
-                        </datalist>
+                        <select id="fCat" class="form-select" onchange="loadSubCatOptions();">
+                            <option value="">-- Select --</option>
+                        </select>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-semibold">Sub Category</label>
-                        <input type="text" id="fSubCat" class="form-control" placeholder="Sub category">
+                        <select id="fSubCat" class="form-select">
+                            <option value="">-- Select --</option>
+                        </select>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-semibold">UOM</label>
-                        <input type="text" id="fUom" class="form-control" placeholder="e.g. PCS, KG, BOX">
+                        <select id="fUom" class="form-select">
+                            <option value="">-- Select --</option>
+                        </select>
                     </div>
                 </div>
                 <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-semibold">Cost Price</label>
-                        <input type="number" id="fCost" class="form-control" step="0.01" min="0" placeholder="0.00" value="0">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-semibold">Original Price</label>
-                        <input type="number" id="fOriPrice" class="form-control" step="0.01" min="0" placeholder="0.00" value="0">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-semibold">Discount Price</label>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-semibold">Price</label>
                         <input type="number" id="fDisPrice" class="form-control" step="0.01" min="0" placeholder="0.00" value="0">
                     </div>
-                </div>
-                <div class="row">
                     <div class="col-md-3 mb-3">
                         <label class="form-label fw-semibold">QOH</label>
                         <input type="number" id="fQoh" class="form-control" min="0" placeholder="0" value="0">
@@ -281,17 +243,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <label class="form-label fw-semibold">Max Qty</label>
                         <input type="number" id="fMaxQty" class="form-control" step="1" min="0" placeholder="0" value="0">
                     </div>
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label fw-semibold">Rack Location</label>
-                        <input type="text" id="fRack" class="form-control" list="rackList" placeholder="Rack">
-                        <datalist id="rackList">
-                            <?php foreach ($racks as $rack): ?>
-                            <option value="<?php echo htmlspecialchars($rack); ?>">
-                            <?php endforeach; ?>
-                        </datalist>
-                    </div>
                 </div>
                 <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Rack Location</label>
+                        <input type="text" id="fRack" class="form-control" list="rackList" placeholder="Rack">
+                        <datalist id="rackList"></datalist>
+                    </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-semibold">Status</label>
                         <select id="fChecked" class="form-select">
@@ -309,52 +267,292 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
+<!-- Manage Categories Modal -->
+<div class="modal fade" id="manageCatModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-tags"></i> Manage Categories & Sub Categories</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="fw-bold mb-2">Categories</h6>
+                        <div class="manage-add-row">
+                            <input type="text" id="newCatName" placeholder="New category name">
+                            <button class="btn btn-sm btn-success" onclick="createCategory();"><i class="fas fa-plus"></i> Add</button>
+                        </div>
+                        <div class="manage-list" id="catListManage"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold mb-2">Sub Categories</h6>
+                        <div class="manage-add-row">
+                            <select id="newSubCatParent" style="max-width:140px;">
+                                <option value="">Category...</option>
+                            </select>
+                            <input type="text" id="newSubCatName" placeholder="New sub category">
+                            <button class="btn btn-sm btn-success" onclick="createSubCategory();"><i class="fas fa-plus"></i> Add</button>
+                        </div>
+                        <div class="manage-list" id="subCatListManage"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage UOM Modal -->
+<div class="modal fade" id="manageUomModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-ruler"></i> Manage UOM</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="manage-add-row">
+                    <input type="text" id="newUomName" placeholder="New UOM name (e.g. PCS, KG, BOX)">
+                    <button class="btn btn-sm btn-success" onclick="createUom();"><i class="fas fa-plus"></i> Add</button>
+                </div>
+                <div class="manage-list" id="uomListManage"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-var modal = null;
+var productModal = null, manageCatModal = null, manageUomModal = null;
+var currentPage = 1;
+var debounceTimer = null;
+
+// Cache for dropdowns
+var categoriesCache = [];
+var subCategoriesCache = {};
+var uomCache = [];
+
 document.addEventListener('DOMContentLoaded', function() {
-    modal = new bootstrap.Modal(document.getElementById('productModal'));
+    productModal = new bootstrap.Modal(document.getElementById('productModal'));
+    manageCatModal = new bootstrap.Modal(document.getElementById('manageCatModal'));
+    manageUomModal = new bootstrap.Modal(document.getElementById('manageUomModal'));
+
+    // Load initial data
+    loadCategoryFilter();
+    loadDropdowns();
+    fetchProducts(1);
 });
 
-// Filter table by search text, category, and status
-function filterTable() {
-    var q = document.getElementById('searchInput').value.toLowerCase();
-    var catFilter = document.getElementById('filterCategory').value;
-    var statusFilter = document.getElementById('filterStatus').value;
-    var rows = document.querySelectorAll('#dataBody tr:not(.no-results)');
-    var count = 0;
+// ===================== PAGINATION & TABLE =====================
 
-    rows.forEach(function(row) {
-        var search = row.getAttribute('data-search') || '';
-        var cat = row.getAttribute('data-cat') || '';
-        var status = row.getAttribute('data-status') || '';
+function debouncedFetch() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function() { fetchProducts(1); }, 300);
+}
 
-        var matchSearch = (q === '' || search.indexOf(q) > -1);
-        var matchCat = (catFilter === '' || cat === catFilter);
-        var matchStatus = (statusFilter === '' || status === statusFilter);
+function fetchProducts(page) {
+    currentPage = page;
+    var search = document.getElementById('searchInput').value.trim();
+    var cat = document.getElementById('filterCategory').value;
+    var status = document.getElementById('filterStatus').value;
 
-        if (matchSearch && matchCat && matchStatus) {
-            row.style.display = '';
-            count++;
-        } else {
-            row.style.display = 'none';
-        }
-    });
+    document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
 
-    document.getElementById('itemCount').textContent = count + ' product(s)';
-
-    // Renumber visible rows
-    var num = 1;
-    rows.forEach(function(row) {
-        if (row.style.display !== 'none') {
-            row.cells[0].textContent = num++;
+    $.ajax({
+        type: 'POST', url: 'product_ajax.php',
+        data: { action: 'list', page: page, per_page: 50, search: search, cat: cat, status: status },
+        dataType: 'json',
+        success: function(data) {
+            renderTable(data);
+            renderPagination(data);
+        },
+        error: function() {
+            document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
         }
     });
 }
 
-// Clear all form fields
+function renderTable(data) {
+    var tbody = document.getElementById('dataBody');
+    var products = data.products || [];
+    var offset = (data.page - 1) * data.per_page;
+
+    if (products.length === 0) {
+        tbody.innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-boxes-stacked" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products found</td></tr>';
+        document.getElementById('itemCount').textContent = '0 product(s)';
+        return;
+    }
+
+    var html = '';
+    for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var isActive = (p.checked || 'Y') === 'Y';
+        var qoh = parseFloat(p.qoh || 0);
+        var minQty = parseInt(p.min_qty || 0);
+        var isLow = (qoh <= minQty && isActive);
+
+        html += '<tr>';
+        html += '<td>' + (offset + i + 1) + '</td>';
+        html += '<td><strong>' + escHtml(p.barcode || '') + '</strong></td>';
+        html += '<td>' + escHtml(p.name || '') + '</td>';
+        html += '<td>' + escHtml(p.cat || '') + '</td>';
+        html += '<td>' + parseFloat(p.disprice || 0).toFixed(2) + '</td>';
+        html += '<td>' + Math.round(qoh);
+        if (isLow) html += ' <span class="badge-low">Low</span>';
+        html += '</td>';
+        html += '<td>' + minQty + '</td>';
+        html += '<td>' + escHtml(p.rack || '') + '</td>';
+        html += '<td><span class="badge-status ' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? 'Active' : 'Inactive') + '</span></td>';
+        html += '<td style="white-space:nowrap">';
+        html += '<button class="btn-action btn-edit" onclick="openEditModal(' + p.id + ');"><i class="fas fa-pen"></i> Edit</button>';
+        if (isActive) {
+            html += ' <button class="btn-action btn-delete" onclick="deactivateProduct(' + p.id + ',\'' + escHtml(p.name || '').replace(/'/g, "\\'") + '\');"><i class="fas fa-ban"></i></button>';
+        }
+        html += '</td>';
+        html += '</tr>';
+    }
+    tbody.innerHTML = html;
+    document.getElementById('itemCount').textContent = data.total + ' product(s)';
+}
+
+function renderPagination(data) {
+    var wrap = document.getElementById('paginationWrap');
+    var info = document.getElementById('paginationInfo');
+    var btns = document.getElementById('paginationBtns');
+
+    if (data.pages <= 1) {
+        wrap.style.display = 'none';
+        return;
+    }
+
+    wrap.style.display = 'flex';
+    var start = (data.page - 1) * data.per_page + 1;
+    var end = Math.min(data.page * data.per_page, data.total);
+    info.textContent = 'Showing ' + start + '-' + end + ' of ' + data.total;
+
+    var html = '';
+    html += '<button ' + (data.page <= 1 ? 'disabled' : '') + ' onclick="fetchProducts(' + (data.page - 1) + ');">&laquo; Prev</button>';
+
+    // Show limited page numbers
+    var startPage = Math.max(1, data.page - 2);
+    var endPage = Math.min(data.pages, data.page + 2);
+    if (startPage > 1) {
+        html += '<button onclick="fetchProducts(1);">1</button>';
+        if (startPage > 2) html += '<button disabled>...</button>';
+    }
+    for (var i = startPage; i <= endPage; i++) {
+        html += '<button class="' + (i === data.page ? 'active' : '') + '" onclick="fetchProducts(' + i + ');">' + i + '</button>';
+    }
+    if (endPage < data.pages) {
+        if (endPage < data.pages - 1) html += '<button disabled>...</button>';
+        html += '<button onclick="fetchProducts(' + data.pages + ');">' + data.pages + '</button>';
+    }
+
+    html += '<button ' + (data.page >= data.pages ? 'disabled' : '') + ' onclick="fetchProducts(' + (data.page + 1) + ');">Next &raquo;</button>';
+    btns.innerHTML = html;
+}
+
+function escHtml(s) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML;
+}
+
+// ===================== DROPDOWNS =====================
+
+function loadCategoryFilter() {
+    $.post('product_ajax.php', { action: 'categories' }, function(cats) {
+        var sel = document.getElementById('filterCategory');
+        var val = sel.value;
+        sel.innerHTML = '<option value="">All Categories</option>';
+        (cats || []).forEach(function(c) {
+            sel.innerHTML += '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>';
+        });
+        sel.value = val;
+    }, 'json');
+}
+
+function loadDropdowns() {
+    // Load categories for product form
+    $.post('product_ajax.php', { action: 'cat_list' }, function(cats) {
+        categoriesCache = (cats || []).filter(function(c) { return c.status === 'ACTIVE'; });
+        refreshCatSelect();
+    }, 'json');
+
+    // Load UOMs
+    $.post('product_ajax.php', { action: 'uom_list' }, function(uoms) {
+        uomCache = (uoms || []).filter(function(u) { return u.status === 'ACTIVE'; });
+        refreshUomSelect();
+    }, 'json');
+
+    // Load racks for datalist
+    $.post('product_ajax.php', { action: 'racks' }, function(racks) {
+        var dl = document.getElementById('rackList');
+        dl.innerHTML = '';
+        (racks || []).forEach(function(r) {
+            dl.innerHTML += '<option value="' + escHtml(r) + '">';
+        });
+    }, 'json');
+}
+
+function refreshCatSelect() {
+    var sel = document.getElementById('fCat');
+    var val = sel.value;
+    sel.innerHTML = '<option value="">-- Select --</option>';
+    categoriesCache.forEach(function(c) {
+        sel.innerHTML += '<option value="' + escHtml(c.name) + '">' + escHtml(c.name) + '</option>';
+    });
+    sel.value = val;
+
+    // Also refresh parent dropdown in manage modal
+    var pSel = document.getElementById('newSubCatParent');
+    var pVal = pSel.value;
+    pSel.innerHTML = '<option value="">Category...</option>';
+    categoriesCache.forEach(function(c) {
+        pSel.innerHTML += '<option value="' + c.id + '">' + escHtml(c.name) + '</option>';
+    });
+    pSel.value = pVal;
+}
+
+function refreshUomSelect() {
+    var sel = document.getElementById('fUom');
+    var val = sel.value;
+    sel.innerHTML = '<option value="">-- Select --</option>';
+    uomCache.forEach(function(u) {
+        sel.innerHTML += '<option value="' + escHtml(u.name) + '">' + escHtml(u.name) + '</option>';
+    });
+    sel.value = val;
+}
+
+function loadSubCatOptions() {
+    var catName = document.getElementById('fCat').value;
+    var sel = document.getElementById('fSubCat');
+    sel.innerHTML = '<option value="">-- Select --</option>';
+
+    if (!catName) return;
+
+    // Find category id
+    var catObj = categoriesCache.find(function(c) { return c.name === catName; });
+    if (!catObj) return;
+
+    $.post('product_ajax.php', { action: 'subcat_list', category_id: catObj.id }, function(subs) {
+        var active = (subs || []).filter(function(s) { return s.status === 'ACTIVE'; });
+        active.forEach(function(s) {
+            sel.innerHTML += '<option value="' + escHtml(s.name) + '">' + escHtml(s.name) + '</option>';
+        });
+    }, 'json');
+}
+
+// ===================== PRODUCT CRUD =====================
+
 function clearForm() {
     document.getElementById('editId').value = '';
     document.getElementById('fBarcode').value = '';
@@ -362,10 +560,8 @@ function clearForm() {
     document.getElementById('fName').value = '';
     document.getElementById('fDescription').value = '';
     document.getElementById('fCat').value = '';
-    document.getElementById('fSubCat').value = '';
+    document.getElementById('fSubCat').innerHTML = '<option value="">-- Select --</option>';
     document.getElementById('fUom').value = '';
-    document.getElementById('fCost').value = '0';
-    document.getElementById('fOriPrice').value = '0';
     document.getElementById('fDisPrice').value = '0';
     document.getElementById('fQoh').value = '0';
     document.getElementById('fMinQty').value = '0';
@@ -375,14 +571,12 @@ function clearForm() {
     document.getElementById('fBarcode').disabled = false;
 }
 
-// Open create modal
 function openCreateModal() {
     clearForm();
     document.getElementById('modalTitle').innerHTML = '<i class="fas fa-box"></i> Add Product';
-    modal.show();
+    productModal.show();
 }
 
-// Open edit modal with AJAX GET
 function openEditModal(id) {
     clearForm();
     document.getElementById('modalTitle').innerHTML = '<i class="fas fa-box"></i> Edit Product';
@@ -398,22 +592,36 @@ function openEditModal(id) {
             document.getElementById('fName').value = data.name || '';
             document.getElementById('fDescription').value = data.description || '';
             document.getElementById('fCat').value = data.cat || '';
-            document.getElementById('fSubCat').value = data.sub_cat || '';
             document.getElementById('fUom').value = data.uom || '';
-            document.getElementById('fCost').value = data.cost || '0';
-            document.getElementById('fOriPrice').value = data.oriprice || '0';
             document.getElementById('fDisPrice').value = data.disprice || '0';
             document.getElementById('fQoh').value = data.qoh || '0';
             document.getElementById('fMinQty').value = data.min_qty || '0';
             document.getElementById('fMaxQty').value = data.max_qty || '0';
             document.getElementById('fRack').value = data.rack || '';
             document.getElementById('fChecked').value = data.checked || 'Y';
-            modal.show();
+
+            // Load sub categories then set value
+            var catName = data.cat || '';
+            if (catName) {
+                var catObj = categoriesCache.find(function(c) { return c.name === catName; });
+                if (catObj) {
+                    $.post('product_ajax.php', { action: 'subcat_list', category_id: catObj.id }, function(subs) {
+                        var sel = document.getElementById('fSubCat');
+                        sel.innerHTML = '<option value="">-- Select --</option>';
+                        var active = (subs || []).filter(function(s) { return s.status === 'ACTIVE'; });
+                        active.forEach(function(s) {
+                            sel.innerHTML += '<option value="' + escHtml(s.name) + '">' + escHtml(s.name) + '</option>';
+                        });
+                        sel.value = data.sub_cat || '';
+                    }, 'json');
+                }
+            }
+
+            productModal.show();
         }
     });
 }
 
-// Save product (create or update)
 function saveProduct() {
     var editId = document.getElementById('editId').value;
     var barcode = document.getElementById('fBarcode').value.trim();
@@ -433,8 +641,6 @@ function saveProduct() {
         cat: document.getElementById('fCat').value.trim(),
         sub_cat: document.getElementById('fSubCat').value.trim(),
         uom: document.getElementById('fUom').value.trim(),
-        cost: document.getElementById('fCost').value,
-        oriprice: document.getElementById('fOriPrice').value,
         disprice: document.getElementById('fDisPrice').value,
         qoh: document.getElementById('fQoh').value,
         min_qty: document.getElementById('fMinQty').value,
@@ -448,8 +654,11 @@ function saveProduct() {
         type: 'POST', url: 'product_ajax.php', data: postData, dataType: 'json',
         success: function(data) {
             if (data.success) {
-                modal.hide();
-                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { location.reload(); });
+                productModal.hide();
+                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
+                    fetchProducts(currentPage);
+                    loadCategoryFilter();
+                });
             } else {
                 Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
             }
@@ -457,7 +666,6 @@ function saveProduct() {
     });
 }
 
-// Deactivate product with SweetAlert confirmation
 function deactivateProduct(id, name) {
     Swal.fire({
         title: 'Deactivate product?',
@@ -473,7 +681,9 @@ function deactivateProduct(id, name) {
                 type: 'POST', url: 'product_ajax.php', data: { action: 'delete', id: id }, dataType: 'json',
                 success: function(data) {
                     if (data.success) {
-                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { location.reload(); });
+                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
+                            fetchProducts(currentPage);
+                        });
                     } else {
                         Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
                     }
@@ -481,6 +691,238 @@ function deactivateProduct(id, name) {
             });
         }
     });
+}
+
+// ===================== CATEGORY MANAGEMENT =====================
+
+function openManageCatModal() {
+    loadManageCategories();
+    loadManageSubCategories();
+    manageCatModal.show();
+}
+
+function loadManageCategories() {
+    $.post('product_ajax.php', { action: 'cat_list' }, function(cats) {
+        var all = cats || [];
+        categoriesCache = all.filter(function(c) { return c.status === 'ACTIVE'; });
+        refreshCatSelect();
+
+        var html = '';
+        all.forEach(function(c) {
+            var inactive = c.status !== 'ACTIVE';
+            html += '<div class="manage-item">';
+            html += '<span class="item-name ' + (inactive ? 'inactive' : '') + '">' + escHtml(c.name) + '</span>';
+            html += '<div class="item-actions">';
+            html += '<button style="background:#3b82f6;" onclick="editCategory(' + c.id + ',\'' + escHtml(c.name).replace(/'/g, "\\'") + '\');"><i class="fas fa-pen"></i></button>';
+            if (inactive) {
+                html += '<button style="background:#16a34a;" onclick="activateCategory(' + c.id + ');"><i class="fas fa-check"></i></button>';
+            } else {
+                html += '<button style="background:#ef4444;" onclick="deleteCategory(' + c.id + ');"><i class="fas fa-ban"></i></button>';
+            }
+            html += '</div></div>';
+        });
+        if (all.length === 0) html = '<div style="padding:20px;text-align:center;color:var(--text-muted);">No categories yet</div>';
+        document.getElementById('catListManage').innerHTML = html;
+    }, 'json');
+}
+
+function createCategory() {
+    var name = document.getElementById('newCatName').value.trim();
+    if (!name) return;
+    $.post('product_ajax.php', { action: 'cat_create', name: name }, function(r) {
+        if (r.success) {
+            document.getElementById('newCatName').value = '';
+            loadManageCategories();
+            loadCategoryFilter();
+        } else {
+            Swal.fire({ icon: 'error', text: r.error });
+        }
+    }, 'json');
+}
+
+function editCategory(id, oldName) {
+    Swal.fire({
+        title: 'Edit Category',
+        input: 'text',
+        inputValue: oldName,
+        showCancelButton: true,
+        confirmButtonText: 'Save',
+        inputValidator: function(v) { if (!v || !v.trim()) return 'Name is required.'; }
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.post('product_ajax.php', { action: 'cat_update', id: id, name: result.value.trim() }, function(r) {
+                if (r.success) {
+                    loadManageCategories();
+                    loadCategoryFilter();
+                } else {
+                    Swal.fire({ icon: 'error', text: r.error });
+                }
+            }, 'json');
+        }
+    });
+}
+
+function deleteCategory(id) {
+    $.post('product_ajax.php', { action: 'cat_delete', id: id }, function(r) {
+        if (r.success) { loadManageCategories(); loadCategoryFilter(); }
+        else Swal.fire({ icon: 'error', text: r.error });
+    }, 'json');
+}
+
+function activateCategory(id) {
+    $.post('product_ajax.php', { action: 'cat_activate', id: id }, function(r) {
+        if (r.success) { loadManageCategories(); loadCategoryFilter(); }
+        else Swal.fire({ icon: 'error', text: r.error });
+    }, 'json');
+}
+
+// ===================== SUB CATEGORY MANAGEMENT =====================
+
+function loadManageSubCategories() {
+    $.post('product_ajax.php', { action: 'subcat_list' }, function(subs) {
+        var all = subs || [];
+        var html = '';
+        all.forEach(function(s) {
+            var inactive = s.status !== 'ACTIVE';
+            html += '<div class="manage-item">';
+            html += '<span class="item-name ' + (inactive ? 'inactive' : '') + '">';
+            html += '<small style="color:var(--text-muted);">[' + escHtml(s.cat_name || '') + ']</small> ' + escHtml(s.name);
+            html += '</span>';
+            html += '<div class="item-actions">';
+            html += '<button style="background:#3b82f6;" onclick="editSubCategory(' + s.id + ',' + s.category_id + ',\'' + escHtml(s.name).replace(/'/g, "\\'") + '\');"><i class="fas fa-pen"></i></button>';
+            if (inactive) {
+                html += '<button style="background:#16a34a;" onclick="activateSubCategory(' + s.id + ');"><i class="fas fa-check"></i></button>';
+            } else {
+                html += '<button style="background:#ef4444;" onclick="deleteSubCategory(' + s.id + ');"><i class="fas fa-ban"></i></button>';
+            }
+            html += '</div></div>';
+        });
+        if (all.length === 0) html = '<div style="padding:20px;text-align:center;color:var(--text-muted);">No sub categories yet</div>';
+        document.getElementById('subCatListManage').innerHTML = html;
+    }, 'json');
+}
+
+function createSubCategory() {
+    var catId = document.getElementById('newSubCatParent').value;
+    var name = document.getElementById('newSubCatName').value.trim();
+    if (!catId || !name) { Swal.fire({ icon: 'warning', text: 'Select a category and enter a name.' }); return; }
+    $.post('product_ajax.php', { action: 'subcat_create', category_id: catId, name: name }, function(r) {
+        if (r.success) {
+            document.getElementById('newSubCatName').value = '';
+            loadManageSubCategories();
+        } else {
+            Swal.fire({ icon: 'error', text: r.error });
+        }
+    }, 'json');
+}
+
+function editSubCategory(id, catId, oldName) {
+    Swal.fire({
+        title: 'Edit Sub Category',
+        input: 'text',
+        inputValue: oldName,
+        showCancelButton: true,
+        confirmButtonText: 'Save',
+        inputValidator: function(v) { if (!v || !v.trim()) return 'Name is required.'; }
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.post('product_ajax.php', { action: 'subcat_update', id: id, category_id: catId, name: result.value.trim() }, function(r) {
+                if (r.success) { loadManageSubCategories(); }
+                else Swal.fire({ icon: 'error', text: r.error });
+            }, 'json');
+        }
+    });
+}
+
+function deleteSubCategory(id) {
+    $.post('product_ajax.php', { action: 'subcat_delete', id: id }, function(r) {
+        if (r.success) loadManageSubCategories();
+        else Swal.fire({ icon: 'error', text: r.error });
+    }, 'json');
+}
+
+function activateSubCategory(id) {
+    $.post('product_ajax.php', { action: 'subcat_activate', id: id }, function(r) {
+        if (r.success) loadManageSubCategories();
+        else Swal.fire({ icon: 'error', text: r.error });
+    }, 'json');
+}
+
+// ===================== UOM MANAGEMENT =====================
+
+function openManageUomModal() {
+    loadManageUoms();
+    manageUomModal.show();
+}
+
+function loadManageUoms() {
+    $.post('product_ajax.php', { action: 'uom_list' }, function(uoms) {
+        var all = uoms || [];
+        uomCache = all.filter(function(u) { return u.status === 'ACTIVE'; });
+        refreshUomSelect();
+
+        var html = '';
+        all.forEach(function(u) {
+            var inactive = u.status !== 'ACTIVE';
+            html += '<div class="manage-item">';
+            html += '<span class="item-name ' + (inactive ? 'inactive' : '') + '">' + escHtml(u.name) + '</span>';
+            html += '<div class="item-actions">';
+            html += '<button style="background:#3b82f6;" onclick="editUom(' + u.id + ',\'' + escHtml(u.name).replace(/'/g, "\\'") + '\');"><i class="fas fa-pen"></i></button>';
+            if (inactive) {
+                html += '<button style="background:#16a34a;" onclick="activateUom(' + u.id + ');"><i class="fas fa-check"></i></button>';
+            } else {
+                html += '<button style="background:#ef4444;" onclick="deleteUom(' + u.id + ');"><i class="fas fa-ban"></i></button>';
+            }
+            html += '</div></div>';
+        });
+        if (all.length === 0) html = '<div style="padding:20px;text-align:center;color:var(--text-muted);">No UOMs yet</div>';
+        document.getElementById('uomListManage').innerHTML = html;
+    }, 'json');
+}
+
+function createUom() {
+    var name = document.getElementById('newUomName').value.trim();
+    if (!name) return;
+    $.post('product_ajax.php', { action: 'uom_create', name: name }, function(r) {
+        if (r.success) {
+            document.getElementById('newUomName').value = '';
+            loadManageUoms();
+        } else {
+            Swal.fire({ icon: 'error', text: r.error });
+        }
+    }, 'json');
+}
+
+function editUom(id, oldName) {
+    Swal.fire({
+        title: 'Edit UOM',
+        input: 'text',
+        inputValue: oldName,
+        showCancelButton: true,
+        confirmButtonText: 'Save',
+        inputValidator: function(v) { if (!v || !v.trim()) return 'Name is required.'; }
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.post('product_ajax.php', { action: 'uom_update', id: id, name: result.value.trim() }, function(r) {
+                if (r.success) loadManageUoms();
+                else Swal.fire({ icon: 'error', text: r.error });
+            }, 'json');
+        }
+    });
+}
+
+function deleteUom(id) {
+    $.post('product_ajax.php', { action: 'uom_delete', id: id }, function(r) {
+        if (r.success) loadManageUoms();
+        else Swal.fire({ icon: 'error', text: r.error });
+    }, 'json');
+}
+
+function activateUom(id) {
+    $.post('product_ajax.php', { action: 'uom_activate', id: id }, function(r) {
+        if (r.success) loadManageUoms();
+        else Swal.fire({ icon: 'error', text: r.error });
+    }, 'json');
 }
 
 // Modal autofocus
