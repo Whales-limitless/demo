@@ -1,8 +1,7 @@
 <?php
-session_start();
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true) {
-    header("Location: login.php");
-    exit;
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once 'dbconnection.php';
 
 // Fetch distinct categories from database
@@ -16,6 +15,8 @@ if ($result) {
             'image' => null
         ];
     }
+} else {
+    echo "Query error: " . mysqli_error($connect);
 }
 ?>
 <!DOCTYPE html>
