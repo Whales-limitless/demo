@@ -108,6 +108,25 @@ body {
 
 .admin-topbar .brand i { font-size: 20px; }
 
+.admin-topbar .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.admin-topbar .nav-links a {
+    color: rgba(255,255,255,0.75);
+    text-decoration: none;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all var(--transition);
+}
+
+.admin-topbar .nav-links a:hover { background: rgba(255,255,255,0.15); color: #fff; }
+.admin-topbar .nav-links a.active { background: rgba(255,255,255,0.2); color: #fff; }
+
 .admin-topbar .right-section {
     display: flex;
     align-items: center;
@@ -340,6 +359,7 @@ audio { display: none; }
     .table-card { padding: 12px; }
     .search-box { max-width: 100%; }
     .btn-action { padding: 4px 8px; font-size: 11px; }
+    .admin-topbar .nav-links { display: none; }
 }
 </style>
 </head>
@@ -349,7 +369,11 @@ audio { display: none; }
 <div class="admin-topbar">
     <div class="brand">
         <i class="fas fa-tachometer-alt"></i>
-        Admin Dashboard
+        Admin Panel
+    </div>
+    <div class="nav-links">
+        <a href="dashboard.php" class="active"><i class="fas fa-list-alt"></i> Orders</a>
+        <a href="user.php"><i class="fas fa-users"></i> Users</a>
     </div>
     <div class="right-section">
         <span class="user-info d-none d-md-inline">
