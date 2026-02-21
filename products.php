@@ -1,22 +1,25 @@
 <?php
 require_once 'dbconnection.php';
 
-$cat_id = isset($_GET['cat']) ? intval($_GET['cat']) : 0;
+$cat_code = isset($_GET['cat']) ? clean($connect, $_GET['cat']) : '';
 
-// Fetch category
-$cat_result = mysqli_query($connect, "SELECT id, name FROM inv_categories WHERE id = " . intval($cat_id));
-$category = mysqli_fetch_assoc($cat_result);
+// Fetch category name from the category table
+$cat_result = mysqli_query($connect, "SELECT cat_name FROM category WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat_code) . "' LIMIT 1");
+$cat_row = mysqli_fetch_assoc($cat_result);
 
-if (!$category) {
+if (!$cat_row) {
     header('Location: index.php');
     exit;
 }
 
-// Fetch subcategories with products
-$sub_result = mysqli_query($connect, "SELECT id, name FROM inv_subcategories WHERE category_id = " . intval($cat_id) . " ORDER BY sort_order ASC, id ASC");
+$category = ['id' => $cat_code, 'name' => $cat_row['cat_name']];
+
+// Fetch subcategories for this category
+$sub_result = mysqli_query($connect, "SELECT DISTINCT sub_code, sub_cat, MIN(sort_no) AS sort_order FROM category WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat_code) . "' GROUP BY sub_code, sub_cat ORDER BY sort_order ASC, sub_cat ASC");
 $subcategories = [];
 while ($sub = mysqli_fetch_assoc($sub_result)) {
-    $prod_result = mysqli_query($connect, "SELECT id, name, sku, barcode, image, rack_location, quantity FROM inv_products WHERE subcategory_id = " . intval($sub['id']) . " ORDER BY name ASC");
+    // Fetch products matching this category and subcategory
+    $prod_result = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, IFNULL(qoh, 0) AS quantity FROM PRODUCTS WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat_code) . "' AND sub_code = '" . mysqli_real_escape_string($connect, $sub['sub_code']) . "' ORDER BY name ASC");
     $products = [];
     while ($prod = mysqli_fetch_assoc($prod_result)) {
         $prod['id'] = intval($prod['id']);
@@ -24,8 +27,11 @@ while ($sub = mysqli_fetch_assoc($sub_result)) {
         $prod['inStock'] = $prod['quantity'] > 0;
         $products[] = $prod;
     }
-    $sub['products'] = $products;
-    $subcategories[] = $sub;
+    $subcategories[] = [
+        'id' => $sub['sub_code'],
+        'name' => $sub['sub_cat'],
+        'products' => $products
+    ];
 }
 ?>
 <!DOCTYPE html>

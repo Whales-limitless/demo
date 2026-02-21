@@ -1,12 +1,16 @@
 <?php
 require_once 'dbconnection.php';
 
-// Fetch categories from database
+// Fetch distinct categories from database
 $categories = [];
-$result = mysqli_query($connect, "SELECT id, name, image FROM inv_categories ORDER BY sort_order ASC, id ASC");
+$result = mysqli_query($connect, "SELECT cat_code, cat_name, MIN(sort_no) AS sort_order FROM category GROUP BY cat_code, cat_name ORDER BY sort_order ASC, cat_name ASC");
 if ($result) {
     while ($row = mysqli_fetch_assoc($result)) {
-        $categories[] = $row;
+        $categories[] = [
+            'id' => $row['cat_code'],
+            'name' => $row['cat_name'],
+            'image' => null
+        ];
     }
 }
 ?>
