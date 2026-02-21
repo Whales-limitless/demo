@@ -11,6 +11,21 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 include('../dbconnection.php');
 $connect->set_charset("utf8mb4");
 
+// Ensure orderlist2 summary table exists
+$connect->query("CREATE TABLE IF NOT EXISTS `orderlist2` (
+  `ID` int(11) NOT NULL AUTO_INCREMENT,
+  `SALNUM` varchar(100) NOT NULL DEFAULT '',
+  `ACCODE` varchar(20) NOT NULL DEFAULT '',
+  `NAME` varchar(100) NOT NULL DEFAULT '',
+  `ADMINRMK` mediumtext DEFAULT NULL,
+  `TXTTO` varchar(200) NOT NULL DEFAULT '',
+  `SDATE` date DEFAULT NULL,
+  `TTIME` time DEFAULT NULL,
+  `SUMQTY` int(11) NOT NULL DEFAULT 0,
+  `HP` varchar(50) NOT NULL DEFAULT '',
+  PRIMARY KEY (`ID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
 // Prepare orderlist2 summary table
 $connect->query("TRUNCATE TABLE `orderlist2`");
 $connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
