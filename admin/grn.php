@@ -83,17 +83,6 @@ $isReceiveMode = ($poId > 0 && $po);
     --shadow-md: 0 4px 16px rgba(0,0,0,0.08); --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; margin: 0; }
-.admin-topbar { background: var(--primary); color: #fff; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(200,16,46,0.3); }
-.admin-topbar .brand { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-.admin-topbar .brand i { font-size: 20px; }
-.admin-topbar .nav-links { display: flex; align-items: center; gap: 4px; }
-.admin-topbar .nav-links a { color: rgba(255,255,255,0.75); text-decoration: none; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; transition: all var(--transition); }
-.admin-topbar .nav-links a:hover { background: rgba(255,255,255,0.15); color: #fff; }
-.admin-topbar .nav-links a.active { background: rgba(255,255,255,0.2); color: #fff; }
-.admin-topbar .right-section { display: flex; align-items: center; gap: 16px; }
-.admin-topbar .user-info { font-size: 13px; opacity: 0.9; }
-.admin-topbar .btn-logout { background: rgba(255,255,255,0.15); color: #fff; border: none; padding: 7px 16px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; transition: background var(--transition); }
-.admin-topbar .btn-logout:hover { background: rgba(255,255,255,0.25); color: #fff; }
 .page-content { max-width: 1400px; margin: 0 auto; padding: 20px 24px 40px; }
 .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
 .page-header h1 { font-family: 'Outfit', sans-serif; font-size: 22px; font-weight: 700; margin: 0; }
@@ -124,8 +113,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .discrepancy { color: #d97706; font-weight: 600; }
 .action-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
 @media (max-width: 768px) {
-    .admin-topbar { padding: 0 16px; }
-    .admin-topbar .nav-links { display: none; }
     .page-content { padding: 16px; }
 }
 </style>
