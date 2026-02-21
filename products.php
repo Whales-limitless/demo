@@ -243,7 +243,7 @@ function renderProductCard(p, index) {
 
   var imgHtml;
   if (p.image) {
-    imgHtml = '<img class="product-img" src="' + p.image + '" alt="' + p.name + '" loading="lazy">';
+    imgHtml = '<img class="product-img" src="/img/' + p.image + '" alt="' + p.name + '" loading="lazy">';
   } else {
     imgHtml = '<div class="no-img-product">' + (p.sku || 'NO IMAGE') + '</div>';
   }
@@ -443,7 +443,7 @@ function addToCart(productId) {
       name: product.name,
       sku: product.sku || '',
       barcode: product.barcode || '',
-      img: product.image || '',
+      img: product.image ? '/img/' + product.image : '',
       rack: product.rack_location || null,
       qty: qty,
       maxQty: product.quantity,
