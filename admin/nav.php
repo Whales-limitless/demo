@@ -6,9 +6,11 @@ $adminName = htmlspecialchars($_SESSION['admin_name'] ?? 'Admin');
 $navItems = [
     ['page' => 'dashboard',   'href' => 'dashboard.php',        'icon' => 'fas fa-list-alt',             'label' => 'Orders'],
     ['page' => 'user',        'href' => 'user.php',             'icon' => 'fas fa-users',                'label' => 'Users'],
+    ['page' => 'product',     'href' => 'product.php',          'icon' => 'fas fa-boxes-stacked',        'label' => 'Products'],
     ['page' => 'supplier',    'href' => 'supplier.php',         'icon' => 'fas fa-truck',                'label' => 'Suppliers'],
     ['page' => 'po',          'href' => 'po.php',               'icon' => 'fas fa-file-invoice',         'label' => 'PO'],
     ['page' => 'grn',         'href' => 'grn.php',              'icon' => 'fas fa-dolly',                'label' => 'Receiving'],
+    ['page' => 'rack',        'href' => 'rack.php',             'icon' => 'fas fa-warehouse',            'label' => 'Racks'],
     ['page' => 'stock_take',  'href' => 'stock_take.php',       'icon' => 'fas fa-clipboard-check',      'label' => 'Stock Take'],
     ['page' => 'stock_loss',  'href' => 'stock_loss.php',       'icon' => 'fas fa-exclamation-triangle',  'label' => 'Stock Loss'],
 ];
