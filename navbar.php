@@ -28,7 +28,8 @@
     <li><a href="./">🏠 Home</a></li>
     <li><a href="./">📦 Categories</a></li>
     <li><a href="cart.php">🛒 Cart</a></li>
-    <li><a href="#">👤 Account</a></li>
+    <li><a href="#" style="opacity:0.7;font-size:13px;">👤 <?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></a></li>
+    <li><a href="logout.php" style="color:#fca5a5;">🚪 Logout</a></li>
   </ul>
 </aside>
 

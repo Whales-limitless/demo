@@ -11,7 +11,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 include('../dbconnection.php');
 $connect->set_charset("utf8mb4");
 
-// Prepare orderlist2 summary table for DataTable
+// Prepare orderlist2 summary table
 $connect->query("TRUNCATE TABLE `orderlist2`");
 $connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
 $connect->query("UPDATE orderlist2 AS b INNER JOIN MEMBER AS g ON b.ACCODE = g.ACCODE SET b.HP = g.HP");
@@ -37,6 +37,15 @@ if ($querySnd && $querySnd->num_rows > 0) {
     $hasNewSound = true;
 }
 
+// Fetch all orders from orderlist2
+$orders = [];
+$orderResult = $connect->query("SELECT * FROM `orderlist2` ORDER BY SALNUM DESC");
+if ($orderResult) {
+    while ($r = $orderResult->fetch_assoc()) {
+        $orders[] = $r;
+    }
+}
+
 $adminName = htmlspecialchars($_SESSION['admin_name'] ?? 'Admin');
 ?>
 <!DOCTYPE html>
@@ -49,8 +58,6 @@ $adminName = htmlspecialchars($_SESSION['admin_name'] ?? 'Admin');
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -216,26 +223,81 @@ body {
     overflow: hidden;
 }
 
-.table-card .table { font-size: 13px; margin-bottom: 0; }
-.table-card .table thead th {
+/* Search & Toolbar */
+.table-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.search-box {
+    position: relative;
+    flex: 1;
+    max-width: 360px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 9px 14px 9px 36px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: border-color var(--transition);
+}
+
+.search-box input:focus { border-color: var(--primary); }
+
+.search-box i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.table-toolbar .order-count {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+/* Orders Table */
+.orders-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.orders-table thead th {
     background: var(--text);
     color: #fff;
     font-weight: 600;
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    border: none;
     padding: 10px 12px;
     white-space: nowrap;
+    text-align: left;
 }
 
-.table-card .table tbody td {
+.orders-table tbody td {
     padding: 10px 12px;
     vertical-align: middle;
     border-bottom: 1px solid #f3f4f6;
 }
 
-.table-card .table tbody tr:hover { background: #f9fafb; }
+.orders-table tbody tr:hover { background: #f9fafb; }
+
+.orders-table tbody tr.no-results td {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted);
+}
 
 /* Action Buttons */
 .btn-action {
@@ -268,16 +330,6 @@ body {
 .modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
 .modal-footer { border-top: 1px solid #e5e7eb; }
 
-/* DataTable overrides */
-.dataTables_wrapper .dataTables_filter input {
-    border-radius: 8px;
-    border: 1px solid #d1d5db;
-    padding: 6px 12px;
-    font-family: 'DM Sans', sans-serif;
-}
-
-div.dt-buttons .btn { font-size: 12px; border-radius: 6px; }
-
 /* Audio hidden */
 audio { display: none; }
 
@@ -286,6 +338,8 @@ audio { display: none; }
     .dashboard-content { padding: 16px; }
     .status-bar { flex-direction: column; align-items: flex-start; }
     .table-card { padding: 12px; }
+    .search-box { max-width: 100%; }
+    .btn-action { padding: 4px 8px; font-size: 11px; }
 }
 </style>
 </head>
@@ -328,11 +382,21 @@ audio { display: none; }
 
     <!-- Orders Table -->
     <div class="table-card">
-        <div class="table-responsive">
-            <table id="ordersTable" class="table table-hover nowrap" style="width:100%">
+        <div class="table-toolbar">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Search orders...">
+            </div>
+            <div class="order-count" id="orderCount">
+                <?php echo count($orders); ?> order(s)
+            </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table class="orders-table" id="ordersTable">
                 <thead>
                     <tr>
-                        <th>No</th>
+                        <th style="width:40px">No</th>
                         <th>Date</th>
                         <th>Time</th>
                         <th>Order No</th>
@@ -341,9 +405,43 @@ audio { display: none; }
                         <th>Qty</th>
                         <th>To / Remark</th>
                         <th>Admin Remark</th>
-                        <th>Action</th>
+                        <th style="width:1%">Action</th>
                     </tr>
                 </thead>
+                <tbody id="ordersBody">
+                    <?php if (count($orders) === 0): ?>
+                    <tr class="no-results">
+                        <td colspan="10"><i class="fas fa-inbox" style="font-size:24px;margin-bottom:8px;display:block;"></i>No orders found</td>
+                    </tr>
+                    <?php else: ?>
+                    <?php foreach ($orders as $i => $order): ?>
+                    <tr data-search="<?php echo htmlspecialchars(strtolower(
+                        ($order['SDATE'] ?? '') . ' ' .
+                        ($order['SALNUM'] ?? '') . ' ' .
+                        ($order['NAME'] ?? '') . ' ' .
+                        ($order['HP'] ?? '') . ' ' .
+                        ($order['TXTTO'] ?? '') . ' ' .
+                        ($order['ADMINRMK'] ?? '')
+                    )); ?>">
+                        <td><?php echo $i + 1; ?></td>
+                        <td><?php echo !empty($order['SDATE']) ? date('d/m/Y', strtotime($order['SDATE'])) : ''; ?></td>
+                        <td><?php echo htmlspecialchars($order['TTIME'] ?? ''); ?></td>
+                        <td><strong><?php echo htmlspecialchars($order['SALNUM'] ?? ''); ?></strong></td>
+                        <td><?php echo htmlspecialchars($order['NAME'] ?? ''); ?></td>
+                        <td><?php echo htmlspecialchars($order['HP'] ?? ''); ?></td>
+                        <td><?php echo htmlspecialchars($order['SUMQTY'] ?? '0'); ?></td>
+                        <td><?php echo htmlspecialchars($order['TXTTO'] ?? ''); ?></td>
+                        <td><?php echo htmlspecialchars($order['ADMINRMK'] ?? ''); ?></td>
+                        <td style="white-space:nowrap">
+                            <a href="order_detail.php?salnum=<?php echo htmlspecialchars($order['SALNUM'] ?? ''); ?>" class="btn-action btn-view"><i class="fas fa-eye"></i> View</a>
+                            <button type="button" onclick="donebtn('<?php echo htmlspecialchars($order['SALNUM'] ?? ''); ?>');" class="btn-action btn-done"><i class="fas fa-check"></i> Done</button>
+                            <button type="button" onclick="editbtn('<?php echo htmlspecialchars($order['SALNUM'] ?? ''); ?>');" class="btn-action btn-success-action"><i class="fas fa-dollar-sign"></i> Success</button>
+                            <button type="button" onclick="deletebtn('<?php echo htmlspecialchars($order['SALNUM'] ?? ''); ?>');" class="btn-action btn-delete"><i class="fas fa-trash"></i> Delete</button>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
             </table>
         </div>
     </div>
@@ -388,16 +486,6 @@ audio { display: none; }
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.colVis.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
@@ -416,86 +504,31 @@ setTimeout(function() {
     location.reload();
 }, 30000);
 
-// DataTable initialization
-$(document).ready(function() {
-    var t = $('#ordersTable').DataTable({
-        processing: true,
-        serverSide: true,
-        ajax: {
-            url: "server_processing.php"
-        },
-        columnDefs: [
-            {
-                searchable: false,
-                orderable: false,
-                targets: 0
-            },
-            {
-                searchable: false,
-                orderable: false,
-                targets: 9,
-                render: function(data, type, row, meta) {
-                    var id = row[3]; // SALNUM
-                    if (type === 'display') {
-                        return '<div style="white-space:nowrap">' +
-                            '<a href="order_detail.php?salnum=' + id + '" class="btn-action btn-view"><i class="fas fa-eye"></i> View</a> ' +
-                            '<button type="button" onclick="donebtn(\'' + id + '\');" class="btn-action btn-done"><i class="fas fa-check"></i> Done</button> ' +
-                            '<button type="button" onclick="editbtn(\'' + id + '\');" class="btn-action btn-success-action"><i class="fas fa-dollar-sign"></i> Success</button> ' +
-                            '<button type="button" onclick="deletebtn(\'' + id + '\');" class="btn-action btn-delete"><i class="fas fa-trash"></i> Delete</button>' +
-                            '</div>';
-                    }
-                    return data;
-                }
-            }
-        ],
-        order: [[0, 'asc']],
-        dom: 'Bfrtip',
-        buttons: [
-            {
-                extend: 'copy',
-                className: 'btn btn-sm btn-outline-secondary',
-                exportOptions: { columns: [0,1,2,3,4,5,6,7,8] }
-            },
-            {
-                extend: 'csv',
-                className: 'btn btn-sm btn-outline-secondary',
-                exportOptions: { columns: [0,1,2,3,4,5,6,7,8] }
-            },
-            {
-                extend: 'excel',
-                className: 'btn btn-sm btn-outline-secondary',
-                exportOptions: { columns: [0,1,2,3,4,5,6,7,8] }
-            },
-            {
-                extend: 'pdf',
-                className: 'btn btn-sm btn-outline-secondary',
-                exportOptions: { columns: [0,1,2,3,4,5,6,7,8] }
-            },
-            {
-                extend: 'print',
-                className: 'btn btn-sm btn-outline-secondary',
-                title: 'Order List',
-                exportOptions: { columns: [0,1,2,3,4,5,6,7,8] },
-                customize: function(doc) {
-                    $(doc.document.body).find('h1').css('font-size', '14pt').css('text-align', 'left');
-                }
-            },
-            {
-                extend: 'colvis',
-                className: 'btn btn-sm btn-outline-secondary'
-            }
-        ],
-        pageLength: 100,
-        stateSave: true
+// Search filter
+document.getElementById('searchInput').addEventListener('input', function() {
+    var query = this.value.toLowerCase();
+    var rows = document.querySelectorAll('#ordersBody tr:not(.no-results)');
+    var visibleCount = 0;
+
+    rows.forEach(function(row) {
+        var searchData = row.getAttribute('data-search') || '';
+        if (searchData.indexOf(query) > -1) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
     });
 
-    // Row numbering
-    t.on('order.dt search.dt', function() {
-        var i = 1;
-        t.cells(null, 0, { search: 'applied', order: 'applied' }).every(function() {
-            this.data(i++);
-        });
-    }).draw();
+    document.getElementById('orderCount').textContent = visibleCount + ' order(s)';
+
+    // Re-number visible rows
+    var num = 1;
+    rows.forEach(function(row) {
+        if (row.style.display !== 'none') {
+            row.cells[0].textContent = num++;
+        }
+    });
 });
 
 // Edit/Success modal
@@ -520,19 +553,17 @@ $('#editModal').on('shown.bs.modal', function() {
 });
 
 // Enter key navigation in modal
-$(document).ready(function() {
-    $('#remark').on('keydown', function(e) {
-        if (e.which === 13) {
-            e.preventDefault();
-            $('#rowtransno').focus();
-        }
-    });
-    $('#rowtransno').on('keydown', function(e) {
-        if (e.which === 13) {
-            e.preventDefault();
-            successbtn();
-        }
-    });
+$('#remark').on('keydown', function(e) {
+    if (e.which === 13) {
+        e.preventDefault();
+        $('#rowtransno').focus();
+    }
+});
+$('#rowtransno').on('keydown', function(e) {
+    if (e.which === 13) {
+        e.preventDefault();
+        successbtn();
+    }
 });
 
 // Done button

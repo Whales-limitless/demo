@@ -2,16 +2,16 @@
 session_start();
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
-// If already logged in, redirect to dashboard
-if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
-    header("Location: dashboard.php");
+// If already logged in as user, redirect to home
+if (isset($_SESSION['user_logged_in']) && $_SESSION['user_logged_in'] === true) {
+    header("Location: index.php");
     exit;
 }
 
 // Handle login form submission
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    include('../dbconnection.php');
+    include('dbconnection.php');
 
     $username = trim($_POST['username'] ?? '');
     $password = trim($_POST['password'] ?? '');
@@ -19,19 +19,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === '' || $password === '') {
         $error = 'Please enter both username and password.';
     } else {
-        $stmt = $connect->prepare("SELECT * FROM `sysfile` WHERE `USER1` = ? AND `USER2` = ? AND `TYPE` = 'A' LIMIT 1");
+        $stmt = $connect->prepare("SELECT * FROM `sysfile` WHERE `USER1` = ? AND `USER2` = ? AND (`TYPE` IS NULL OR `TYPE` != 'A') LIMIT 1");
         $stmt->bind_param("ss", $username, $password);
         $stmt->execute();
         $result = $stmt->get_result();
 
         if ($result->num_rows > 0) {
             $user = $result->fetch_assoc();
-            $_SESSION['admin_logged_in'] = true;
-            $_SESSION['admin_user'] = $username;
-            $_SESSION['admin_name'] = $user['USER_NAME'] ?? $user['USERNAME'] ?? $username;
-            $_SESSION['admin_level'] = $user['LEVEL'] ?? 0;
-            $_SESSION['admin_outlet'] = $user['OUTLET'] ?? '';
-            header("Location: dashboard.php");
+            $_SESSION['user_logged_in'] = true;
+            $_SESSION['user_id'] = $user['ID'] ?? '';
+            $_SESSION['user_username'] = $username;
+            $_SESSION['user_name'] = $user['USER_NAME'] ?? $user['USERNAME'] ?? $username;
+            $_SESSION['user_level'] = $user['LEVEL'] ?? 0;
+            $_SESSION['user_outlet'] = $user['OUTLET'] ?? '';
+            $_SESSION['user_dept'] = $user['DEPT'] ?? '';
+            header("Location: index.php");
             exit;
         } else {
             $error = 'Invalid username or password.';
@@ -45,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Login</title>
+<title>Login</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -58,7 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     --text: #1a1a1a;
     --text-muted: #6b7280;
     --radius: 14px;
-    --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
     --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
     --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -208,18 +209,17 @@ body {
         <div class="login-header">
             <div class="logo">
                 <svg viewBox="0 0 24 24">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                    <path d="M2 17l10 5 10-5"/>
-                    <path d="M2 12l10 5 10-5"/>
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
                 </svg>
             </div>
-            <h1>Admin Panel</h1>
-            <p>Sign in to continue</p>
+            <h1>Welcome</h1>
+            <p>Sign in to your account</p>
         </div>
 
         <?php if ($error): ?>
         <div class="error-msg">
-            <svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            <svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
             <?php echo htmlspecialchars($error); ?>
         </div>
         <?php endif; ?>
