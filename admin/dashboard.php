@@ -398,6 +398,7 @@ audio { display: none; }
     </div>
     <div class="nav-links">
         <a href="dashboard.php" class="active"><i class="fas fa-list-alt"></i> Orders</a>
+        <a href="rack.php"><i class="fas fa-warehouse"></i> Rack</a>
         <a href="user.php"><i class="fas fa-users"></i> Users</a>
     </div>
     <div class="right-section">
