@@ -1,4 +1,9 @@
 <?php
+session_start();
+if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true) {
+    header("Location: login.php");
+    exit;
+}
 require_once 'dbconnection.php';
 
 $cat_id = isset($_GET['cat']) ? intval($_GET['cat']) : 0;
