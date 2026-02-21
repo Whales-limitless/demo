@@ -56,6 +56,16 @@
   - **Auto QOH Update** — `PRODUCTS.qoh` updated automatically on receiving
   - **PO Listing** — Admin page to view/filter/search all POs by status, supplier, date
 
+#### Feature 2b: Fix Staff STOCKIN (Quick Receive)
+- **Problem:** Staff app STOCKIN order type creates an `orderlist` record but does NOT update `PRODUCTS.qoh`.
+- **Fix:**
+  - Update `submit_order.php` so STOCKIN orders auto-update `PRODUCTS.qoh` on submission
+  - This remains a "quick receive" — no PO, no supplier link needed
+  - Use case: ad-hoc receipts, walk-in purchases, samples, inter-store transfers
+- **Two stock-in paths after implementation:**
+  - **Formal:** Admin creates PO → Approves → Receives via GRN → qoh updated
+  - **Quick:** Staff selects items → Submits as STOCKIN → qoh updated
+
 ---
 
 ### Phase 2 — Inventory Control
