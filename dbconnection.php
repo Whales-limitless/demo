@@ -1,5 +1,5 @@
 <?php
-	mysqli_report(MYSQLI_REPORT_ERROR);
+	mysqli_report(MYSQLI_REPORT_OFF);
 
 	$_dbHost    = 'localhost';
 	$_dbUser    = 'pwuser';
