@@ -94,6 +94,12 @@ foreach ($items as $item) {
 
     if (mysqli_query($connect, $sql)) {
         $insertedCount++;
+
+        // Feature 2b: Auto-update PRODUCTS.qoh for STOCKIN orders
+        if ($ptype === 'STOCKIN' && $barcode !== '' && $qty > 0) {
+            $updateQoh = "UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) + $qty WHERE `barcode` = '" . mysqli_real_escape_string($connect, $barcode) . "'";
+            mysqli_query($connect, $updateQoh);
+        }
     } else {
         $errors[] = "Failed to insert item: " . $name . " - " . mysqli_error($connect);
     }
