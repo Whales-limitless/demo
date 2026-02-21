@@ -304,23 +304,55 @@ function finishOrder() {
   fill.classList.remove('running');
   fill.style.width = '0%';
 
-  var overlay = document.getElementById('successOverlay');
-  var title = document.getElementById('successTitle');
-  var msg = document.getElementById('successMsg');
-  if (orderType === 'purchase') {
-    title.textContent = 'Purchase Submitted!';
-    msg.textContent = 'Your purchase order has been placed successfully.';
-  } else {
-    title.textContent = 'Stock In Submitted!';
-    msg.textContent = 'Your stock in order has been recorded successfully.';
-  }
+  var btn = document.getElementById('btnConfirm');
+  var btnText = document.getElementById('btnText');
+  btnText.textContent = 'Submitting…';
+  btn.disabled = true;
 
-  document.querySelectorAll('input[name="orderType"]').forEach(function(r) { r.disabled = false; });
-  overlay.classList.add('active');
+  // Send order to backend
+  var payload = JSON.stringify({ orderType: orderType, items: items });
 
-  // Clear cart and confirm data
-  sessionStorage.removeItem('confirmItems');
-  sessionStorage.removeItem('cart');
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', 'submit_order.php', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4) {
+      btn.disabled = false;
+      document.querySelectorAll('input[name="orderType"]').forEach(function(r) { r.disabled = false; });
+
+      var overlay = document.getElementById('successOverlay');
+      var title = document.getElementById('successTitle');
+      var msg = document.getElementById('successMsg');
+
+      if (xhr.status === 200) {
+        try {
+          var resp = JSON.parse(xhr.responseText);
+          if (resp.success) {
+            if (orderType === 'purchase') {
+              title.textContent = 'Purchase Submitted!';
+              msg.textContent = 'Order ' + resp.salnum + ' has been placed successfully.';
+            } else {
+              title.textContent = 'Stock In Submitted!';
+              msg.textContent = 'Stock in ' + resp.salnum + ' has been recorded successfully.';
+            }
+            overlay.classList.add('active');
+            sessionStorage.removeItem('confirmItems');
+            sessionStorage.removeItem('cart');
+          } else {
+            alert('Order failed: ' + (resp.error || 'Unknown error'));
+            updateType();
+          }
+        } catch(e) {
+          alert('Order failed: Invalid server response');
+          updateType();
+        }
+      } else {
+        alert('Order failed: Server error (' + xhr.status + ')');
+        updateType();
+      }
+    }
+  };
+  xhr.send(payload);
 }
 
 render();
