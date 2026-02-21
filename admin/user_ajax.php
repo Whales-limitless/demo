@@ -14,9 +14,41 @@ $connect->set_charset("utf8mb4");
 
 $action = $_POST['action'] ?? '';
 
+// Auto-generate next unique code (USR0001, USR0002, ...)
+function generateCode($connect) {
+    $result = $connect->query("SELECT `USERNAME` FROM `sysfile` WHERE `USERNAME` LIKE 'USR%' ORDER BY `USERNAME` DESC LIMIT 1");
+    $next = 1;
+    if ($result && $row = $result->fetch_assoc()) {
+        $num = intval(substr($row['USERNAME'], 3));
+        $next = $num + 1;
+    }
+    $code = 'USR' . str_pad($next, 4, '0', STR_PAD_LEFT);
+
+    // Ensure uniqueness
+    $chk = $connect->prepare("SELECT `ID` FROM `sysfile` WHERE `USERNAME` = ? LIMIT 1");
+    $chk->bind_param("s", $code);
+    $chk->execute();
+    if ($chk->get_result()->num_rows > 0) {
+        $chk->close();
+        // Fallback: find max numeric and increment
+        $all = $connect->query("SELECT `USERNAME` FROM `sysfile` WHERE `USERNAME` LIKE 'USR%' ORDER BY `USERNAME` ASC");
+        $max = 0;
+        if ($all) {
+            while ($r = $all->fetch_assoc()) {
+                $n = intval(substr($r['USERNAME'], 3));
+                if ($n > $max) $max = $n;
+            }
+        }
+        $code = 'USR' . str_pad($max + 1, 4, '0', STR_PAD_LEFT);
+    } else {
+        $chk->close();
+    }
+    return $code;
+}
+
 if ($action === 'get') {
     $id = intval($_POST['id'] ?? 0);
-    $stmt = $connect->prepare("SELECT `ID`,`USER1`,`USER_NAME`,`TYPE`,`STATUS`,`OUTLET`,`LEVEL`,`DEPT` FROM `sysfile` WHERE `ID` = ? LIMIT 1");
+    $stmt = $connect->prepare("SELECT `ID`,`USER1`,`USER_NAME`,`USERNAME`,`TYPE` FROM `sysfile` WHERE `ID` = ? LIMIT 1");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -32,15 +64,16 @@ if ($action === 'get') {
     $username = trim($_POST['username'] ?? '');
     $password = trim($_POST['password'] ?? '');
     $name     = trim($_POST['name'] ?? '');
-    $type     = trim($_POST['type'] ?? 'U');
-    $status   = trim($_POST['status'] ?? 'Y');
-    $outlet   = trim($_POST['outlet'] ?? '');
-    $level    = floatval($_POST['level'] ?? 0);
-    $dept     = trim($_POST['dept'] ?? '');
+    $type     = trim($_POST['type'] ?? 'S');
 
     if ($username === '' || $password === '') {
         echo json_encode(['error' => 'Username and password are required.']);
         exit;
+    }
+
+    // Validate type
+    if (!in_array($type, ['A', 'S', 'D'])) {
+        $type = 'S';
     }
 
     // Check duplicate username
@@ -54,11 +87,14 @@ if ($action === 'get') {
     }
     $chk->close();
 
-    $stmt = $connect->prepare("INSERT INTO `sysfile` (`USER1`,`USER2`,`USER_NAME`,`TYPE`,`STATUS`,`OUTLET`,`LEVEL`,`DEPT`,`PUSHID`) VALUES (?,?,?,?,?,?,?,?,'')");
-    $stmt->bind_param("ssssssds", $username, $password, $name, $type, $status, $outlet, $level, $dept);
+    // Auto-generate code
+    $code = generateCode($connect);
+
+    $stmt = $connect->prepare("INSERT INTO `sysfile` (`USER1`,`USER2`,`USER_NAME`,`USERNAME`,`TYPE`,`STATUS`,`OUTLET`,`PUSHID`) VALUES (?,?,?,?,?,'Y','MAIN','')");
+    $stmt->bind_param("sssss", $username, $password, $name, $code, $type);
 
     if ($stmt->execute()) {
-        echo json_encode(['success' => 'User created successfully.']);
+        echo json_encode(['success' => 'User created. Code: ' . $code]);
     } else {
         echo json_encode(['error' => 'Failed to create user: ' . $connect->error]);
     }
@@ -68,23 +104,23 @@ if ($action === 'get') {
     $id       = intval($_POST['id'] ?? 0);
     $password = trim($_POST['password'] ?? '');
     $name     = trim($_POST['name'] ?? '');
-    $type     = trim($_POST['type'] ?? 'U');
-    $status   = trim($_POST['status'] ?? 'Y');
-    $outlet   = trim($_POST['outlet'] ?? '');
-    $level    = floatval($_POST['level'] ?? 0);
-    $dept     = trim($_POST['dept'] ?? '');
+    $type     = trim($_POST['type'] ?? 'S');
 
     if ($id <= 0) {
         echo json_encode(['error' => 'Invalid user ID.']);
         exit;
     }
 
+    if (!in_array($type, ['A', 'S', 'D'])) {
+        $type = 'S';
+    }
+
     if ($password !== '') {
-        $stmt = $connect->prepare("UPDATE `sysfile` SET `USER2`=?, `USER_NAME`=?, `TYPE`=?, `STATUS`=?, `OUTLET`=?, `LEVEL`=?, `DEPT`=? WHERE `ID`=?");
-        $stmt->bind_param("sssssdsi", $password, $name, $type, $status, $outlet, $level, $dept, $id);
+        $stmt = $connect->prepare("UPDATE `sysfile` SET `USER2`=?, `USER_NAME`=?, `TYPE`=? WHERE `ID`=?");
+        $stmt->bind_param("sssi", $password, $name, $type, $id);
     } else {
-        $stmt = $connect->prepare("UPDATE `sysfile` SET `USER_NAME`=?, `TYPE`=?, `STATUS`=?, `OUTLET`=?, `LEVEL`=?, `DEPT`=? WHERE `ID`=?");
-        $stmt->bind_param("ssssdsi", $name, $type, $status, $outlet, $level, $dept, $id);
+        $stmt = $connect->prepare("UPDATE `sysfile` SET `USER_NAME`=?, `TYPE`=? WHERE `ID`=?");
+        $stmt->bind_param("ssi", $name, $type, $id);
     }
 
     if ($stmt->execute()) {
