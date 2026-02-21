@@ -222,6 +222,29 @@ CREATE TABLE IF NOT EXISTS `product_uom` (
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 ");
+
+// --- Rack ---
+runMigration($connect, 'Create rack table', "
+CREATE TABLE IF NOT EXISTS `rack` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `code` VARCHAR(50) NOT NULL UNIQUE,
+  `description` VARCHAR(200) DEFAULT '',
+  `status` ENUM('ACTIVE','INACTIVE') DEFAULT 'ACTIVE',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+// --- Rack-Product Mapping ---
+runMigration($connect, 'Create rack_product table', "
+CREATE TABLE IF NOT EXISTS `rack_product` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `rack_id` INT NOT NULL,
+  `barcode` VARCHAR(50) NOT NULL,
+  `assigned_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_rack_barcode` (`rack_id`, `barcode`),
+  FOREIGN KEY (`rack_id`) REFERENCES `rack`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
 ?>
 <!DOCTYPE html>
 <html lang="en">

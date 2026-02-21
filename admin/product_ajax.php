@@ -59,7 +59,7 @@ if ($action === 'list') {
     $offset = ($page - 1) * $perPage;
 
     // Fetch page
-    $sql = "SELECT `id`, `barcode`, `code`, `name`, `cat`, `sub_cat`, `disprice`, COALESCE(`qoh`, 0) AS `qoh`, `uom`, `rack`, `min_qty`, `max_qty`, `checked`
+    $sql = "SELECT `id`, `barcode`, `code`, `name`, `cat`, `sub_cat`, COALESCE(`qoh`, 0) AS `qoh`, `uom`, `rack`, `min_qty`, `max_qty`, `checked`
             FROM `PRODUCTS` WHERE $where ORDER BY `checked` DESC, `name` ASC LIMIT ?, ?";
     $stmt = $connect->prepare($sql);
     $fetchTypes = $types . "ii";
@@ -101,7 +101,6 @@ if ($action === 'list') {
     $description = trim($_POST['description'] ?? '');
     $cat = trim($_POST['cat'] ?? '');
     $sub_cat = trim($_POST['sub_cat'] ?? '');
-    $disprice = floatval($_POST['disprice'] ?? 0);
     $uom = trim($_POST['uom'] ?? '');
     $rack = trim($_POST['rack'] ?? '');
     $min_qty = intval($_POST['min_qty'] ?? 0);
@@ -125,8 +124,8 @@ if ($action === 'list') {
     }
     $chk->close();
 
-    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`disprice`,`uom`,`rack`,`min_qty`,`max_qty`,`qoh`,`checked`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
-    $stmt->bind_param("ssssssdssiiids", $barcode, $code, $name, $description, $cat, $sub_cat, $disprice, $uom, $rack, $min_qty, $max_qty, $qoh, $checked);
+    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`uom`,`rack`,`min_qty`,`max_qty`,`qoh`,`checked`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+    $stmt->bind_param("ssssssssiiids", $barcode, $code, $name, $description, $cat, $sub_cat, $uom, $rack, $min_qty, $max_qty, $qoh, $checked);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Product created successfully.']);
@@ -143,7 +142,6 @@ if ($action === 'list') {
     $description = trim($_POST['description'] ?? '');
     $cat = trim($_POST['cat'] ?? '');
     $sub_cat = trim($_POST['sub_cat'] ?? '');
-    $disprice = floatval($_POST['disprice'] ?? 0);
     $uom = trim($_POST['uom'] ?? '');
     $rack = trim($_POST['rack'] ?? '');
     $min_qty = intval($_POST['min_qty'] ?? 0);
@@ -156,8 +154,8 @@ if ($action === 'list') {
         exit;
     }
 
-    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`disprice`=?,`uom`=?,`rack`=?,`min_qty`=?,`max_qty`=?,`qoh`=?,`checked`=? WHERE `id`=?");
-    $stmt->bind_param("ssssssdssiiidsi", $barcode, $code, $name, $description, $cat, $sub_cat, $disprice, $uom, $rack, $min_qty, $max_qty, $qoh, $checked, $id);
+    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`uom`=?,`rack`=?,`min_qty`=?,`max_qty`=?,`qoh`=?,`checked`=? WHERE `id`=?");
+    $stmt->bind_param("ssssssssiiidsi", $barcode, $code, $name, $description, $cat, $sub_cat, $uom, $rack, $min_qty, $max_qty, $qoh, $checked, $id);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Product updated successfully.']);
@@ -403,6 +401,18 @@ if ($action === 'list') {
         echo json_encode(['error' => 'Failed: ' . $connect->error]);
     }
     $stmt->close();
+
+// ===================== RACK LIST (from new rack table) =====================
+
+} elseif ($action === 'rack_list') {
+    $rows = [];
+    $result = $connect->query("SELECT `id`, `code`, `description`, `status` FROM `rack` WHERE `status`='ACTIVE' ORDER BY `code` ASC");
+    if ($result) {
+        while ($r = $result->fetch_assoc()) {
+            $rows[] = $r;
+        }
+    }
+    echo json_encode($rows);
 
 // ===================== LEGACY ENDPOINTS =====================
 

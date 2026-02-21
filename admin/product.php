@@ -144,7 +144,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>Barcode</th>
                         <th>Name</th>
                         <th>Category</th>
-                        <th>Price</th>
                         <th>QOH</th>
                         <th>Min Qty</th>
                         <th>Rack</th>
@@ -153,7 +152,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     </tr>
                 </thead>
                 <tbody id="dataBody">
-                    <tr class="no-results"><td colspan="10" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
+                    <tr class="no-results"><td colspan="9" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -214,28 +213,29 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     </div>
                 </div>
                 <div class="row">
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label fw-semibold">Price</label>
-                        <input type="number" id="fDisPrice" class="form-control" step="0.01" min="0" placeholder="0.00" value="0">
-                    </div>
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label class="form-label fw-semibold">QOH</label>
                         <input type="number" id="fQoh" class="form-control" min="0" placeholder="0" value="0">
                     </div>
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label class="form-label fw-semibold">Min Qty (Reorder)</label>
                         <input type="number" id="fMinQty" class="form-control" step="1" min="0" placeholder="0" value="0">
                     </div>
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label class="form-label fw-semibold">Max Qty</label>
                         <input type="number" id="fMaxQty" class="form-control" step="1" min="0" placeholder="0" value="0">
                     </div>
                 </div>
                 <div class="row">
                     <div class="col-md-4 mb-3">
-                        <label class="form-label fw-semibold">Rack Location</label>
-                        <input type="text" id="fRack" class="form-control" list="rackList" placeholder="Rack">
-                        <datalist id="rackList"></datalist>
+                        <label class="form-label fw-semibold">Rack</label>
+                        <select id="fRackSelect" class="form-select">
+                            <option value="">-- Select --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Rack Remark</label>
+                        <input type="text" id="fRack" class="form-control" placeholder="Rack remark (optional)">
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-semibold">Status</label>
@@ -326,6 +326,7 @@ var debounceTimer = null;
 var categoriesCache = [];
 var subCategoriesCache = {};
 var uomCache = [];
+var racksCache = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     productModal = new bootstrap.Modal(document.getElementById('productModal'));
@@ -351,7 +352,7 @@ function fetchProducts(page) {
     var cat = document.getElementById('filterCategory').value;
     var status = document.getElementById('filterStatus').value;
 
-    document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
+    document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="9" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
 
     $.ajax({
         type: 'POST', url: 'product_ajax.php',
@@ -362,7 +363,7 @@ function fetchProducts(page) {
             renderPagination(data);
         },
         error: function() {
-            document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
+            document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
         }
     });
 }
@@ -373,7 +374,7 @@ function renderTable(data) {
     var offset = (data.page - 1) * data.per_page;
 
     if (products.length === 0) {
-        tbody.innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-boxes-stacked" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products found</td></tr>';
+        tbody.innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-boxes-stacked" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products found</td></tr>';
         document.getElementById('itemCount').textContent = '0 product(s)';
         return;
     }
@@ -391,7 +392,6 @@ function renderTable(data) {
         html += '<td><strong>' + escHtml(p.barcode || '') + '</strong></td>';
         html += '<td>' + escHtml(p.name || '') + '</td>';
         html += '<td>' + escHtml(p.cat || '') + '</td>';
-        html += '<td>' + parseFloat(p.disprice || 0).toFixed(2) + '</td>';
         html += '<td>' + Math.round(qoh);
         if (isLow) html += ' <span class="badge-low">Low</span>';
         html += '</td>';
@@ -480,13 +480,10 @@ function loadDropdowns() {
         refreshUomSelect();
     }, 'json');
 
-    // Load racks for datalist
-    $.post('product_ajax.php', { action: 'racks' }, function(racks) {
-        var dl = document.getElementById('rackList');
-        dl.innerHTML = '';
-        (racks || []).forEach(function(r) {
-            dl.innerHTML += '<option value="' + escHtml(r) + '">';
-        });
+    // Load racks from rack table for select dropdown
+    $.post('product_ajax.php', { action: 'rack_list' }, function(racks) {
+        racksCache = racks || [];
+        refreshRackSelect();
     }, 'json');
 }
 
@@ -515,6 +512,16 @@ function refreshUomSelect() {
     sel.innerHTML = '<option value="">-- Select --</option>';
     uomCache.forEach(function(u) {
         sel.innerHTML += '<option value="' + escHtml(u.name) + '">' + escHtml(u.name) + '</option>';
+    });
+    sel.value = val;
+}
+
+function refreshRackSelect() {
+    var sel = document.getElementById('fRackSelect');
+    var val = sel.value;
+    sel.innerHTML = '<option value="">-- Select --</option>';
+    racksCache.forEach(function(r) {
+        sel.innerHTML += '<option value="' + escHtml(r.code) + '">' + escHtml(r.code) + (r.description ? ' - ' + escHtml(r.description) : '') + '</option>';
     });
     sel.value = val;
 }
@@ -549,10 +556,10 @@ function clearForm() {
     document.getElementById('fCat').value = '';
     document.getElementById('fSubCat').innerHTML = '<option value="">-- Select --</option>';
     document.getElementById('fUom').value = '';
-    document.getElementById('fDisPrice').value = '0';
     document.getElementById('fQoh').value = '0';
     document.getElementById('fMinQty').value = '0';
     document.getElementById('fMaxQty').value = '0';
+    document.getElementById('fRackSelect').value = '';
     document.getElementById('fRack').value = '';
     document.getElementById('fChecked').value = 'Y';
     document.getElementById('fBarcode').disabled = false;
@@ -580,11 +587,13 @@ function openEditModal(id) {
             document.getElementById('fDescription').value = data.description || '';
             document.getElementById('fCat').value = data.cat || '';
             document.getElementById('fUom').value = data.uom || '';
-            document.getElementById('fDisPrice').value = data.disprice || '0';
             document.getElementById('fQoh').value = data.qoh || '0';
             document.getElementById('fMinQty').value = data.min_qty || '0';
             document.getElementById('fMaxQty').value = data.max_qty || '0';
-            document.getElementById('fRack').value = data.rack || '';
+            // Try to match rack text to a rack code in the select
+            var rackVal = data.rack || '';
+            document.getElementById('fRackSelect').value = rackVal;
+            document.getElementById('fRack').value = rackVal;
             document.getElementById('fChecked').value = data.checked || 'Y';
 
             // Load sub categories then set value
@@ -619,6 +628,11 @@ function saveProduct() {
         return;
     }
 
+    var rackSelect = document.getElementById('fRackSelect').value.trim();
+    var rackRemark = document.getElementById('fRack').value.trim();
+    // Use rack select value if chosen, otherwise fall back to rack remark
+    var rackValue = rackSelect || rackRemark;
+
     var postData = {
         action: editId ? 'update' : 'create',
         barcode: barcode,
@@ -628,11 +642,10 @@ function saveProduct() {
         cat: document.getElementById('fCat').value.trim(),
         sub_cat: document.getElementById('fSubCat').value.trim(),
         uom: document.getElementById('fUom').value.trim(),
-        disprice: document.getElementById('fDisPrice').value,
         qoh: document.getElementById('fQoh').value,
         min_qty: document.getElementById('fMinQty').value,
         max_qty: document.getElementById('fMaxQty').value,
-        rack: document.getElementById('fRack').value.trim(),
+        rack: rackValue,
         checked: document.getElementById('fChecked').value
     };
     if (editId) postData.id = editId;

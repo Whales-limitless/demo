@@ -7,25 +7,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
-include('../dbconnection.php');
-$connect->set_charset("utf8mb4");
-
-// Fetch distinct racks with product counts
-$racks = [];
-$result = $connect->query("
-    SELECT COALESCE(NULLIF(rack, ''), 'Unassigned') AS rack_name,
-           COUNT(*) AS product_count,
-           SUM(COALESCE(qoh, 0)) AS total_qoh
-    FROM PRODUCTS WHERE checked = 'Y'
-    GROUP BY COALESCE(NULLIF(rack, ''), 'Unassigned')
-    ORDER BY rack_name ASC
-");
-if ($result) {
-    while ($r = $result->fetch_assoc()) {
-        $racks[] = $r;
-    }
-}
-
 $currentPage = 'rack';
 ?>
 <!DOCTYPE html>
@@ -52,11 +33,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-add:hover { background: var(--primary-dark); }
 .table-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-md); padding: 20px; overflow: hidden; }
 .table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-.search-box { position: relative; flex: 1; max-width: 320px; }
+.toolbar-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; }
+.search-box { position: relative; flex: 1; max-width: 320px; min-width: 180px; }
 .search-box input { width: 100%; padding: 9px 14px 9px 36px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color var(--transition); }
 .search-box input:focus { border-color: var(--primary); }
 .search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; }
-.item-count { font-size: 13px; color: var(--text-muted); }
+.filter-select { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; background: #fff; transition: border-color var(--transition); min-width: 140px; }
+.filter-select:focus { border-color: var(--primary); }
+.item-count { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .data-table thead th { background: var(--text); color: #fff; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; padding: 10px 12px; white-space: nowrap; text-align: left; }
 .data-table tbody td { padding: 10px 12px; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
@@ -65,262 +49,59 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .badge-status { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .badge-active { background: #dcfce7; color: #16a34a; }
 .badge-inactive { background: #fee2e2; color: #dc2626; }
+.badge-count { background: #dbeafe; color: #2563eb; display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; }
 .btn-action { padding: 5px 12px; border: none; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); display: inline-block; margin: 1px; color: #fff; }
 .btn-edit { background: #3b82f6; } .btn-edit:hover { background: #2563eb; }
 .btn-delete { background: #ef4444; } .btn-delete:hover { background: #dc2626; }
+.btn-view { background: #16a34a; } .btn-view:hover { background: #15803d; }
+.btn-activate { background: #16a34a; } .btn-activate:hover { background: #15803d; }
 .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
 .modal-header { border-bottom: 1px solid #e5e7eb; }
 .modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
 .modal-footer { border-top: 1px solid #e5e7eb; }
 
-/* Rack Grid */
-.rack-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-}
-.rack-card {
-    background: var(--surface);
-    border: 2px solid #e5e7eb;
-    border-radius: var(--radius);
-    padding: 18px;
-    cursor: pointer;
-    transition: all var(--transition);
-    position: relative;
-}
-.rack-card:hover {
-    border-color: var(--primary);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-.rack-card.selected {
-    border-color: var(--primary);
-    background: #fef2f2;
-    box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.15);
-}
-.rack-card .rack-name {
-    font-family: 'Outfit', sans-serif;
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text);
-}
-.rack-card .rack-name i {
-    color: var(--primary);
-    font-size: 18px;
-}
-.rack-card .rack-stats {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 12px;
-}
-.rack-card .rack-stat {
-    display: flex;
-    flex-direction: column;
-}
-.rack-card .rack-stat .stat-value {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1.2;
-}
-.rack-card .rack-stat .stat-label {
-    font-size: 11px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    font-weight: 600;
-}
-.rack-card .btn-rename {
-    background: none;
-    border: 1px solid #d1d5db;
-    color: var(--text-muted);
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all var(--transition);
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-.rack-card .btn-rename:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: #fef2f2;
-}
+/* Pagination */
+.pagination-wrap { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; flex-wrap: wrap; gap: 8px; }
+.pagination-info { font-size: 13px; color: var(--text-muted); }
+.pagination-btns { display: flex; gap: 4px; }
+.pagination-btns button { padding: 6px 12px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); color: var(--text); }
+.pagination-btns button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.pagination-btns button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.pagination-btns button:disabled { opacity: 0.4; cursor: default; }
 
-/* Detail card */
-#detailCard {
-    display: none;
-}
-#detailCard.visible {
-    display: block;
-}
-.detail-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-.detail-header h2 {
-    font-family: 'Outfit', sans-serif;
-    font-size: 18px;
-    font-weight: 700;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.detail-header h2 i {
-    color: var(--primary);
-}
-.btn-assign {
-    background: #16a34a;
-    color: #fff;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background var(--transition);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-.btn-assign:hover {
-    background: #15803d;
-}
-.btn-move {
-    background: #f59e0b;
-    color: #fff;
-}
-.btn-move:hover {
-    background: #d97706;
-}
+/* Product list in rack detail */
+.product-list-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-md); padding: 20px; margin-top: 20px; }
+.product-list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+.product-list-header h2 { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; }
+.product-list-header h2 i { color: var(--primary); }
 
-/* Assign modal search results */
-.assign-search-box {
-    position: relative;
-    margin-bottom: 16px;
-}
-.assign-search-box input {
-    width: 100%;
-    padding: 10px 14px 10px 38px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 13px;
-    outline: none;
-    transition: border-color var(--transition);
-}
-.assign-search-box input:focus {
-    border-color: var(--primary);
-}
-.assign-search-box i {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-muted);
-    font-size: 14px;
-}
-.assign-results {
-    max-height: 320px;
-    overflow-y: auto;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-}
-.assign-results .assign-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 14px;
-    border-bottom: 1px solid #f3f4f6;
-    transition: background var(--transition);
-}
-.assign-results .assign-item:last-child {
-    border-bottom: none;
-}
-.assign-results .assign-item:hover {
-    background: #f9fafb;
-}
-.assign-results .assign-item .item-info {
-    flex: 1;
-    min-width: 0;
-}
-.assign-results .assign-item .item-barcode {
-    font-size: 11px;
-    color: var(--text-muted);
-    font-weight: 600;
-}
-.assign-results .assign-item .item-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.assign-results .assign-item .item-rack {
-    font-size: 11px;
-    color: var(--text-muted);
-}
-.assign-results .assign-item .btn-assign-item {
-    background: var(--primary);
-    color: #fff;
-    border: none;
-    padding: 5px 12px;
-    border-radius: 6px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background var(--transition);
-    white-space: nowrap;
-    margin-left: 12px;
-}
-.assign-results .assign-item .btn-assign-item:hover {
-    background: var(--primary-dark);
-}
-.assign-results .no-results-msg {
-    text-align: center;
-    padding: 24px;
-    color: var(--text-muted);
-    font-size: 13px;
-}
-.loading-spinner {
-    text-align: center;
-    padding: 30px;
-    color: var(--text-muted);
-}
-.loading-spinner i {
-    font-size: 24px;
-    animation: spin 1s linear infinite;
-}
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
+/* Assign search */
+.assign-search-box { position: relative; margin-bottom: 16px; }
+.assign-search-box input { width: 100%; padding: 10px 14px 10px 38px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color var(--transition); }
+.assign-search-box input:focus { border-color: var(--primary); }
+.assign-search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; }
+.assign-results { max-height: 320px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+.assign-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #f3f4f6; transition: background var(--transition); }
+.assign-item:last-child { border-bottom: none; }
+.assign-item:hover { background: #f9fafb; }
+.assign-item .item-info { flex: 1; min-width: 0; }
+.assign-item .item-barcode { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+.assign-item .item-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.assign-item .item-qoh { font-size: 11px; color: var(--text-muted); }
+.assign-item .btn-assign-item { background: var(--primary); color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; transition: background var(--transition); white-space: nowrap; margin-left: 12px; }
+.assign-item .btn-assign-item:hover { background: var(--primary-dark); }
+.no-results-msg { text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px; }
+
+/* Loading spinner */
+.table-loading { text-align: center; padding: 40px; color: var(--text-muted); }
+.table-loading i { font-size: 24px; margin-bottom: 8px; display: block; }
 
 @media (max-width: 768px) {
     .page-content { padding: 16px; }
     .table-card { padding: 12px; }
     .search-box { max-width: 100%; }
+    .toolbar-filters { flex-direction: column; align-items: stretch; }
     .btn-action { padding: 4px 8px; font-size: 11px; }
-    .rack-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-    .rack-card { padding: 14px; }
-    .detail-header { flex-direction: column; align-items: flex-start; }
 }
 </style>
 </head>
@@ -331,50 +112,57 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="page-content">
     <div class="page-header">
         <h1><i class="fas fa-warehouse" style="color:var(--primary);margin-right:8px;"></i>Rack Management</h1>
-        <div class="item-count"><?php echo count($racks); ?> rack(s)</div>
+        <button class="btn-add" onclick="openCreateModal();">
+            <i class="fas fa-plus"></i> Add Rack
+        </button>
     </div>
 
-    <!-- Rack Grid -->
-    <div class="rack-grid" id="rackGrid">
-        <?php if (count($racks) === 0): ?>
-            <div style="grid-column: 1/-1; text-align:center; padding:40px; color:var(--text-muted);">
-                <i class="fas fa-warehouse" style="font-size:32px; margin-bottom:12px; display:block;"></i>
-                No racks found
-            </div>
-        <?php else: ?>
-            <?php foreach ($racks as $rack): ?>
-            <div class="rack-card" id="rack-<?php echo htmlspecialchars(md5($rack['rack_name'])); ?>"
-                 onclick="loadRackProducts('<?php echo htmlspecialchars($rack['rack_name'], ENT_QUOTES); ?>', this);">
-                <div class="rack-name">
-                    <i class="fas fa-warehouse"></i>
-                    <?php echo htmlspecialchars($rack['rack_name']); ?>
+    <div class="table-card">
+        <div class="table-toolbar">
+            <div class="toolbar-filters">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="Search racks..." oninput="debouncedFetch();">
                 </div>
-                <div class="rack-stats">
-                    <div class="rack-stat">
-                        <span class="stat-value"><?php echo (int)$rack['product_count']; ?></span>
-                        <span class="stat-label">Products</span>
-                    </div>
-                    <div class="rack-stat">
-                        <span class="stat-value"><?php echo (int)$rack['total_qoh']; ?></span>
-                        <span class="stat-label">Total QOH</span>
-                    </div>
-                </div>
-                <?php if ($rack['rack_name'] !== 'Unassigned'): ?>
-                <button class="btn-rename" onclick="event.stopPropagation(); renameRack('<?php echo htmlspecialchars($rack['rack_name'], ENT_QUOTES); ?>');">
-                    <i class="fas fa-pen"></i> Rename
-                </button>
-                <?php endif; ?>
+                <select id="filterStatus" class="filter-select" onchange="fetchRacks(1);">
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
             </div>
-            <?php endforeach; ?>
-        <?php endif; ?>
+            <div class="item-count" id="itemCount">Loading...</div>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px">No</th>
+                        <th>Rack Code</th>
+                        <th>Description</th>
+                        <th>Products</th>
+                        <th>Status</th>
+                        <th style="width:1%">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="dataBody">
+                    <tr class="no-results"><td colspan="6" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading racks...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="pagination-wrap" id="paginationWrap" style="display:none;">
+            <div class="pagination-info" id="paginationInfo"></div>
+            <div class="pagination-btns" id="paginationBtns"></div>
+        </div>
     </div>
 
-    <!-- Detail Card -->
-    <div class="table-card" id="detailCard">
-        <div class="detail-header">
-            <h2><i class="fas fa-boxes-stacked"></i> <span id="detailTitle">Rack Products</span></h2>
-            <button class="btn-assign" onclick="openAssignModal();">
-                <i class="fas fa-plus"></i> Assign Product
+    <!-- Rack Products Section -->
+    <div class="product-list-card" id="productListCard" style="display:none;">
+        <div class="product-list-header">
+            <h2><i class="fas fa-boxes-stacked"></i> <span id="productListTitle">Rack Products</span></h2>
+            <button class="btn-add" onclick="openAssignModal();" style="background:#16a34a;">
+                <i class="fas fa-plus"></i> Add Products
             </button>
         </div>
         <div style="overflow-x:auto;">
@@ -386,49 +174,52 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>Name</th>
                         <th>Category</th>
                         <th>QOH</th>
+                        <th>UOM</th>
+                        <th>Assigned</th>
                         <th style="width:1%">Action</th>
                     </tr>
                 </thead>
-                <tbody id="detailBody">
-                    <tr class="no-results"><td colspan="6">Select a rack to view products</td></tr>
+                <tbody id="productBody">
+                    <tr class="no-results"><td colspan="8">Select a rack to view products</td></tr>
                 </tbody>
             </table>
         </div>
     </div>
 </div>
 
-<!-- Rename Modal -->
-<div class="modal fade" id="renameModal" tabindex="-1" aria-hidden="true">
+<!-- Create/Edit Rack Modal -->
+<div class="modal fade" id="rackModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-pen"></i> Rename Rack</h5>
+                <h5 class="modal-title" id="rackModalTitle"><i class="fas fa-warehouse"></i> Add Rack</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <input type="hidden" id="editId" value="">
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Old Name</label>
-                    <input type="text" id="renameOldName" class="form-control" disabled>
+                    <label class="form-label fw-semibold">Rack Code <span class="text-danger">*</span></label>
+                    <input type="text" id="fCode" class="form-control" placeholder="e.g. RACK-A1, SHELF-01">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">New Name <span class="text-danger">*</span></label>
-                    <input type="text" id="renameNewName" class="form-control" placeholder="Enter new rack name">
+                    <label class="form-label fw-semibold">Description</label>
+                    <input type="text" id="fDescription" class="form-control" placeholder="Optional description">
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success w-50" onclick="doRename();"><i class="fas fa-check"></i> Rename</button>
+                <button type="button" class="btn btn-success w-50" onclick="saveRack();"><i class="fas fa-check"></i> Save</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Assign Product Modal -->
+<!-- Assign Products Modal -->
 <div class="modal fade" id="assignModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-plus-circle"></i> Assign Product to <span id="assignRackLabel"></span></h5>
+                <h5 class="modal-title"><i class="fas fa-plus-circle"></i> Add Products to <span id="assignRackLabel"></span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -451,49 +242,247 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-var renameModal = null;
-var assignModal = null;
-var currentRack = '';
-var currentCardEl = null;
+var rackModal = null, assignModal_bs = null;
+var currentPage = 1;
+var debounceTimer = null;
 var searchTimer = null;
+var selectedRackId = 0;
+var selectedRackCode = '';
 
 document.addEventListener('DOMContentLoaded', function() {
-    renameModal = new bootstrap.Modal(document.getElementById('renameModal'));
-    assignModal = new bootstrap.Modal(document.getElementById('assignModal'));
+    rackModal = new bootstrap.Modal(document.getElementById('rackModal'));
+    assignModal_bs = new bootstrap.Modal(document.getElementById('assignModal'));
+    fetchRacks(1);
 });
 
-// Load products for a specific rack
-function loadRackProducts(rackName, cardEl) {
-    // Update selected state
-    document.querySelectorAll('.rack-card').forEach(function(c) {
-        c.classList.remove('selected');
-    });
-    if (cardEl) {
-        cardEl.classList.add('selected');
-    }
+// ===================== RACK TABLE =====================
 
-    currentRack = rackName;
-    currentCardEl = cardEl;
+function debouncedFetch() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function() { fetchRacks(1); }, 300);
+}
 
-    // Show detail card
-    var detailCard = document.getElementById('detailCard');
-    detailCard.classList.add('visible');
+function fetchRacks(page) {
+    currentPage = page;
+    var search = document.getElementById('searchInput').value.trim();
+    var status = document.getElementById('filterStatus').value;
 
-    // Update title
-    document.getElementById('detailTitle').textContent = rackName + ' Products';
-
-    // Show loading
-    document.getElementById('detailBody').innerHTML = '<tr><td colspan="6"><div class="loading-spinner"><i class="fas fa-spinner"></i><div>Loading products...</div></div></td></tr>';
+    document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="6" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
 
     $.ajax({
-        type: 'POST',
-        url: 'rack_ajax.php',
-        data: { action: 'products', rack: rackName },
+        type: 'POST', url: 'rack_ajax.php',
+        data: { action: 'list', page: page, per_page: 50, search: search, status: status },
         dataType: 'json',
         success: function(data) {
-            var tbody = document.getElementById('detailBody');
-            if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr class="no-results"><td colspan="6"><i class="fas fa-box-open" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products in this rack</td></tr>';
+            renderTable(data);
+            renderPagination(data);
+        },
+        error: function() {
+            document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="6"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load racks</td></tr>';
+        }
+    });
+}
+
+function renderTable(data) {
+    var tbody = document.getElementById('dataBody');
+    var racks = data.racks || [];
+    var offset = (data.page - 1) * data.per_page;
+
+    if (racks.length === 0) {
+        tbody.innerHTML = '<tr class="no-results"><td colspan="6"><i class="fas fa-warehouse" style="font-size:24px;margin-bottom:8px;display:block;"></i>No racks found</td></tr>';
+        document.getElementById('itemCount').textContent = '0 rack(s)';
+        return;
+    }
+
+    var html = '';
+    for (var i = 0; i < racks.length; i++) {
+        var r = racks[i];
+        var isActive = r.status === 'ACTIVE';
+        var pCount = parseInt(r.product_count || 0);
+        var isSelected = (r.id == selectedRackId);
+
+        html += '<tr style="' + (isSelected ? 'background:#fef2f2;' : '') + '">';
+        html += '<td>' + (offset + i + 1) + '</td>';
+        html += '<td><strong>' + escHtml(r.code) + '</strong></td>';
+        html += '<td>' + escHtml(r.description || '-') + '</td>';
+        html += '<td><span class="badge-count">' + pCount + '</span></td>';
+        html += '<td><span class="badge-status ' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? 'Active' : 'Inactive') + '</span></td>';
+        html += '<td style="white-space:nowrap">';
+        html += '<button class="btn-action btn-view" onclick="viewRackProducts(' + r.id + ',\'' + escHtml(r.code).replace(/'/g, "\\'") + '\');"><i class="fas fa-eye"></i></button> ';
+        html += '<button class="btn-action btn-edit" onclick="openEditModal(' + r.id + ');"><i class="fas fa-pen"></i></button>';
+        if (isActive) {
+            html += ' <button class="btn-action btn-delete" onclick="deactivateRack(' + r.id + ',\'' + escHtml(r.code).replace(/'/g, "\\'") + '\');"><i class="fas fa-ban"></i></button>';
+        } else {
+            html += ' <button class="btn-action btn-activate" onclick="activateRack(' + r.id + ');"><i class="fas fa-check"></i></button>';
+        }
+        html += '</td>';
+        html += '</tr>';
+    }
+    tbody.innerHTML = html;
+    document.getElementById('itemCount').textContent = data.total + ' rack(s)';
+}
+
+function renderPagination(data) {
+    var wrap = document.getElementById('paginationWrap');
+    var info = document.getElementById('paginationInfo');
+    var btns = document.getElementById('paginationBtns');
+
+    if (data.pages <= 1) {
+        wrap.style.display = 'none';
+        return;
+    }
+
+    wrap.style.display = 'flex';
+    var start = (data.page - 1) * data.per_page + 1;
+    var end = Math.min(data.page * data.per_page, data.total);
+    info.textContent = 'Showing ' + start + '-' + end + ' of ' + data.total;
+
+    var html = '';
+    html += '<button ' + (data.page <= 1 ? 'disabled' : '') + ' onclick="fetchRacks(' + (data.page - 1) + ');">&laquo; Prev</button>';
+
+    var startPage = Math.max(1, data.page - 2);
+    var endPage = Math.min(data.pages, data.page + 2);
+    if (startPage > 1) {
+        html += '<button onclick="fetchRacks(1);">1</button>';
+        if (startPage > 2) html += '<button disabled>...</button>';
+    }
+    for (var i = startPage; i <= endPage; i++) {
+        html += '<button class="' + (i === data.page ? 'active' : '') + '" onclick="fetchRacks(' + i + ');">' + i + '</button>';
+    }
+    if (endPage < data.pages) {
+        if (endPage < data.pages - 1) html += '<button disabled>...</button>';
+        html += '<button onclick="fetchRacks(' + data.pages + ');">' + data.pages + '</button>';
+    }
+
+    html += '<button ' + (data.page >= data.pages ? 'disabled' : '') + ' onclick="fetchRacks(' + (data.page + 1) + ');">Next &raquo;</button>';
+    btns.innerHTML = html;
+}
+
+function escHtml(s) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML;
+}
+
+// ===================== RACK CRUD =====================
+
+function clearForm() {
+    document.getElementById('editId').value = '';
+    document.getElementById('fCode').value = '';
+    document.getElementById('fDescription').value = '';
+}
+
+function openCreateModal() {
+    clearForm();
+    document.getElementById('rackModalTitle').innerHTML = '<i class="fas fa-warehouse"></i> Add Rack';
+    rackModal.show();
+}
+
+function openEditModal(id) {
+    clearForm();
+    document.getElementById('rackModalTitle').innerHTML = '<i class="fas fa-warehouse"></i> Edit Rack';
+    document.getElementById('editId').value = id;
+
+    $.ajax({
+        type: 'POST', url: 'rack_ajax.php', data: { action: 'get', id: id }, dataType: 'json',
+        success: function(data) {
+            if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
+            document.getElementById('fCode').value = data.code || '';
+            document.getElementById('fDescription').value = data.description || '';
+            rackModal.show();
+        }
+    });
+}
+
+function saveRack() {
+    var editId = document.getElementById('editId').value;
+    var code = document.getElementById('fCode').value.trim();
+
+    if (code === '') {
+        Swal.fire({ icon: 'warning', text: 'Rack code is required.' });
+        return;
+    }
+
+    var postData = {
+        action: editId ? 'update' : 'create',
+        code: code,
+        description: document.getElementById('fDescription').value.trim()
+    };
+    if (editId) postData.id = editId;
+
+    $.ajax({
+        type: 'POST', url: 'rack_ajax.php', data: postData, dataType: 'json',
+        success: function(data) {
+            if (data.success) {
+                rackModal.hide();
+                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
+                    fetchRacks(currentPage);
+                });
+            } else {
+                Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
+            }
+        }
+    });
+}
+
+function deactivateRack(id, code) {
+    Swal.fire({
+        title: 'Deactivate rack?',
+        text: 'Deactivate "' + code + '"?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Yes, Deactivate'
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.ajax({
+                type: 'POST', url: 'rack_ajax.php', data: { action: 'delete', id: id }, dataType: 'json',
+                success: function(data) {
+                    if (data.success) {
+                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
+                            fetchRacks(currentPage);
+                        });
+                    } else {
+                        Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
+                    }
+                }
+            });
+        }
+    });
+}
+
+function activateRack(id) {
+    $.post('rack_ajax.php', { action: 'activate', id: id }, function(data) {
+        if (data.success) {
+            fetchRacks(currentPage);
+        } else {
+            Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
+        }
+    }, 'json');
+}
+
+// ===================== RACK PRODUCTS =====================
+
+function viewRackProducts(rackId, rackCode) {
+    selectedRackId = rackId;
+    selectedRackCode = rackCode;
+
+    document.getElementById('productListCard').style.display = 'block';
+    document.getElementById('productListTitle').textContent = rackCode + ' - Products';
+    document.getElementById('productBody').innerHTML = '<tr class="no-results"><td colspan="8" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
+
+    // Refresh the table to highlight selected row
+    fetchRacks(currentPage);
+
+    $.ajax({
+        type: 'POST', url: 'rack_ajax.php',
+        data: { action: 'rack_products', rack_id: rackId },
+        dataType: 'json',
+        success: function(data) {
+            var tbody = document.getElementById('productBody');
+            if (!data || data.length === 0 || data.error) {
+                tbody.innerHTML = '<tr class="no-results"><td colspan="8"><i class="fas fa-box-open" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products assigned to this rack</td></tr>';
                 return;
             }
 
@@ -502,138 +491,75 @@ function loadRackProducts(rackName, cardEl) {
                 var p = data[i];
                 html += '<tr>';
                 html += '<td>' + (i + 1) + '</td>';
-                html += '<td><strong>' + escapeHtml(p.barcode || p.code || '') + '</strong></td>';
-                html += '<td>' + escapeHtml(p.name || '') + '</td>';
-                html += '<td>' + escapeHtml(p.cat || '') + '</td>';
+                html += '<td><strong>' + escHtml(p.barcode || '') + '</strong></td>';
+                html += '<td>' + escHtml(p.name || '-') + '</td>';
+                html += '<td>' + escHtml(p.cat || '-') + '</td>';
                 html += '<td>' + parseInt(p.qoh || 0) + '</td>';
+                html += '<td>' + escHtml(p.uom || '-') + '</td>';
+                html += '<td><small>' + escHtml((p.assigned_at || '').substring(0, 10)) + '</small></td>';
                 html += '<td style="white-space:nowrap">';
-                html += '<button class="btn-action btn-move" onclick="changeRack(' + parseInt(p.id) + ', \'' + escapeHtml(p.name || '').replace(/'/g, "\\'") + '\');"><i class="fas fa-arrows-alt"></i> Move</button>';
+                html += '<button class="btn-action btn-delete" onclick="removeProduct(' + parseInt(p.mapping_id) + ',\'' + escHtml(p.barcode || '').replace(/'/g, "\\'") + '\');"><i class="fas fa-times"></i> Remove</button>';
                 html += '</td>';
                 html += '</tr>';
             }
             tbody.innerHTML = html;
         },
         error: function() {
-            document.getElementById('detailBody').innerHTML = '<tr class="no-results"><td colspan="6">Failed to load products</td></tr>';
+            document.getElementById('productBody').innerHTML = '<tr class="no-results"><td colspan="8">Failed to load products</td></tr>';
         }
     });
 
-    // Scroll to detail card
+    // Scroll to product list
     setTimeout(function() {
-        detailCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('productListCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
 }
 
-// Rename rack
-function renameRack(oldName) {
-    document.getElementById('renameOldName').value = oldName;
-    document.getElementById('renameNewName').value = '';
-    renameModal.show();
-}
-
-function doRename() {
-    var oldName = document.getElementById('renameOldName').value.trim();
-    var newName = document.getElementById('renameNewName').value.trim();
-
-    if (newName === '') {
-        Swal.fire({ icon: 'warning', text: 'Please enter a new rack name.' });
-        return;
-    }
-
-    if (newName === oldName) {
-        Swal.fire({ icon: 'warning', text: 'New name is the same as the old name.' });
-        return;
-    }
-
-    $.ajax({
-        type: 'POST',
-        url: 'rack_ajax.php',
-        data: { action: 'rename', old_rack: oldName, new_rack: newName },
-        dataType: 'json',
-        success: function(data) {
-            if (data.success) {
-                renameModal.hide();
-                Swal.fire({
-                    icon: 'success',
-                    text: data.success,
-                    timer: 1500,
-                    showConfirmButton: false
-                }).then(function() {
-                    location.reload();
-                });
-            } else {
-                Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
-            }
-        },
-        error: function() {
-            Swal.fire({ icon: 'error', text: 'Failed to rename rack.' });
-        }
-    });
-}
-
-// Change rack for a single product (move)
-function changeRack(productId, productName) {
+function removeProduct(mappingId, barcode) {
     Swal.fire({
-        title: 'Move Product',
-        text: 'Enter new rack for "' + productName + '":',
-        input: 'text',
-        inputPlaceholder: 'New rack name (leave empty to unassign)',
+        title: 'Remove product?',
+        text: 'Remove "' + barcode + '" from this rack?',
+        icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#C8102E',
+        confirmButtonColor: '#ef4444',
         cancelButtonColor: '#6b7280',
-        confirmButtonText: 'Move',
-        inputValidator: function(value) {
-            // Allow empty to unassign
-            return null;
-        }
+        confirmButtonText: 'Yes, Remove'
     }).then(function(result) {
         if (result.isConfirmed) {
-            var newRack = (result.value || '').trim();
-
             $.ajax({
-                type: 'POST',
-                url: 'rack_ajax.php',
-                data: { action: 'assign', product_id: productId, rack: newRack },
-                dataType: 'json',
+                type: 'POST', url: 'rack_ajax.php', data: { action: 'remove_product', mapping_id: mappingId }, dataType: 'json',
                 success: function(data) {
                     if (data.success) {
-                        Swal.fire({
-                            icon: 'success',
-                            text: data.success,
-                            timer: 1500,
-                            showConfirmButton: false
-                        }).then(function() {
-                            location.reload();
+                        Swal.fire({ icon: 'success', text: data.success, timer: 1200, showConfirmButton: false }).then(function() {
+                            viewRackProducts(selectedRackId, selectedRackCode);
                         });
                     } else {
                         Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
                     }
-                },
-                error: function() {
-                    Swal.fire({ icon: 'error', text: 'Failed to move product.' });
                 }
             });
         }
     });
 }
 
-// Assign product modal
+// ===================== ASSIGN PRODUCTS =====================
+
 function openAssignModal() {
-    if (!currentRack) {
+    if (!selectedRackId) {
         Swal.fire({ icon: 'warning', text: 'Please select a rack first.' });
         return;
     }
-    document.getElementById('assignRackLabel').textContent = '"' + currentRack + '"';
+
+    document.getElementById('assignRackLabel').textContent = '"' + selectedRackCode + '"';
     document.getElementById('assignSearchInput').value = '';
     document.getElementById('assignResults').innerHTML = '<div class="no-results-msg">Type to search for products</div>';
-    assignModal.show();
+    assignModal_bs.show();
 
     setTimeout(function() {
         document.getElementById('assignSearchInput').focus();
     }, 300);
 }
 
-// Search products for assignment (debounced)
 function searchProducts() {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(function() {
@@ -645,16 +571,11 @@ function searchProducts() {
             return;
         }
 
-        if (q.length < 1) {
-            return;
-        }
-
-        resultsDiv.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner"></i></div>';
+        resultsDiv.innerHTML = '<div class="no-results-msg"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
 
         $.ajax({
-            type: 'POST',
-            url: 'rack_ajax.php',
-            data: { action: 'search_products', q: q },
+            type: 'POST', url: 'rack_ajax.php',
+            data: { action: 'search_products', q: q, rack_id: selectedRackId },
             dataType: 'json',
             success: function(data) {
                 if (!data || data.length === 0) {
@@ -665,70 +586,59 @@ function searchProducts() {
                 var html = '';
                 for (var i = 0; i < data.length; i++) {
                     var p = data[i];
-                    var rackLabel = p.rack ? escapeHtml(p.rack) : 'Unassigned';
                     html += '<div class="assign-item">';
                     html += '<div class="item-info">';
-                    html += '<div class="item-barcode">' + escapeHtml(p.barcode || '') + '</div>';
-                    html += '<div class="item-name">' + escapeHtml(p.name || '') + '</div>';
-                    html += '<div class="item-rack"><i class="fas fa-warehouse" style="margin-right:4px;font-size:10px;"></i>Current: ' + rackLabel + '</div>';
+                    html += '<div class="item-barcode">' + escHtml(p.barcode || '') + '</div>';
+                    html += '<div class="item-name">' + escHtml(p.name || '') + '</div>';
+                    html += '<div class="item-qoh">QOH: ' + parseInt(p.qoh || 0) + ' | ' + escHtml(p.cat || '-') + '</div>';
                     html += '</div>';
-                    html += '<button class="btn-assign-item" onclick="assignToRack(' + parseInt(p.id) + ');"><i class="fas fa-plus"></i> Assign</button>';
+                    html += '<button class="btn-assign-item" onclick="assignProduct(\'' + escHtml(p.barcode || '').replace(/'/g, "\\'") + '\', this);"><i class="fas fa-plus"></i> Add</button>';
                     html += '</div>';
                 }
                 resultsDiv.innerHTML = html;
             },
             error: function() {
-                resultsDiv.innerHTML = '<div class="no-results-msg">Search failed. Please try again.</div>';
+                resultsDiv.innerHTML = '<div class="no-results-msg">Search failed. Try again.</div>';
             }
         });
     }, 300);
 }
 
-// Assign a product to the current rack
-function assignToRack(productId) {
-    if (!currentRack || currentRack === 'Unassigned') {
-        // If assigning to "Unassigned", set rack to empty
-        var rackValue = (currentRack === 'Unassigned') ? '' : currentRack;
-    } else {
-        var rackValue = currentRack;
-    }
+function assignProduct(barcode, btnEl) {
+    if (!selectedRackId) return;
+
+    // Disable button
+    if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
 
     $.ajax({
-        type: 'POST',
-        url: 'rack_ajax.php',
-        data: { action: 'assign', product_id: productId, rack: rackValue },
+        type: 'POST', url: 'rack_ajax.php',
+        data: { action: 'add_product', rack_id: selectedRackId, barcode: barcode },
         dataType: 'json',
         success: function(data) {
             if (data.success) {
-                Swal.fire({
-                    icon: 'success',
-                    text: data.success,
-                    timer: 1500,
-                    showConfirmButton: false
-                }).then(function() {
-                    assignModal.hide();
-                    location.reload();
-                });
+                // Update button to show added
+                if (btnEl) {
+                    btnEl.innerHTML = '<i class="fas fa-check"></i> Added';
+                    btnEl.style.background = '#16a34a';
+                    btnEl.disabled = true;
+                }
+                // Refresh rack products
+                viewRackProducts(selectedRackId, selectedRackCode);
             } else {
+                if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '<i class="fas fa-plus"></i> Add'; }
                 Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
             }
         },
         error: function() {
+            if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '<i class="fas fa-plus"></i> Add'; }
             Swal.fire({ icon: 'error', text: 'Failed to assign product.' });
         }
     });
 }
 
-// Utility: escape HTML
-function escapeHtml(text) {
-    var div = document.createElement('div');
-    div.appendChild(document.createTextNode(text));
-    return div.innerHTML;
-}
-
-// Focus new name input when rename modal opens
-document.getElementById('renameModal').addEventListener('shown.bs.modal', function() {
-    document.getElementById('renameNewName').focus();
+// Focus code input when modal opens
+document.getElementById('rackModal').addEventListener('shown.bs.modal', function() {
+    document.getElementById('fCode').focus();
 });
 </script>
 </body>
