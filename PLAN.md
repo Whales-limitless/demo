@@ -1,4 +1,4 @@
-# Inventory System - Procurement & Feature Gap Analysis
+# Inventory System - Implementation Plan
 
 ## Current System Overview
 
@@ -34,163 +34,62 @@
 
 ---
 
-## Furniture Procurement - What You Have
+## Implementation Scope — 5 Features, 2 Phases
 
-Furniture is category code `38` with **29 subcategories**:
+### Phase 1 — Procurement Foundation
 
-| Sub Code | Subcategory |
-|----------|-------------|
-| 1 | DINING |
-| 2 | LIVING ROOM |
-| 3 | BEDROOM |
-| 4 | STUDY ROOM |
-| 5 | OTHERS |
-| 6 | METAL PRODUCT |
-| 7 | BOOKSHELF |
-| 8 | CUSHION |
-| 9 | SWING |
-| 10 | DINNING TABLE |
-| 11 | SOFA SET |
-| 12 | BEDSHEET |
-| 13 | FOLDING TABLE |
-| 14 | IRON BOARD |
-| 15 | MULTI PURPOSE RACK |
-| 16 | ROSTRUM |
-| 17 | CABINET |
-| 18-29 | CHINA STOCK (GD75-GD84), YUKI FURNITURE, ELK DESA |
+#### Feature 1: Supplier Management
+- **Problem:** No `supplier` table. Supplier data is free-text in `stockin` records, causing inconsistency.
+- **Build:**
+  - `supplier` table with code, name, contact person, phone, email, address, payment terms, lead time, status
+  - Admin page: list all suppliers, create, edit, delete (soft delete via status)
+  - Supplier dropdown in PO creation and stock-in forms
 
-### For procurement specifically:
-- Products are cataloged with barcode, cost price, original price, discount price
-- The `stockin` table records when goods arrive (with SUPPLIER and SUPPNO fields)
-- But there is **NO dedicated supplier master table** — supplier info is just free-text in stockin records
-- There is **NO formal Purchase Order (PO) system** — no PO creation, no PO approval, no PO-to-receiving matching
-- Stock quantities (`qoh` in PRODUCTS table) exist but are not clearly linked to any automated PO trigger
+#### Feature 2: Purchase Order (PO) Lifecycle
+- **Problem:** No formal PO system. Can record stock-in but can't create/track/approve purchase orders.
+- **Build:**
+  - **PO Creation** — Select supplier, add line items (product, qty, unit cost)
+  - **PO Status Workflow** — DRAFT → APPROVED → PARTIALLY RECEIVED → RECEIVED → CLOSED / CANCELLED
+  - **PO Approval** — Admin approves before sending to supplier
+  - **Goods Receiving (GRN)** — Receive against a PO, partial receiving supported
+  - **Discrepancy Tracking** — Ordered vs received qty mismatch alerts
+  - **Auto QOH Update** — `PRODUCTS.qoh` updated automatically on receiving
+  - **PO Listing** — Admin page to view/filter/search all POs by status, supplier, date
 
 ---
 
-## Missing Features for a Complete Inventory System
+### Phase 2 — Inventory Control
 
-### Priority 1 — Core Procurement Features (Must Have)
+#### Feature 3: Reorder Point & Low Stock Alerts
+- **Problem:** No minimum stock levels, no reorder points, no alerts when stock runs low.
+- **Build:**
+  - Add `min_qty` (reorder point) and `max_qty` fields to `PRODUCTS` table
+  - Editable per product in admin
+  - Dashboard widget showing all items where `qoh <= min_qty`
+  - Auto-suggest PO generation for low-stock items (pre-fill PO with suggested quantities)
 
-#### 1. Supplier Management
-- **What's missing:** No `supplier` table. Supplier data is stored as free-text in `stockin` records, causing inconsistency.
-- **What to build:** Supplier master table with contact info, payment terms, lead time, product associations. Supplier CRUD pages in admin.
+#### Feature 4: Stock Take / Physical Inventory Count
+- **Problem:** No formal physical count process. Stock adjustments exist but aren't tied to count sessions.
+- **Build:**
+  - **Stock Take Session** — Create a count session (full inventory or filtered by category/location)
+  - **Count Entry** — Enter counted qty per product (manual entry)
+  - **Variance Report** — Compare system qty (`qoh`) vs counted qty, show differences
+  - **Apply Adjustments** — Auto-generate `stockadj` records from variances to correct `qoh`
+  - **Session Status** — OPEN → IN PROGRESS → COMPLETED
 
-#### 2. Purchase Order (PO) System
-- **What's missing:** No formal PO lifecycle. You can record stock-in but can't create/track/approve purchase orders before goods arrive.
-- **What to build:**
-  - PO creation (select supplier, add line items with qty & price)
-  - PO status workflow: DRAFT → APPROVED → PARTIALLY RECEIVED → FULLY RECEIVED → CLOSED
-  - PO approval process (admin approval before sending to supplier)
-  - PO printing / PDF export to send to suppliers
-
-#### 3. Goods Receiving Note (GRN)
-- **What's missing:** Stock-in records exist but aren't linked to any PO. No partial receiving, no discrepancy tracking.
-- **What to build:**
-  - GRN creation linked to a PO
-  - Partial receiving (receive 50 of 100 ordered, PO stays "PARTIALLY RECEIVED")
-  - Quantity discrepancy alerts (ordered 100, received 95)
-  - Auto-update `qoh` in PRODUCTS on receiving
-
-### Priority 2 — Inventory Control Features (Should Have)
-
-#### 4. Reorder Point & Low Stock Alerts
-- **What's missing:** No minimum stock levels, no reorder points, no alerts when stock is running low.
-- **What to build:**
-  - Add `min_qty` (reorder point) and `max_qty` fields to PRODUCTS
-  - Dashboard widget showing items below reorder point
-  - Auto-suggest PO generation for low-stock items
-
-#### 5. Stock Take / Physical Inventory Count
-- **What's missing:** No cycle count or full physical inventory feature. Stock adjustments exist but aren't tied to a formal count process.
-- **What to build:**
-  - Stock take session creation (full or partial/cycle count)
-  - Count entry (scanned or manual)
-  - Variance report (system qty vs counted qty)
-  - Auto-generate stock adjustments from variances
-
-#### 6. Return Management
-- **What's missing:** No purchase returns (return to supplier) or customer return tracking.
-- **What to build:**
-  - Purchase Return / Debit Note (return damaged goods to supplier, update stock)
-  - Customer Return / Credit Note (accept returns from customers, update stock)
-
-#### 7. Inventory Reports & Analytics
-- **What's missing:** No reporting on stock movements, aging, valuation, or turnover.
-- **What to build:**
-  - Stock Movement Report (all in/out/adj for a product in a date range)
-  - Stock Valuation Report (total inventory value by cost price)
-  - Slow-Moving / Dead Stock Report (items with no movement in X days)
-  - Stock Aging Report (how long items have been sitting)
-  - Category-wise Stock Summary
-
-### Priority 3 — Operational Efficiency (Nice to Have)
-
-#### 8. Delivery Order / Dispatch Note
-- **What's missing:** The `stockout` table has delivery fields (DNAME, VEHICLE, PDATE, etc.) but no formal DO workflow.
-- **What to build:**
-  - Delivery Order creation linked to customer orders
-  - DO status tracking (PACKED → DISPATCHED → DELIVERED)
-  - Driver assignment and vehicle tracking
-  - DO printing
-
-#### 9. Stock Reservation
-- **What's missing:** No mechanism to reserve stock for pending orders. Two people can order the same last unit.
-- **What to build:**
-  - Reserve stock when order is placed
-  - Release reserved stock if order is cancelled/deleted
-  - Show "available qty" (qoh minus reserved) on product pages
-
-#### 10. Batch & Expiry Tracking
-- **What's missing:** BATCHNO and EXPDATE fields exist in stockin/stockout/stockadj tables but there's no active management UI.
-- **What to build:**
-  - Batch tracking per product (FIFO enforcement)
-  - Expiry date alerts (items expiring in X days)
-  - Dashboard widget for near-expiry items
-
-#### 11. Warehouse Location Management
-- **What's missing:** Products have a `rack` field (free-text) but no structured location hierarchy.
-- **What to build:**
-  - Location master (Zone → Aisle → Rack → Bin)
-  - Product-to-location mapping
-  - Location-based picking list for orders
-
-#### 12. Barcode / Label Printing
-- **What's missing:** Products have barcodes but no label generation/printing feature.
-- **What to build:**
-  - Barcode label template designer
-  - Bulk label printing (for stock-in batches)
-  - Price tag printing with barcode
+#### Feature 5: Stock Loss (Spoilage / Damage / Theft)
+- **Problem:** Stock adjustments exist but have no categorization for loss reasons.
+- **Build:**
+  - Dedicated "Stock Loss" page in admin
+  - Loss reason categories: SPOILAGE, DAMAGE, THEFT, EXPIRED, OTHER
+  - Record: product, qty lost, reason, remark, date, recorded by
+  - Auto-deduct from `PRODUCTS.qoh`
+  - Stores in `stockadj` table with reason category field
+  - Loss history log with filtering by reason, date range, product
 
 ---
 
-## Recommended Implementation Order
-
-```
-Phase 1 - Procurement Foundation
-├── 1. Supplier Management (supplier table + CRUD)
-├── 2. Purchase Order System (PO lifecycle)
-└── 3. Goods Receiving Note (GRN linked to PO)
-
-Phase 2 - Inventory Control
-├── 4. Reorder Point & Low Stock Alerts
-├── 5. Stock Take / Physical Count
-└── 6. Return Management
-
-Phase 3 - Reporting & Analytics
-└── 7. Inventory Reports (movement, valuation, aging, slow-moving)
-
-Phase 4 - Operational Efficiency
-├── 8. Delivery Order System
-├── 9. Stock Reservation
-├── 10. Batch & Expiry Management
-├── 11. Warehouse Location Management
-└── 12. Barcode / Label Printing
-```
-
----
-
-## Suggested New Database Tables
+## New Database Tables
 
 ```sql
 -- Supplier Master
@@ -240,7 +139,7 @@ CREATE TABLE purchase_order_item (
   FOREIGN KEY (po_id) REFERENCES purchase_order(id)
 );
 
--- Goods Receiving Note
+-- Goods Receiving Note Header
 CREATE TABLE grn (
   id INT AUTO_INCREMENT PRIMARY KEY,
   grn_number VARCHAR(50) NOT NULL UNIQUE,
@@ -271,4 +170,87 @@ CREATE TABLE grn_item (
   FOREIGN KEY (grn_id) REFERENCES grn(id),
   FOREIGN KEY (po_item_id) REFERENCES purchase_order_item(id)
 );
+
+-- Stock Take Session
+CREATE TABLE stock_take (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  session_code VARCHAR(50) NOT NULL UNIQUE,
+  description VARCHAR(200),
+  type ENUM('FULL','PARTIAL') DEFAULT 'FULL',
+  filter_cat VARCHAR(50) DEFAULT NULL,
+  filter_location VARCHAR(70) DEFAULT NULL,
+  status ENUM('OPEN','IN_PROGRESS','COMPLETED') DEFAULT 'OPEN',
+  created_by VARCHAR(50),
+  completed_by VARCHAR(50),
+  completed_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Stock Take Line Items (one row per product counted)
+CREATE TABLE stock_take_item (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  stock_take_id INT NOT NULL,
+  barcode VARCHAR(50) NOT NULL,
+  product_desc VARCHAR(100),
+  system_qty DOUBLE(8,2) NOT NULL,
+  counted_qty DOUBLE(8,2) DEFAULT NULL,
+  variance DOUBLE(8,2) DEFAULT NULL,
+  adj_applied TINYINT(1) DEFAULT 0,
+  remark VARCHAR(200),
+  counted_by VARCHAR(50),
+  counted_at DATETIME,
+  FOREIGN KEY (stock_take_id) REFERENCES stock_take(id)
+);
+```
+
+### Modified Existing Table
+
+```sql
+-- Add reorder point fields to PRODUCTS
+ALTER TABLE PRODUCTS
+  ADD COLUMN min_qty DOUBLE(8,2) DEFAULT 0.00,
+  ADD COLUMN max_qty DOUBLE(8,2) DEFAULT 0.00;
+
+-- Add loss reason field to stockadj
+ALTER TABLE stockadj
+  ADD COLUMN LOSS_REASON ENUM('SPOILAGE','DAMAGE','THEFT','EXPIRED','OTHER','ADJUSTMENT') DEFAULT 'ADJUSTMENT';
+```
+
+---
+
+## Admin Page Structure
+
+```
+/admin/
+├── dashboard.php              (existing — add low stock widget)
+├── supplier.php               (NEW — supplier list + CRUD)
+├── supplier_ajax.php          (NEW — supplier AJAX endpoints)
+├── po.php                     (NEW — PO listing page)
+├── po_detail.php              (NEW — PO create/edit/view)
+├── po_ajax.php                (NEW — PO AJAX endpoints)
+├── grn.php                    (NEW — GRN create from PO, receive goods)
+├── grn_ajax.php               (NEW — GRN AJAX endpoints)
+├── stock_take.php             (NEW — stock take sessions list)
+├── stock_take_detail.php      (NEW — count entry + variance report)
+├── stock_take_ajax.php        (NEW — stock take AJAX endpoints)
+├── stock_loss.php             (NEW — record & view stock losses)
+├── stock_loss_ajax.php        (NEW — stock loss AJAX endpoints)
+└── ... (existing files unchanged)
+```
+
+---
+
+## Implementation Order
+
+```
+Phase 1 — Procurement Foundation
+  Step 1: Create supplier table + supplier.php + supplier_ajax.php
+  Step 2: Create PO tables + po.php + po_detail.php + po_ajax.php
+  Step 3: Create GRN tables + grn.php + grn_ajax.php (linked to PO)
+  Step 4: Wire up auto QOH update on GRN receive
+
+Phase 2 — Inventory Control
+  Step 5: ALTER PRODUCTS table (min_qty, max_qty) + low stock dashboard widget
+  Step 6: Create stock_take tables + stock_take.php + stock_take_detail.php + stock_take_ajax.php
+  Step 7: ALTER stockadj (LOSS_REASON) + stock_loss.php + stock_loss_ajax.php
 ```
