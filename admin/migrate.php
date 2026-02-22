@@ -245,6 +245,21 @@ CREATE TABLE IF NOT EXISTS `rack_product` (
   FOREIGN KEY (`rack_id`) REFERENCES `rack`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 ");
+
+// --- Product Trend Config ---
+runMigration($connect, 'Create product_trend_config table', "
+CREATE TABLE IF NOT EXISTS `product_trend_config` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(100) NOT NULL,
+  `date_from` DATE NOT NULL,
+  `date_to` DATE NOT NULL,
+  `green_min` INT NOT NULL DEFAULT 50,
+  `yellow_min` INT NOT NULL DEFAULT 10,
+  `red_min` INT NOT NULL DEFAULT 1,
+  `is_active` TINYINT(1) DEFAULT 0,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
 ?>
 <!DOCTYPE html>
 <html lang="en">

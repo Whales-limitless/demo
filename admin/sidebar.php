@@ -3,8 +3,9 @@
 // Requires: $currentPage to be set by the including page
 $sidebarSections = [
     'MAIN' => [
-        ['page' => 'dashboard',   'href' => 'dashboard.php',        'icon' => 'fas fa-list-alt',             'label' => 'Orders'],
-        ['page' => 'product',     'href' => 'product.php',          'icon' => 'fas fa-boxes-stacked',        'label' => 'Products'],
+        ['page' => 'dashboard',      'href' => 'dashboard.php',        'icon' => 'fas fa-list-alt',             'label' => 'Orders'],
+        ['page' => 'product',        'href' => 'product.php',          'icon' => 'fas fa-boxes-stacked',        'label' => 'Products'],
+        ['page' => 'product_trend',  'href' => 'product_trend.php',    'icon' => 'fas fa-chart-line',           'label' => 'Product Trends'],
     ],
     'PURCHASING' => [
         ['page' => 'supplier',    'href' => 'supplier.php',         'icon' => 'fas fa-truck',                'label' => 'Suppliers'],

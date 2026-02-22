@@ -19,6 +19,31 @@ if (!$cat_row) {
 
 $category = ['id' => $cat_code, 'name' => $cat_row['cat_name']];
 
+// ===================== TREND CONFIG =====================
+// Load active trend config and compute order totals per barcode
+$trendConfig = null;
+$trendMap = []; // barcode => { color, total_ordered }
+
+$tcRes = mysqli_query($connect, "SELECT * FROM `product_trend_config` WHERE `is_active` = 1 LIMIT 1");
+if ($tcRes && $tcRow = mysqli_fetch_assoc($tcRes)) {
+    $trendConfig = $tcRow;
+    $df = mysqli_real_escape_string($connect, $tcRow['date_from']);
+    $dt = mysqli_real_escape_string($connect, $tcRow['date_to']);
+
+    $orderRes = mysqli_query($connect, "
+        SELECT BARCODE, SUM(ABS(QTY)) AS total_ordered
+        FROM `orderlist`
+        WHERE `SDATE` BETWEEN '$df' AND '$dt'
+          AND `STATUS` != 'DELETED'
+        GROUP BY `BARCODE`
+    ");
+    if ($orderRes) {
+        while ($oRow = mysqli_fetch_assoc($orderRes)) {
+            $trendMap[$oRow['BARCODE']] = (int)$oRow['total_ordered'];
+        }
+    }
+}
+
 // Fetch subcategories for this category
 $sub_result = mysqli_query($connect, "SELECT DISTINCT sub_code, sub_cat, MIN(sort_no) AS sort_order FROM category WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat_code) . "' GROUP BY sub_code, sub_cat ORDER BY sort_order ASC, sub_cat ASC");
 $subcategories = [];
@@ -30,6 +55,25 @@ while ($sub = mysqli_fetch_assoc($sub_result)) {
         $prod['id'] = intval($prod['id']);
         $prod['quantity'] = intval($prod['quantity']);
         $prod['inStock'] = $prod['quantity'] > 0;
+
+        // Compute trend indicator
+        if ($trendConfig) {
+            $ordered = $trendMap[$prod['barcode']] ?? 0;
+            if ($ordered >= (int)$trendConfig['green_min']) {
+                $prod['trend'] = 'green';
+            } elseif ($ordered >= (int)$trendConfig['yellow_min']) {
+                $prod['trend'] = 'yellow';
+            } elseif ($ordered >= (int)$trendConfig['red_min']) {
+                $prod['trend'] = 'red';
+            } else {
+                $prod['trend'] = 'black';
+            }
+            $prod['trend_qty'] = $ordered;
+        } else {
+            $prod['trend'] = null;
+            $prod['trend_qty'] = 0;
+        }
+
         $products[] = $prod;
     }
     $subcategories[] = [
@@ -142,6 +186,18 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .stock-badge.in-stock { background: var(--green-light); color: var(--green); border: 1px solid #bbf7d0; }
 .stock-badge.out-of-stock { background: var(--red-light); color: var(--primary); border: 1px solid #fecaca; }
 
+/* Trend indicator badge */
+.trend-badge { position: absolute; top: 8px; right: 8px; font-size: 9px; font-weight: 700; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 4px; }
+.trend-badge .trend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.trend-badge.trend-green { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.trend-badge.trend-green .trend-dot { background: #16a34a; }
+.trend-badge.trend-yellow { background: #fefce8; color: #a16207; border: 1px solid #fde68a; }
+.trend-badge.trend-yellow .trend-dot { background: #eab308; }
+.trend-badge.trend-red { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.trend-badge.trend-red .trend-dot { background: #ef4444; }
+.trend-badge.trend-black { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+.trend-badge.trend-black .trend-dot { background: #1a1a1a; }
+
 .product-info { padding: 12px; display: flex; flex-direction: column; flex: 1; }
 .product-name { font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
@@ -237,15 +293,26 @@ function getProductImage(p) {
   return null;
 }
 
-function renderProductCard(p, index) {
-  var sc = p.inStock ? 'in-stock' : 'out-of-stock';
-  var st = p.inStock ? 'In Stock' : 'Out of Stock';
+var trendLabels = { green: 'Hot', yellow: 'Moderate', red: 'Slow', black: 'Dead' };
 
+function renderProductCard(p, index) {
   var imgHtml;
   if (p.image) {
     imgHtml = '<img class="product-img" src="/img/' + p.image + '" alt="' + p.name + '" loading="lazy">';
   } else {
     imgHtml = '<div class="no-img-product">' + (p.sku || 'NO IMAGE') + '</div>';
+  }
+
+  // Trend indicator badge (replaces stock badge when trend config is active)
+  var badgeHtml;
+  if (p.trend) {
+    var tLabel = trendLabels[p.trend] || '';
+    badgeHtml = '<span class="trend-badge trend-' + p.trend + '"><span class="trend-dot"></span>' + tLabel + '</span>';
+  } else {
+    // Fallback to stock badge when no trend config is active
+    var sc = p.inStock ? 'in-stock' : 'out-of-stock';
+    var st = p.inStock ? 'In Stock' : 'Out of Stock';
+    badgeHtml = '<span class="stock-badge ' + sc + '">' + st + '</span>';
   }
 
   var tags = '';
@@ -261,7 +328,7 @@ function renderProductCard(p, index) {
   var bt = p.inStock ? 'Add to Cart' : 'Out of Stock';
 
   return '<div class="product-card" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" style="animation-delay:' + (index+1)*0.05 + 's">' +
-    '<div class="product-img-wrap">' + imgHtml + '<span class="stock-badge ' + sc + '">' + st + '</span></div>' +
+    '<div class="product-img-wrap">' + imgHtml + badgeHtml + '</div>' +
     '<div class="product-info">' +
       '<div class="product-name">' + p.name + '</div>' +
       '<div class="product-tags">' + tags + '</div>' +
