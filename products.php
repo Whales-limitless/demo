@@ -234,7 +234,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 </head>
 <body>
 
-<?php $searchPlaceholder = 'Search products…'; include('navbar.php'); ?>
+<?php include('navbar.php'); ?>
 
 <main class="main">
   <a href="index.php" class="back-link">
@@ -327,7 +327,7 @@ function renderProductCard(p, index) {
   var bc = p.inStock ? 'active' : 'disabled';
   var bt = p.inStock ? 'Add to Cart' : 'Out of Stock';
 
-  return '<div class="product-card" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" style="animation-delay:' + (index+1)*0.05 + 's">' +
+  return '<div class="product-card" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" data-barcode="' + (p.barcode || '').toLowerCase() + '" style="animation-delay:' + (index+1)*0.05 + 's">' +
     '<div class="product-img-wrap">' + imgHtml + badgeHtml + '</div>' +
     '<div class="product-info">' +
       '<div class="product-name">' + p.name + '</div>' +
@@ -448,13 +448,14 @@ document.getElementById('applyFilter').addEventListener('click', applySubcatFilt
 document.getElementById('clearAll').addEventListener('click', function() { selectedSubcats = {}; renderModalList(modalSearch.value); });
 document.getElementById('selectAll').addEventListener('click', function() { subcategories.forEach(function(sc) { selectedSubcats[sc.id] = true; }); renderModalList(modalSearch.value); });
 
-// Product search
+// Product search (filters by name, SKU, or barcode)
 function filterProducts(query) {
   var q = query.toLowerCase();
   document.querySelectorAll('.product-card').forEach(function(card) {
     var nameMatch = card.getAttribute('data-name').indexOf(q) !== -1;
     var skuMatch = card.getAttribute('data-sku').indexOf(q) !== -1;
-    card.style.display = (nameMatch || skuMatch) ? '' : 'none';
+    var barcodeMatch = card.getAttribute('data-barcode').indexOf(q) !== -1;
+    card.style.display = (nameMatch || skuMatch || barcodeMatch) ? '' : 'none';
   });
   document.querySelectorAll('.subcat-section, .oos-section').forEach(function(sec) {
     var any = Array.from(sec.querySelectorAll('.product-card')).some(function(c) { return c.style.display !== 'none'; });
@@ -463,10 +464,6 @@ function filterProducts(query) {
 }
 
 document.getElementById('productSearchInput').addEventListener('input', function() { filterProducts(this.value); });
-document.getElementById('searchInput').addEventListener('input', function() {
-  document.getElementById('productSearchInput').value = this.value;
-  filterProducts(this.value);
-});
 
 // Cart functionality
 function updateQty(action, id) {

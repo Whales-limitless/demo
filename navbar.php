@@ -3,11 +3,14 @@
   <button class="menu-btn" id="menuBtn" aria-label="Menu">
     <svg class="icon"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
   </button>
-  <div class="nav-search">
-    <input type="text" placeholder="<?php echo isset($searchPlaceholder) ? $searchPlaceholder : 'Search…'; ?>" id="searchInput">
-    <button aria-label="Search">
-      <svg class="icon icon-sm"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    </button>
+  <div class="nav-search-wrap">
+    <div class="nav-search">
+      <input type="text" placeholder="Search product name or barcode…" id="searchInput" autocomplete="off">
+      <button aria-label="Search">
+        <svg class="icon icon-sm"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+    </div>
+    <div class="search-dropdown" id="searchDropdown"></div>
   </div>
   <a href="cart.php" class="cart-btn" aria-label="Cart">
     <svg class="icon"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
@@ -45,6 +48,106 @@
     menuBtn.addEventListener('click', function(){ sidebar.classList.add('active'); sOverlay.classList.add('active'); });
     sOverlay.addEventListener('click', function(){ sidebar.classList.remove('active'); sOverlay.classList.remove('active'); });
     sClose.addEventListener('click', function(){ sidebar.classList.remove('active'); sOverlay.classList.remove('active'); });
+  }
+
+  // Product search dropdown
+  var searchInput = document.getElementById('searchInput');
+  var dropdown = document.getElementById('searchDropdown');
+  var debounceTimer = null;
+
+  function escHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function highlightMatch(text, query) {
+    if (!query) return escHtml(text);
+    var escaped = escHtml(text);
+    var re = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return escaped.replace(re, '<mark>$1</mark>');
+  }
+
+  function doProductSearch(q) {
+    if (!q || q.length < 1) {
+      dropdown.classList.remove('active');
+      dropdown.innerHTML = '';
+      return;
+    }
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'product_search_ajax.php?q=' + encodeURIComponent(q));
+    xhr.onload = function() {
+      if (xhr.status !== 200) { dropdown.classList.remove('active'); return; }
+      try {
+        var data = JSON.parse(xhr.responseText);
+        renderDropdown(data.products || [], q);
+      } catch(e) {
+        dropdown.classList.remove('active');
+      }
+    };
+    xhr.onerror = function() { dropdown.classList.remove('active'); };
+    xhr.send();
+  }
+
+  function renderDropdown(products, query) {
+    if (products.length === 0) {
+      dropdown.innerHTML = '<div class="search-empty">No products found</div>';
+      dropdown.classList.add('active');
+      return;
+    }
+
+    var html = products.map(function(p) {
+      var imgHtml;
+      if (p.image) {
+        imgHtml = '<img class="search-result-img" src="/img/' + escHtml(p.image) + '" alt="">';
+      } else {
+        imgHtml = '<div class="search-result-img search-no-img"><svg style="width:18px;height:18px;stroke:#9ca3af;fill:none;stroke-width:1.5"><rect x="2" y="2" width="16" height="16" rx="2"/><circle cx="7" cy="8" r="2"/><polyline points="18 14 13 9 4 18"/></svg></div>';
+      }
+
+      var stockClass = p.inStock ? 'in-stock' : 'out-of-stock';
+      var stockText = p.inStock ? 'Qty: ' + p.qoh : 'Out of Stock';
+
+      var catLink = p.cat_code ? 'products.php?cat=' + encodeURIComponent(p.cat_code) : '#';
+
+      return '<a href="' + catLink + '" class="search-result-item">' +
+        imgHtml +
+        '<div class="search-result-info">' +
+          '<div class="search-result-name">' + highlightMatch(p.name, query) + '</div>' +
+          '<div class="search-result-meta">' +
+            (p.barcode ? '<span class="search-tag barcode">' + highlightMatch(p.barcode, query) + '</span>' : '') +
+            (p.category_name ? '<span class="search-tag cat">' + escHtml(p.category_name) + '</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<span class="search-stock ' + stockClass + '">' + stockText + '</span>' +
+      '</a>';
+    }).join('');
+
+    dropdown.innerHTML = html;
+    dropdown.classList.add('active');
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      var q = this.value.trim();
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function() { doProductSearch(q); }, 250);
+    });
+
+    searchInput.addEventListener('focus', function() {
+      var q = this.value.trim();
+      if (q.length >= 1 && dropdown.innerHTML) {
+        dropdown.classList.add('active');
+      }
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      var wrap = document.querySelector('.nav-search-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        dropdown.classList.remove('active');
+      }
+    });
   }
 })();
 </script>
