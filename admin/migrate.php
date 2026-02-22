@@ -649,18 +649,19 @@ foreach ($keepColumns as $table => $keep) {
     if (empty($dropCols)) {
         $results[] = ['skip', "Cleanup $table: no unused columns found"];
     } else {
-        // Drop each unused column
-        foreach ($dropCols as $dropCol) {
-            $sql = "ALTER TABLE `$table` DROP COLUMN `$dropCol`";
-            if ($connect->query($sql)) {
-                $results[] = ['ok', "Cleanup $table: dropped column `$dropCol`"];
+        // Batch all DROP COLUMNs into a single ALTER TABLE statement
+        // This rebuilds the table only ONCE instead of once per column,
+        // which avoids "table is full" errors on limited disk space.
+        $dropParts = array_map(function($col) { return "DROP COLUMN `$col`"; }, $dropCols);
+        $sql = "ALTER TABLE `$table` " . implode(', ', $dropParts);
+        if ($connect->query($sql)) {
+            $results[] = ['ok', "Cleanup $table: dropped " . count($dropCols) . " unused columns (" . implode(', ', $dropCols) . ")"];
+        } else {
+            $err = $connect->error;
+            if (strpos($err, "check that column/key exists") !== false) {
+                $results[] = ['skip', "Cleanup $table: columns already removed"];
             } else {
-                $err = $connect->error;
-                if (strpos($err, "check that column/key exists") !== false || strpos($err, "Unknown column") !== false) {
-                    $results[] = ['skip', "Cleanup $table: column `$dropCol` already removed"];
-                } else {
-                    $results[] = ['fail', "Cleanup $table: drop `$dropCol` failed: $err"];
-                }
+                $results[] = ['fail', "Cleanup $table: " . $err];
             }
         }
     }
