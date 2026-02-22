@@ -413,6 +413,174 @@
 .inv-modal-btn .inv-icon.stock-take { background: #2563eb; }
 .inv-modal-btn .inv-icon.stock-loss { background: #dc2626; }
 
+/* ── SCAN MODAL ── */
+.scan-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 500;
+  flex-direction: column;
+}
+
+.scan-modal-overlay.active { display: flex; }
+
+.scan-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  flex-shrink: 0;
+}
+
+.scan-modal-header h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.scan-close-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(255,255,255,0.15);
+  border-radius: 50%;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.2s;
+}
+
+.scan-close-btn:hover { background: rgba(255,255,255,0.25); }
+
+.scan-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  overflow: hidden;
+}
+
+.scan-viewfinder {
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 1;
+  border-radius: 20px;
+  overflow: hidden;
+  position: relative;
+  background: #000;
+}
+
+.scan-viewfinder video { width: 100% !important; height: 100% !important; object-fit: cover !important; border: none !important; }
+#qrReader { width: 100% !important; height: 100% !important; border: none !important; }
+#qrReader video { border-radius: 20px; }
+#qrReader img[alt="Info icon"] { display: none !important; }
+#qr-shaded-region { display: none !important; }
+
+/* Scanner corner brackets */
+.scan-viewfinder::before,
+.scan-viewfinder::after {
+  content: '';
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border-color: #fff;
+  border-style: solid;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.scan-viewfinder::before { top: 16px; left: 16px; border-width: 3px 0 0 3px; border-radius: 8px 0 0 0; }
+.scan-viewfinder::after { top: 16px; right: 16px; border-width: 3px 3px 0 0; border-radius: 0 8px 0 0; }
+
+.scan-corners-bottom { position: absolute; bottom: 0; left: 0; right: 0; height: 70px; pointer-events: none; z-index: 2; }
+.scan-corners-bottom::before,
+.scan-corners-bottom::after {
+  content: '';
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border-color: #fff;
+  border-style: solid;
+}
+.scan-corners-bottom::before { bottom: 16px; left: 16px; border-width: 0 0 3px 3px; border-radius: 0 0 0 8px; }
+.scan-corners-bottom::after { bottom: 16px; right: 16px; border-width: 0 3px 3px 0; border-radius: 0 0 8px 0; }
+
+/* Scan line animation */
+.scan-line {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  z-index: 3;
+  animation: scanMove 2.5s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(200, 16, 46, 0.5);
+}
+
+@keyframes scanMove { 0%, 100% { top: 20px; } 50% { top: calc(100% - 20px); } }
+
+.scan-hint {
+  color: rgba(255,255,255,0.7);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  margin-top: 24px;
+}
+
+.scan-result {
+  margin-top: 16px;
+  padding: 12px 20px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 12px;
+  max-width: 360px;
+  width: 100%;
+  display: none;
+  text-align: center;
+}
+
+.scan-result.active { display: block; }
+
+.scan-result-text {
+  color: #fff;
+  font-size: 13px;
+  word-break: break-all;
+  margin-bottom: 10px;
+}
+
+.scan-result-actions { display: flex; gap: 8px; justify-content: center; }
+
+.scan-result-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scan-result-btn.primary { background: var(--primary); color: #fff; }
+.scan-result-btn.primary:hover { background: var(--primary-dark); }
+.scan-result-btn.secondary { background: rgba(255,255,255,0.15); color: #fff; }
+.scan-result-btn.secondary:hover { background: rgba(255,255,255,0.25); }
+
+.scan-error {
+  color: #fca5a5;
+  font-size: 13px;
+  text-align: center;
+  margin-top: 16px;
+  display: none;
+}
+
+.scan-error.active { display: block; }
+
 .inv-modal-btn .inv-label { display: flex; flex-direction: column; gap: 2px; }
 .inv-modal-btn .inv-label small { font-size: 12px; font-weight: 400; color: var(--text-muted); }
 
