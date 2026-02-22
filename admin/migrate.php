@@ -11,6 +11,239 @@ include('../dbconnection.php');
 $connect->set_charset("utf8mb4");
 
 $results = [];
+$importResults = [];
+$action = $_POST['action'] ?? '';
+
+// =====================================================================
+// --- SQL FILE IMPORT (from root folder) ---
+// =====================================================================
+function importSqlFile($connect, $filePath) {
+    set_time_limit(0);
+    ini_set('memory_limit', '512M');
+
+    $fileSize = filesize($filePath);
+    $handle = fopen($filePath, 'r');
+    if (!$handle) {
+        return ['success' => false, 'error' => 'Cannot open file.', 'executed' => 0, 'failed' => 0, 'skipped' => 0];
+    }
+
+    // Disable foreign key checks during import for speed and to avoid ordering issues
+    $connect->query("SET FOREIGN_KEY_CHECKS = 0");
+    $connect->query("SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO'");
+    $connect->query("SET AUTOCOMMIT = 0");
+
+    $stmt = '';
+    $executed = 0;
+    $failed = 0;
+    $skipped = 0;
+    $errors = [];
+    $inBlockComment = false;
+
+    while (($line = fgets($handle)) !== false) {
+        $trimmed = trim($line);
+
+        // Skip empty lines
+        if ($trimmed === '') continue;
+
+        // Handle block comments
+        if ($inBlockComment) {
+            if (strpos($trimmed, '*/') !== false) {
+                $inBlockComment = false;
+            }
+            continue;
+        }
+
+        // Skip single-line comments
+        if (strpos($trimmed, '--') === 0) continue;
+        if (strpos($trimmed, '#') === 0) continue;
+
+        // Start of block comment (not MySQL conditional)
+        if (strpos($trimmed, '/*') === 0 && strpos($trimmed, '/*!') !== 0) {
+            if (strpos($trimmed, '*/') === false) {
+                $inBlockComment = true;
+            }
+            continue;
+        }
+
+        // Skip database-level statements (we import into current DB)
+        $upper = strtoupper($trimmed);
+        if (preg_match('/^(CREATE\s+DATABASE|USE\s+`|DROP\s+DATABASE)/i', $upper)) {
+            $skipped++;
+            continue;
+        }
+
+        $stmt .= $line;
+
+        // Check if statement is complete (ends with ;)
+        if (preg_match('/;\s*$/', $trimmed)) {
+            $sql = trim($stmt);
+            $stmt = '';
+
+            if ($sql === '' || $sql === ';') continue;
+
+            if ($connect->query($sql)) {
+                $executed++;
+                // Commit in batches of 500 for performance
+                if ($executed % 500 === 0) {
+                    $connect->query("COMMIT");
+                    $connect->query("START TRANSACTION");
+                }
+            } else {
+                $err = $connect->error;
+                // Ignore duplicate/exists errors silently
+                if (strpos($err, 'already exists') !== false || strpos($err, 'Duplicate entry') !== false) {
+                    $skipped++;
+                } else {
+                    $failed++;
+                    if (count($errors) < 20) {
+                        $errors[] = mb_substr($err, 0, 200);
+                    }
+                }
+            }
+        }
+    }
+
+    // Execute any remaining statement
+    $sql = trim($stmt);
+    if ($sql !== '' && $sql !== ';') {
+        if ($connect->query($sql)) {
+            $executed++;
+        } else {
+            $failed++;
+        }
+    }
+
+    $connect->query("COMMIT");
+    $connect->query("SET FOREIGN_KEY_CHECKS = 1");
+    $connect->query("SET AUTOCOMMIT = 1");
+
+    fclose($handle);
+
+    return [
+        'success' => true,
+        'executed' => $executed,
+        'failed' => $failed,
+        'skipped' => $skipped,
+        'errors' => $errors,
+        'file_size' => $fileSize
+    ];
+}
+
+// --- Scan for .sql files in root folder ---
+$rootDir = realpath(__DIR__ . '/..');
+$sqlFiles = [];
+foreach (glob($rootDir . '/*.sql') as $f) {
+    $sqlFiles[] = [
+        'name' => basename($f),
+        'path' => $f,
+        'size' => filesize($f),
+        'modified' => filemtime($f)
+    ];
+}
+usort($sqlFiles, function($a, $b) { return $b['modified'] - $a['modified']; });
+
+// =====================================================================
+// --- SHOW FILE PICKER (no action yet) ---
+// =====================================================================
+if ($action === '') {
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Database Migration</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-4" style="max-width:700px;">
+    <h2 class="mb-2">Database Migration</h2>
+    <p class="text-muted mb-4">Import old SQL data and run migrations to restructure the database for the new inventory program.</p>
+
+    <!-- Step 1: Optional SQL Import -->
+    <div class="card mb-3">
+        <div class="card-header bg-dark text-white"><strong>Step 1: Import SQL File (Optional)</strong></div>
+        <div class="card-body">
+            <?php if (empty($sqlFiles)): ?>
+                <p class="text-muted mb-0">No <code>.sql</code> files found in root folder (<code><?php echo htmlspecialchars($rootDir); ?></code>).<br>Place your SQL dump file there and refresh.</p>
+            <?php else: ?>
+                <p class="small text-muted mb-3">Select a SQL file from your project root to import directly. This is much faster than phpMyAdmin for large files.</p>
+                <form method="post" id="importForm">
+                    <input type="hidden" name="action" value="import_and_migrate">
+                    <div class="mb-3">
+                    <?php foreach ($sqlFiles as $i => $sf): ?>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="sql_file" id="sf_<?php echo $i; ?>" value="<?php echo htmlspecialchars($sf['name']); ?>">
+                            <label class="form-check-label" for="sf_<?php echo $i; ?>">
+                                <strong><?php echo htmlspecialchars($sf['name']); ?></strong>
+                                <span class="text-muted small">(<?php echo number_format($sf['size'] / 1048576, 1); ?> MB, <?php echo date('Y-m-d H:i', $sf['modified']); ?>)</span>
+                            </label>
+                        </div>
+                    <?php endforeach; ?>
+                    </div>
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('This will import the selected SQL file into your database. Tables with the same name will be overwritten. Continue?')">
+                        Import SQL &amp; Run Migration
+                    </button>
+                    <span class="text-muted small ms-2">Imports data, then cleans up unused columns</span>
+                </form>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Step 2: Migrate Only -->
+    <div class="card mb-3">
+        <div class="card-header bg-primary text-white"><strong>Step 2: Run Migration Only</strong></div>
+        <div class="card-body">
+            <p class="small text-muted mb-3">Skip import. Only create new tables, alter existing tables, and clean up unused columns.</p>
+            <form method="post">
+                <input type="hidden" name="action" value="migrate_only">
+                <button type="submit" class="btn btn-primary">Run Migration Only</button>
+            </form>
+        </div>
+    </div>
+
+    <a href="dashboard.php" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+</body>
+</html>
+<?php
+    exit;
+}
+
+// =====================================================================
+// --- HANDLE IMPORT ---
+// =====================================================================
+if ($action === 'import_and_migrate') {
+    $selectedFile = $_POST['sql_file'] ?? '';
+    if ($selectedFile === '') {
+        $importResults[] = ['fail', 'No SQL file selected.'];
+    } else {
+        $filePath = $rootDir . '/' . basename($selectedFile);
+        if (!file_exists($filePath)) {
+            $importResults[] = ['fail', 'File not found: ' . basename($selectedFile)];
+        } else {
+            $importResults[] = ['info', 'Importing: ' . basename($selectedFile) . ' (' . number_format(filesize($filePath) / 1048576, 1) . ' MB)'];
+
+            $startTime = microtime(true);
+            $result = importSqlFile($connect, $filePath);
+            $elapsed = round(microtime(true) - $startTime, 1);
+
+            if ($result['success']) {
+                $importResults[] = ['ok', "Import completed in {$elapsed}s - Executed: {$result['executed']}, Skipped: {$result['skipped']}, Failed: {$result['failed']}"];
+                if (!empty($result['errors'])) {
+                    foreach ($result['errors'] as $err) {
+                        $importResults[] = ['fail', 'Import error: ' . $err];
+                    }
+                }
+            } else {
+                $importResults[] = ['fail', 'Import failed: ' . ($result['error'] ?? 'Unknown error')];
+            }
+        }
+    }
+}
+
+// =====================================================================
+// --- RUN MIGRATIONS (always runs after import or on migrate_only) ---
+// =====================================================================
 
 function runMigration($connect, $label, $sql) {
     global $results;
@@ -365,8 +598,25 @@ foreach ($dropTables as $dropTable) {
 <body class="bg-light">
 <div class="container py-4" style="max-width:700px;">
     <h2 class="mb-4">Database Migration Results</h2>
+
+    <?php if (!empty($importResults)): ?>
+    <h5 class="mt-3">SQL Import</h5>
+    <table class="table table-bordered mb-4">
+        <thead class="table-dark"><tr><th style="width:80px">Status</th><th>Detail</th></tr></thead>
+        <tbody>
+        <?php foreach ($importResults as $r): ?>
+            <tr class="<?php echo $r[0]==='ok' ? 'table-success' : ($r[0]==='info' ? 'table-info' : ($r[0]==='skip' ? 'table-secondary' : 'table-danger')); ?>">
+                <td><strong><?php echo strtoupper($r[0]); ?></strong></td>
+                <td><?php echo htmlspecialchars($r[1]); ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
+
+    <h5>Migrations &amp; Cleanup</h5>
     <table class="table table-bordered">
-        <thead class="table-dark"><tr><th>Status</th><th>Migration</th></tr></thead>
+        <thead class="table-dark"><tr><th style="width:80px">Status</th><th>Migration</th></tr></thead>
         <tbody>
         <?php foreach ($results as $r): ?>
             <tr class="<?php echo $r[0]==='ok' ? 'table-success' : ($r[0]==='skip' ? 'table-secondary' : 'table-danger'); ?>">
@@ -376,7 +626,8 @@ foreach ($dropTables as $dropTable) {
         <?php endforeach; ?>
         </tbody>
     </table>
-    <a href="dashboard.php" class="btn btn-primary">Back to Dashboard</a>
+    <a href="dashboard.php" class="btn btn-primary me-2">Back to Dashboard</a>
+    <a href="migrate.php" class="btn btn-outline-secondary">Run Again</a>
 </div>
 </body>
 </html>
