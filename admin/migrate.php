@@ -609,23 +609,41 @@ CREATE TABLE IF NOT EXISTS `product_trend_config` (
 // =====================================================================
 // --- CLEANUP: Drop unused columns from legacy/imported tables ---
 // =====================================================================
-// When importing old parkdeptmain data, tables come with many columns
-// that are no longer used in the new inventory program. This section
-// automatically detects and drops those unused columns.
+// Strategy: CREATE LIKE (empty copy) → DROP columns on empty table (instant)
+// → INSERT SELECT kept columns → DROP old table (frees disk) → RENAME.
+// This avoids ALTER TABLE on large tables which causes "table is full"
+// errors on hosting with limited disk quota.
+
+// Drop unused legacy tables FIRST to free disk space
+$dropTables = ['cat_group', 'stockin', 'stockout'];
+foreach ($dropTables as $dropTable) {
+    $tableCheck = $connect->query("SHOW TABLES LIKE '$dropTable'");
+    if ($tableCheck && $tableCheck->num_rows > 0) {
+        if ($connect->query("DROP TABLE `$dropTable`")) {
+            $results[] = ['ok', "Cleanup: dropped unused table `$dropTable`"];
+        } else {
+            $results[] = ['fail', "Cleanup: drop table `$dropTable` failed: " . $connect->error];
+        }
+    } else {
+        $results[] = ['skip', "Cleanup: table `$dropTable` does not exist"];
+    }
+}
 
 // Define the columns each table SHOULD keep (used by the new program)
 $keepColumns = [
-    'PRODUCTS' => ['id', 'cat_code', 'sub_code', 'barcode', 'code', 'cat', 'sub_cat', 'name', 'description', 'img1', 'qoh', 'uom', 'checked', 'stkcode', 'rack'],
-    'orderlist' => ['ID', 'OUTLET', 'SDATE', 'ACCODE', 'NAME', 'SALNUM', 'BARCODE', 'PDESC', 'QTY', 'PTYPE', 'TRANSNO', 'TDATE', 'TTIME', 'STATUS', 'PRINT', 'view_status', 'ADMINRMK', 'SOUND', 'TXTTO'],
-    'stockadj' => ['ID', 'ACCODE', 'USER', 'OUTLET', 'SDATE', 'STIME', 'SALNUM', 'BARCODE', 'PDESC', 'QTYADJ', 'REMARK', 'LOSS_REASON'],
     'sysfile' => ['ID', 'USER1', 'USER2', 'USER_NAME', 'USERNAME', 'TYPE', 'STATUS', 'OUTLET'],
+    'stockadj' => ['ID', 'ACCODE', 'USER', 'OUTLET', 'SDATE', 'STIME', 'SALNUM', 'BARCODE', 'PDESC', 'QTYADJ', 'REMARK', 'LOSS_REASON'],
+    'orderlist' => ['ID', 'OUTLET', 'SDATE', 'ACCODE', 'NAME', 'SALNUM', 'BARCODE', 'PDESC', 'QTY', 'PTYPE', 'TRANSNO', 'TDATE', 'TTIME', 'STATUS', 'PRINT', 'view_status', 'ADMINRMK', 'SOUND', 'TXTTO'],
+    'PRODUCTS' => ['id', 'cat_code', 'sub_code', 'barcode', 'code', 'cat', 'sub_cat', 'name', 'description', 'img1', 'qoh', 'uom', 'checked', 'stkcode', 'rack'],
 ];
+
+$connect->query("SET FOREIGN_KEY_CHECKS = 0");
 
 foreach ($keepColumns as $table => $keep) {
     // Check if table exists
     $tableCheck = $connect->query("SHOW TABLES LIKE '$table'");
     if (!$tableCheck || $tableCheck->num_rows === 0) {
-        continue; // Table doesn't exist, skip
+        continue;
     }
 
     // Get current columns
@@ -647,40 +665,60 @@ foreach ($keepColumns as $table => $keep) {
     }
 
     if (empty($dropCols)) {
-        $results[] = ['skip', "Cleanup $table: no unused columns found"];
-    } else {
-        // Batch all DROP COLUMNs into a single ALTER TABLE statement
-        // This rebuilds the table only ONCE instead of once per column,
-        // which avoids "table is full" errors on limited disk space.
-        $dropParts = array_map(function($col) { return "DROP COLUMN `$col`"; }, $dropCols);
-        $sql = "ALTER TABLE `$table` " . implode(', ', $dropParts);
-        if ($connect->query($sql)) {
-            $results[] = ['ok', "Cleanup $table: dropped " . count($dropCols) . " unused columns (" . implode(', ', $dropCols) . ")"];
-        } else {
-            $err = $connect->error;
-            if (strpos($err, "check that column/key exists") !== false) {
-                $results[] = ['skip', "Cleanup $table: columns already removed"];
-            } else {
-                $results[] = ['fail', "Cleanup $table: " . $err];
-            }
+        $results[] = ['skip', "Cleanup $table: already clean"];
+        continue;
+    }
+
+    // Figure out which kept columns actually exist in the current table
+    $selectCols = [];
+    foreach ($currentCols as $col) {
+        if (in_array(strtolower($col), $keepLower)) {
+            $selectCols[] = '`' . $col . '`';
         }
+    }
+
+    $tmpTable = $table . '_clean';
+
+    // 1. Drop temp table if leftover from a previous failed run
+    $connect->query("DROP TABLE IF EXISTS `$tmpTable`");
+
+    // 2. Copy structure (empty, instant) preserving PK/indexes/auto_increment
+    if (!$connect->query("CREATE TABLE `$tmpTable` LIKE `$table`")) {
+        $results[] = ['fail', "Cleanup $table: CREATE LIKE failed: " . $connect->error];
+        continue;
+    }
+
+    // 3. Drop unused columns from EMPTY temp table (instant, no data to move)
+    $dropParts = array_map(function($col) { return "DROP COLUMN `$col`"; }, $dropCols);
+    if (!$connect->query("ALTER TABLE `$tmpTable` " . implode(', ', $dropParts))) {
+        $results[] = ['fail', "Cleanup $table: ALTER temp table failed: " . $connect->error];
+        $connect->query("DROP TABLE IF EXISTS `$tmpTable`");
+        continue;
+    }
+
+    // 4. Copy data (only kept columns - much smaller than original)
+    if (!$connect->query("INSERT INTO `$tmpTable` (" . implode(',', $selectCols) . ") SELECT " . implode(',', $selectCols) . " FROM `$table`")) {
+        $results[] = ['fail', "Cleanup $table: data copy failed: " . $connect->error];
+        $connect->query("DROP TABLE IF EXISTS `$tmpTable`");
+        continue;
+    }
+
+    // 5. Drop old bloated table (frees disk immediately)
+    if (!$connect->query("DROP TABLE `$table`")) {
+        $results[] = ['fail', "Cleanup $table: drop old table failed: " . $connect->error];
+        $connect->query("DROP TABLE IF EXISTS `$tmpTable`");
+        continue;
+    }
+
+    // 6. Rename lean table to original name
+    if ($connect->query("RENAME TABLE `$tmpTable` TO `$table`")) {
+        $results[] = ['ok', "Cleanup $table: removed " . count($dropCols) . " unused columns (" . implode(', ', $dropCols) . ")"];
+    } else {
+        $results[] = ['fail', "Cleanup $table: rename failed: " . $connect->error];
     }
 }
 
-// --- Drop unused legacy tables ---
-$dropTables = ['cat_group', 'stockin', 'stockout'];
-foreach ($dropTables as $dropTable) {
-    $tableCheck = $connect->query("SHOW TABLES LIKE '$dropTable'");
-    if ($tableCheck && $tableCheck->num_rows > 0) {
-        if ($connect->query("DROP TABLE `$dropTable`")) {
-            $results[] = ['ok', "Cleanup: dropped unused table `$dropTable`"];
-        } else {
-            $results[] = ['fail', "Cleanup: drop table `$dropTable` failed: " . $connect->error];
-        }
-    } else {
-        $results[] = ['skip', "Cleanup: table `$dropTable` does not exist"];
-    }
-}
+$connect->query("SET FOREIGN_KEY_CHECKS = 1");
 ?>
 <!DOCTYPE html>
 <html lang="en">
