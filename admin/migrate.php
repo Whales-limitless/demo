@@ -259,6 +259,99 @@ function runMigration($connect, $label, $sql) {
     }
 }
 
+// =====================================================================
+// --- BASE TABLES (required for system to function) ---
+// =====================================================================
+
+// --- sysfile (User/Admin/Staff authentication) ---
+runMigration($connect, 'Create sysfile table', "
+CREATE TABLE IF NOT EXISTS `sysfile` (
+  `ID` INT AUTO_INCREMENT PRIMARY KEY,
+  `USER1` VARCHAR(100) NOT NULL,
+  `USER2` VARCHAR(100) NOT NULL,
+  `USER_NAME` VARCHAR(100) DEFAULT '',
+  `USERNAME` VARCHAR(20) DEFAULT '',
+  `TYPE` VARCHAR(5) DEFAULT 'S',
+  `STATUS` VARCHAR(5) DEFAULT 'Y',
+  `OUTLET` VARCHAR(20) DEFAULT 'MAIN'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+// Seed default admin user if sysfile is empty
+$sysCheck = $connect->query("SELECT COUNT(*) AS cnt FROM `sysfile`");
+if ($sysCheck && $sysCheck->fetch_assoc()['cnt'] == 0) {
+    $connect->query("INSERT INTO `sysfile` (`USER1`,`USER2`,`USER_NAME`,`USERNAME`,`TYPE`,`STATUS`,`OUTLET`) VALUES ('admin','admin','Administrator','ADM0001','A','Y','MAIN')");
+    $results[] = ['ok', 'Seed: default admin user created (admin/admin)'];
+} else {
+    $results[] = ['skip', 'Seed: sysfile already has users'];
+}
+
+// --- stockadj (Stock adjustment log) ---
+runMigration($connect, 'Create stockadj table', "
+CREATE TABLE IF NOT EXISTS `stockadj` (
+  `ID` INT AUTO_INCREMENT PRIMARY KEY,
+  `ACCODE` VARCHAR(20) DEFAULT '',
+  `USER` VARCHAR(50) DEFAULT '',
+  `OUTLET` VARCHAR(20) DEFAULT '',
+  `SDATE` DATE DEFAULT NULL,
+  `STIME` TIME DEFAULT NULL,
+  `SALNUM` VARCHAR(50) DEFAULT '',
+  `BARCODE` VARCHAR(50) NOT NULL,
+  `PDESC` VARCHAR(100) DEFAULT '',
+  `QTYADJ` DOUBLE(8,2) DEFAULT 0,
+  `REMARK` VARCHAR(500) DEFAULT '',
+  `LOSS_REASON` ENUM('SPOILAGE','DAMAGE','THEFT','EXPIRED','OTHER','ADJUSTMENT') DEFAULT 'ADJUSTMENT'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+// --- parafile (System counters) ---
+runMigration($connect, 'Create parafile table', "
+CREATE TABLE IF NOT EXISTS `parafile` (
+  `ID` INT AUTO_INCREMENT PRIMARY KEY,
+  `PO_NUM` VARCHAR(8) NOT NULL DEFAULT '',
+  `GRN_NUM` VARCHAR(8) NOT NULL DEFAULT ''
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+// Seed parafile with initial row if empty
+$paraCheck = $connect->query("SELECT COUNT(*) AS cnt FROM `parafile`");
+if ($paraCheck && $paraCheck->fetch_assoc()['cnt'] == 0) {
+    $connect->query("INSERT INTO `parafile` (`PO_NUM`,`GRN_NUM`) VALUES ('','')");
+    $results[] = ['ok', 'Seed: parafile initial row created'];
+} else {
+    $results[] = ['skip', 'Seed: parafile already has data'];
+}
+
+// --- MEMBER (Customer/member contacts for orders) ---
+runMigration($connect, 'Create MEMBER table', "
+CREATE TABLE IF NOT EXISTS `MEMBER` (
+  `ID` INT AUTO_INCREMENT PRIMARY KEY,
+  `ACCODE` VARCHAR(20) NOT NULL DEFAULT '',
+  `HP` VARCHAR(50) DEFAULT '',
+  `EMAIL` VARCHAR(100) DEFAULT '',
+  `ADD1` VARCHAR(255) DEFAULT '',
+  `ADD2` VARCHAR(255) DEFAULT '',
+  `ADD3` VARCHAR(255) DEFAULT '',
+  UNIQUE KEY `uq_accode` (`ACCODE`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+// --- outlet (Outlet/branch info for orders) ---
+runMigration($connect, 'Create outlet table', "
+CREATE TABLE IF NOT EXISTS `outlet` (
+  `ID` INT AUTO_INCREMENT PRIMARY KEY,
+  `CODE` VARCHAR(20) NOT NULL DEFAULT '',
+  `PDESC` VARCHAR(100) DEFAULT '',
+  `ADDRESS` TEXT,
+  `CONTACT` VARCHAR(100) DEFAULT '',
+  UNIQUE KEY `uq_code` (`CODE`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+// =====================================================================
+// --- FEATURE TABLES ---
+// =====================================================================
+
 // --- Supplier Master ---
 runMigration($connect, 'Create supplier table', "
 CREATE TABLE IF NOT EXISTS `supplier` (
