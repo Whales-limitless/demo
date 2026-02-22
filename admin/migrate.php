@@ -152,21 +152,6 @@ CREATE TABLE IF NOT EXISTS `stock_take_item` (
 
 // --- ALTER existing tables ---
 
-// Add min_qty and max_qty to PRODUCTS
-$colCheck = $connect->query("SHOW COLUMNS FROM `PRODUCTS` LIKE 'min_qty'");
-if ($colCheck && $colCheck->num_rows === 0) {
-    runMigration($connect, 'Add min_qty to PRODUCTS', "ALTER TABLE `PRODUCTS` ADD COLUMN `min_qty` DOUBLE(8,2) DEFAULT 0.00");
-} else {
-    $results[] = ['skip', 'Add min_qty to PRODUCTS (already exists)'];
-}
-
-$colCheck2 = $connect->query("SHOW COLUMNS FROM `PRODUCTS` LIKE 'max_qty'");
-if ($colCheck2 && $colCheck2->num_rows === 0) {
-    runMigration($connect, 'Add max_qty to PRODUCTS', "ALTER TABLE `PRODUCTS` ADD COLUMN `max_qty` DOUBLE(8,2) DEFAULT 0.00");
-} else {
-    $results[] = ['skip', 'Add max_qty to PRODUCTS (already exists)'];
-}
-
 // Add LOSS_REASON to stockadj
 $colCheck3 = $connect->query("SHOW COLUMNS FROM `stockadj` LIKE 'LOSS_REASON'");
 if ($colCheck3 && $colCheck3->num_rows === 0) {

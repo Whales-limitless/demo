@@ -63,14 +63,6 @@ if ($orderResult) {
 
 $adminName = htmlspecialchars($_SESSION['admin_name'] ?? 'Admin');
 
-// Low stock alert: products where qoh <= min_qty and min_qty > 0
-$lowStockItems = [];
-$lowStockResult = $connect->query("SELECT `barcode`, `name`, `cat`, `qoh`, `min_qty`, `max_qty` FROM `PRODUCTS` WHERE `min_qty` > 0 AND COALESCE(`qoh`, 0) <= `min_qty` AND `checked` = 'Y' ORDER BY (`qoh` - `min_qty`) ASC LIMIT 20");
-if ($lowStockResult) {
-    while ($r = $lowStockResult->fetch_assoc()) {
-        $lowStockItems[] = $r;
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -345,44 +337,6 @@ audio { display: none; }
             </button>
         </form>
     </div>
-
-    <!-- Low Stock Alert Widget -->
-    <?php if (count($lowStockItems) > 0): ?>
-    <div class="table-card" style="margin-bottom:20px;border-left:4px solid #f59e0b;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-            <h5 style="margin:0;font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;color:#d97706;">
-                <i class="fas fa-exclamation-triangle"></i> Low Stock Alert (<?php echo count($lowStockItems); ?> items)
-            </h5>
-            <a href="po.php" style="font-size:12px;color:var(--primary);font-weight:600;text-decoration:none;">Create PO <i class="fas fa-arrow-right"></i></a>
-        </div>
-        <div style="overflow-x:auto;">
-            <table class="orders-table" style="font-size:12px;">
-                <thead>
-                    <tr>
-                        <th>Barcode</th>
-                        <th>Product</th>
-                        <th>Category</th>
-                        <th>Current QOH</th>
-                        <th>Min Qty</th>
-                        <th>Suggested Order</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($lowStockItems as $ls): ?>
-                    <tr>
-                        <td><?php echo htmlspecialchars($ls['barcode']); ?></td>
-                        <td><?php echo htmlspecialchars(mb_substr($ls['name'], 0, 50)); ?></td>
-                        <td><?php echo htmlspecialchars($ls['cat']); ?></td>
-                        <td style="color:#dc2626;font-weight:700;"><?php echo intval($ls['qoh']); ?></td>
-                        <td><?php echo intval($ls['min_qty']); ?></td>
-                        <td><?php echo max(0, intval($ls['max_qty']) - intval($ls['qoh'])); ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    <?php endif; ?>
 
     <!-- Orders Table -->
     <div class="table-card">

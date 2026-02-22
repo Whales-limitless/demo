@@ -59,7 +59,7 @@ if ($action === 'list') {
     $offset = ($page - 1) * $perPage;
 
     // Fetch page
-    $sql = "SELECT `id`, `barcode`, `code`, `name`, `cat`, `sub_cat`, COALESCE(`qoh`, 0) AS `qoh`, `uom`, `rack`, `min_qty`, `max_qty`, `checked`
+    $sql = "SELECT `id`, `barcode`, `code`, `name`, `cat`, `sub_cat`, COALESCE(`qoh`, 0) AS `qoh`, `uom`, `rack`, `checked`
             FROM `PRODUCTS` WHERE $where ORDER BY `checked` DESC, `name` ASC LIMIT ?, ?";
     $stmt = $connect->prepare($sql);
     $fetchTypes = $types . "ii";
@@ -103,8 +103,6 @@ if ($action === 'list') {
     $sub_cat = trim($_POST['sub_cat'] ?? '');
     $uom = trim($_POST['uom'] ?? '');
     $rack = trim($_POST['rack'] ?? '');
-    $min_qty = intval($_POST['min_qty'] ?? 0);
-    $max_qty = intval($_POST['max_qty'] ?? 0);
     $qoh = floatval($_POST['qoh'] ?? 0);
     $checked = trim($_POST['checked'] ?? 'Y');
 
@@ -124,8 +122,8 @@ if ($action === 'list') {
     }
     $chk->close();
 
-    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`uom`,`rack`,`min_qty`,`max_qty`,`qoh`,`checked`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
-    $stmt->bind_param("ssssssssiiids", $barcode, $code, $name, $description, $cat, $sub_cat, $uom, $rack, $min_qty, $max_qty, $qoh, $checked);
+    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`uom`,`rack`,`qoh`,`checked`) VALUES (?,?,?,?,?,?,?,?,?,?)");
+    $stmt->bind_param("ssssssssds", $barcode, $code, $name, $description, $cat, $sub_cat, $uom, $rack, $qoh, $checked);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Product created successfully.']);
@@ -144,8 +142,6 @@ if ($action === 'list') {
     $sub_cat = trim($_POST['sub_cat'] ?? '');
     $uom = trim($_POST['uom'] ?? '');
     $rack = trim($_POST['rack'] ?? '');
-    $min_qty = intval($_POST['min_qty'] ?? 0);
-    $max_qty = intval($_POST['max_qty'] ?? 0);
     $qoh = floatval($_POST['qoh'] ?? 0);
     $checked = trim($_POST['checked'] ?? 'Y');
 
@@ -154,8 +150,8 @@ if ($action === 'list') {
         exit;
     }
 
-    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`uom`=?,`rack`=?,`min_qty`=?,`max_qty`=?,`qoh`=?,`checked`=? WHERE `id`=?");
-    $stmt->bind_param("ssssssssiiidsi", $barcode, $code, $name, $description, $cat, $sub_cat, $uom, $rack, $min_qty, $max_qty, $qoh, $checked, $id);
+    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`uom`=?,`rack`=?,`qoh`=?,`checked`=? WHERE `id`=?");
+    $stmt->bind_param("ssssssssdsi", $barcode, $code, $name, $description, $cat, $sub_cat, $uom, $rack, $qoh, $checked, $id);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Product updated successfully.']);

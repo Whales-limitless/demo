@@ -145,14 +145,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>Name</th>
                         <th>Category</th>
                         <th>QOH</th>
-                        <th>Min Qty</th>
                         <th>Rack</th>
                         <th>Status</th>
                         <th style="width:1%">Action</th>
                     </tr>
                 </thead>
                 <tbody id="dataBody">
-                    <tr class="no-results"><td colspan="9" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
+                    <tr class="no-results"><td colspan="8" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -216,14 +215,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-semibold">QOH</label>
                         <input type="number" id="fQoh" class="form-control" min="0" placeholder="0" value="0">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-semibold">Min Qty (Reorder)</label>
-                        <input type="number" id="fMinQty" class="form-control" step="1" min="0" placeholder="0" value="0">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-semibold">Max Qty</label>
-                        <input type="number" id="fMaxQty" class="form-control" step="1" min="0" placeholder="0" value="0">
                     </div>
                 </div>
                 <div class="row">
@@ -384,18 +375,13 @@ function renderTable(data) {
         var p = products[i];
         var isActive = (p.checked || 'Y') === 'Y';
         var qoh = parseFloat(p.qoh || 0);
-        var minQty = parseInt(p.min_qty || 0);
-        var isLow = (qoh <= minQty && isActive);
 
         html += '<tr>';
         html += '<td>' + (offset + i + 1) + '</td>';
         html += '<td><strong>' + escHtml(p.barcode || '') + '</strong></td>';
         html += '<td>' + escHtml(p.name || '') + '</td>';
         html += '<td>' + escHtml(p.cat || '') + '</td>';
-        html += '<td>' + Math.round(qoh);
-        if (isLow) html += ' <span class="badge-low">Low</span>';
-        html += '</td>';
-        html += '<td>' + minQty + '</td>';
+        html += '<td>' + Math.round(qoh) + '</td>';
         html += '<td>' + escHtml(p.rack || '') + '</td>';
         html += '<td><span class="badge-status ' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? 'Active' : 'Inactive') + '</span></td>';
         html += '<td style="white-space:nowrap">';
@@ -557,8 +543,6 @@ function clearForm() {
     document.getElementById('fSubCat').innerHTML = '<option value="">-- Select --</option>';
     document.getElementById('fUom').value = '';
     document.getElementById('fQoh').value = '0';
-    document.getElementById('fMinQty').value = '0';
-    document.getElementById('fMaxQty').value = '0';
     document.getElementById('fRackSelect').value = '';
     document.getElementById('fRack').value = '';
     document.getElementById('fChecked').value = 'Y';
@@ -588,8 +572,6 @@ function openEditModal(id) {
             document.getElementById('fCat').value = data.cat || '';
             document.getElementById('fUom').value = data.uom || '';
             document.getElementById('fQoh').value = data.qoh || '0';
-            document.getElementById('fMinQty').value = data.min_qty || '0';
-            document.getElementById('fMaxQty').value = data.max_qty || '0';
             // Try to match rack text to a rack code in the select
             var rackVal = data.rack || '';
             document.getElementById('fRackSelect').value = rackVal;
@@ -643,8 +625,6 @@ function saveProduct() {
         sub_cat: document.getElementById('fSubCat').value.trim(),
         uom: document.getElementById('fUom').value.trim(),
         qoh: document.getElementById('fQoh').value,
-        min_qty: document.getElementById('fMinQty').value,
-        max_qty: document.getElementById('fMaxQty').value,
         rack: rackValue,
         checked: document.getElementById('fChecked').value
     };
