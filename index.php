@@ -150,7 +150,7 @@ body {
 </head>
 <body>
 
-<?php $searchPlaceholder = 'Search categories…'; include('navbar.php'); ?>
+<?php include('navbar.php'); ?>
 
 <main class="main">
   <section>
@@ -189,15 +189,6 @@ function renderGrid(list) {
     '</a>';
   }).join('');
 }
-
-// Navbar search
-document.getElementById('searchInput').addEventListener('input', function() {
-  var q = this.value.toLowerCase();
-  if (!q) { renderGrid(); return; }
-  renderGrid(categories.filter(function(c) {
-    return c.name.toLowerCase().indexOf(q) !== -1;
-  }));
-});
 
 renderGrid();
 </script>
