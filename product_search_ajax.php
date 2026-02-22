@@ -12,25 +12,26 @@ $connect->set_charset("utf8mb4");
 
 $search = trim($_GET['q'] ?? '');
 
-if ($search === '' || strlen($search) < 1) {
+if ($search === '') {
     echo json_encode(['products' => []]);
     exit;
 }
 
-$like = '%' . strtolower($search) . '%';
+$like = '%' . $search . '%';
 
+// Exact barcode match first (uses index), then partial name/barcode matches.
+// No LOWER() wrapping — relies on utf8mb4_unicode_ci collation for case-insensitive matching.
+// LEFT JOIN directly on category table with indexed cat_code for fast lookups.
 $stmt = $connect->prepare("
     SELECT p.`id`, p.`barcode`, p.`name`, p.`stkcode`, p.`img1` AS image,
            p.`cat_code`, p.`rack`, COALESCE(p.`qoh`, 0) AS qoh,
            c.`cat_name` AS category_name
     FROM `PRODUCTS` p
-    LEFT JOIN (
-        SELECT `cat_code`, `cat_name` FROM `category` GROUP BY `cat_code`, `cat_name`
-    ) c ON p.`cat_code` = c.`cat_code`
-    WHERE (LOWER(p.`name`) LIKE ? OR LOWER(p.`barcode`) LIKE ?)
+    LEFT JOIN `category` c ON p.`cat_code` = c.`cat_code`
+    WHERE (p.`name` LIKE ? OR p.`barcode` LIKE ?)
       AND (p.`checked` != 'N' OR p.`checked` IS NULL)
     ORDER BY
-        CASE WHEN LOWER(p.`barcode`) = LOWER(?) THEN 0 ELSE 1 END,
+        CASE WHEN p.`barcode` = ? THEN 0 ELSE 1 END,
         p.`name` ASC
     LIMIT 20
 ");
@@ -39,7 +40,12 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 $products = [];
+$seen = [];
 while ($row = $result->fetch_assoc()) {
+    // Deduplicate in case LEFT JOIN on category returns multiple rows
+    if (isset($seen[$row['id']])) continue;
+    $seen[$row['id']] = true;
+
     $row['id'] = (int)$row['id'];
     $row['qoh'] = (int)$row['qoh'];
     $row['inStock'] = $row['qoh'] > 0;

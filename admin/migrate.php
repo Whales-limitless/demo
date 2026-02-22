@@ -201,7 +201,145 @@ if ($action === '') {
         </div>
     </div>
 
+    <!-- Step 3: Optimize -->
+    <div class="card mb-3">
+        <div class="card-header bg-success text-white"><strong>Step 3: Optimize Database</strong></div>
+        <div class="card-body">
+            <p class="small text-muted mb-3">Add indexes for fast product search (name, barcode), optimize tables, and analyze table statistics. Run this after import/migration to ensure the best search and browsing performance with large data.</p>
+            <form method="post">
+                <input type="hidden" name="action" value="optimize">
+                <button type="submit" class="btn btn-success">Optimize</button>
+            </form>
+        </div>
+    </div>
+
     <a href="dashboard.php" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+</body>
+</html>
+<?php
+    exit;
+}
+
+// =====================================================================
+// --- HANDLE OPTIMIZE ---
+// =====================================================================
+if ($action === 'optimize') {
+    $optimizeResults = [];
+
+    // Helper: add index if it doesn't already exist
+    function addIndexIfMissing($connect, $table, $indexName, $indexSql, &$out) {
+        $check = $connect->query("SHOW INDEX FROM `$table` WHERE Key_name = '$indexName'");
+        if ($check && $check->num_rows > 0) {
+            $out[] = ['skip', "Index `$indexName` on `$table` already exists"];
+        } else {
+            if ($connect->query($indexSql)) {
+                $out[] = ['ok', "Added index `$indexName` on `$table`"];
+            } else {
+                $err = $connect->error;
+                if (strpos($err, 'Duplicate') !== false || strpos($err, 'already exists') !== false) {
+                    $out[] = ['skip', "Index `$indexName` on `$table` already exists"];
+                } else {
+                    $out[] = ['fail', "Index `$indexName` on `$table`: $err"];
+                }
+            }
+        }
+    }
+
+    // ------ PRODUCTS table indexes ------
+    $prodCheck = $connect->query("SHOW TABLES LIKE 'PRODUCTS'");
+    if ($prodCheck && $prodCheck->num_rows > 0) {
+        addIndexIfMissing($connect, 'PRODUCTS', 'idx_products_barcode',
+            "ALTER TABLE `PRODUCTS` ADD INDEX `idx_products_barcode` (`barcode`)", $optimizeResults);
+
+        addIndexIfMissing($connect, 'PRODUCTS', 'idx_products_name',
+            "ALTER TABLE `PRODUCTS` ADD INDEX `idx_products_name` (`name`)", $optimizeResults);
+
+        addIndexIfMissing($connect, 'PRODUCTS', 'idx_products_cat_code',
+            "ALTER TABLE `PRODUCTS` ADD INDEX `idx_products_cat_code` (`cat_code`)", $optimizeResults);
+
+        addIndexIfMissing($connect, 'PRODUCTS', 'idx_products_checked',
+            "ALTER TABLE `PRODUCTS` ADD INDEX `idx_products_checked` (`checked`)", $optimizeResults);
+
+        addIndexIfMissing($connect, 'PRODUCTS', 'idx_products_search',
+            "ALTER TABLE `PRODUCTS` ADD INDEX `idx_products_search` (`name`, `barcode`)", $optimizeResults);
+    } else {
+        $optimizeResults[] = ['skip', 'PRODUCTS table not found'];
+    }
+
+    // ------ category table indexes ------
+    $catCheck = $connect->query("SHOW TABLES LIKE 'category'");
+    if ($catCheck && $catCheck->num_rows > 0) {
+        addIndexIfMissing($connect, 'category', 'idx_category_cat_code',
+            "ALTER TABLE `category` ADD INDEX `idx_category_cat_code` (`cat_code`)", $optimizeResults);
+    }
+
+    // ------ orderlist table indexes ------
+    $olCheck = $connect->query("SHOW TABLES LIKE 'orderlist'");
+    if ($olCheck && $olCheck->num_rows > 0) {
+        addIndexIfMissing($connect, 'orderlist', 'idx_orderlist_barcode',
+            "ALTER TABLE `orderlist` ADD INDEX `idx_orderlist_barcode` (`BARCODE`)", $optimizeResults);
+
+        addIndexIfMissing($connect, 'orderlist', 'idx_orderlist_sdate_status',
+            "ALTER TABLE `orderlist` ADD INDEX `idx_orderlist_sdate_status` (`SDATE`, `STATUS`)", $optimizeResults);
+    }
+
+    // ------ stock_take_item table indexes ------
+    $stiCheck = $connect->query("SHOW TABLES LIKE 'stock_take_item'");
+    if ($stiCheck && $stiCheck->num_rows > 0) {
+        addIndexIfMissing($connect, 'stock_take_item', 'idx_sti_barcode',
+            "ALTER TABLE `stock_take_item` ADD INDEX `idx_sti_barcode` (`barcode`)", $optimizeResults);
+
+        addIndexIfMissing($connect, 'stock_take_item', 'idx_sti_stock_take_id',
+            "ALTER TABLE `stock_take_item` ADD INDEX `idx_sti_stock_take_id` (`stock_take_id`)", $optimizeResults);
+    }
+
+    // ------ stockadj table indexes ------
+    $saCheck = $connect->query("SHOW TABLES LIKE 'stockadj'");
+    if ($saCheck && $saCheck->num_rows > 0) {
+        addIndexIfMissing($connect, 'stockadj', 'idx_stockadj_barcode',
+            "ALTER TABLE `stockadj` ADD INDEX `idx_stockadj_barcode` (`BARCODE`)", $optimizeResults);
+    }
+
+    // ------ OPTIMIZE & ANALYZE key tables ------
+    $tablesToOptimize = ['PRODUCTS', 'category', 'orderlist', 'stock_take_item', 'stockadj', 'sysfile'];
+    foreach ($tablesToOptimize as $tbl) {
+        $tblCheck = $connect->query("SHOW TABLES LIKE '$tbl'");
+        if ($tblCheck && $tblCheck->num_rows > 0) {
+            $connect->query("OPTIMIZE TABLE `$tbl`");
+            if ($connect->query("ANALYZE TABLE `$tbl`")) {
+                $optimizeResults[] = ['ok', "OPTIMIZE + ANALYZE `$tbl`"];
+            } else {
+                $optimizeResults[] = ['fail', "ANALYZE `$tbl`: " . $connect->error];
+            }
+        }
+    }
+
+    // --- Show results ---
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Database Optimization Results</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-4" style="max-width:700px;">
+    <h2 class="mb-4">Database Optimization Results</h2>
+    <table class="table table-bordered">
+        <thead class="table-dark"><tr><th style="width:80px">Status</th><th>Detail</th></tr></thead>
+        <tbody>
+        <?php foreach ($optimizeResults as $r): ?>
+            <tr class="<?php echo $r[0]==='ok' ? 'table-success' : ($r[0]==='skip' ? 'table-secondary' : 'table-danger'); ?>">
+                <td><strong><?php echo strtoupper($r[0]); ?></strong></td>
+                <td><?php echo htmlspecialchars($r[1]); ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <a href="dashboard.php" class="btn btn-primary me-2">Back to Dashboard</a>
+    <a href="migrate.php" class="btn btn-outline-secondary">Run Again</a>
 </div>
 </body>
 </html>
