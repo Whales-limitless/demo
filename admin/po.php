@@ -113,7 +113,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>Supplier</th>
                         <th>Order Date</th>
                         <th>Expected</th>
-                        <th>Total (RM)</th>
                         <th>Status</th>
                         <th>Created By</th>
                         <th style="width:1%">Action</th>
@@ -121,7 +120,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 </thead>
                 <tbody id="dataBody">
                     <?php if (count($pos) === 0): ?>
-                    <tr class="no-results"><td colspan="9"><i class="fas fa-file-invoice" style="font-size:24px;margin-bottom:8px;display:block;"></i>No purchase orders found</td></tr>
+                    <tr class="no-results"><td colspan="8"><i class="fas fa-file-invoice" style="font-size:24px;margin-bottom:8px;display:block;"></i>No purchase orders found</td></tr>
                     <?php else: ?>
                     <?php foreach ($pos as $i => $po): ?>
                     <tr data-search="<?php echo htmlspecialchars(strtolower(
@@ -132,7 +131,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <td><?php echo htmlspecialchars($po['supplier_name'] ?? ''); ?></td>
                         <td><?php echo !empty($po['order_date']) ? date('d/m/Y', strtotime($po['order_date'])) : ''; ?></td>
                         <td><?php echo !empty($po['expected_date']) ? date('d/m/Y', strtotime($po['expected_date'])) : '-'; ?></td>
-                        <td><?php echo number_format($po['total_amount'] ?? 0, 2); ?></td>
                         <td><span class="badge-po badge-<?php echo htmlspecialchars($po['status'] ?? 'DRAFT'); ?>"><?php echo str_replace('_', ' ', htmlspecialchars($po['status'] ?? '')); ?></span></td>
                         <td><?php echo htmlspecialchars($po['created_by'] ?? ''); ?></td>
                         <td style="white-space:nowrap">

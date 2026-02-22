@@ -72,7 +72,7 @@ if ($action === 'receive') {
         $stmt->close();
 
         // Insert GRN items + update PRODUCTS.qoh + update PO item qty_received
-        $grnItemStmt = $connect->prepare("INSERT INTO `grn_item` (`grn_id`,`po_item_id`,`barcode`,`product_desc`,`qty_received`,`qty_rejected`,`unit_cost`,`batch_no`,`rack_location`) VALUES (?,?,?,?,?,?,?,?,?)");
+        $grnItemStmt = $connect->prepare("INSERT INTO `grn_item` (`grn_id`,`po_item_id`,`barcode`,`product_desc`,`qty_received`,`qty_rejected`,`unit_cost`,`batch_no`,`rack_location`) VALUES (?,?,?,?,?,?,0,?,?)");
         $updateQohStmt = $connect->prepare("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) + ? WHERE `barcode` = ?");
         $updatePoItemStmt = $connect->prepare("UPDATE `purchase_order_item` SET `qty_received` = `qty_received` + ? WHERE `id` = ?");
 
@@ -82,20 +82,11 @@ if ($action === 'receive') {
             $desc = trim($item['product_desc'] ?? '');
             $qtyReceived = floatval($item['qty_received'] ?? 0);
             $qtyRejected = floatval($item['qty_rejected'] ?? 0);
-            $unitCost = floatval($item['unit_cost'] ?? 0);
             $batchNo = trim($item['batch_no'] ?? '');
             $rackLoc = trim($item['rack_location'] ?? '');
 
-            // If unit_cost not provided, look it up from PO item
-            if ($unitCost == 0 && $poItemId) {
-                $costResult = $connect->query("SELECT `unit_cost` FROM `purchase_order_item` WHERE `id` = $poItemId LIMIT 1");
-                if ($costResult && $costRow = $costResult->fetch_assoc()) {
-                    $unitCost = floatval($costRow['unit_cost']);
-                }
-            }
-
             // Insert GRN line item
-            $grnItemStmt->bind_param("iissdddss", $grnId, $poItemId, $barcode, $desc, $qtyReceived, $qtyRejected, $unitCost, $batchNo, $rackLoc);
+            $grnItemStmt->bind_param("iissddss", $grnId, $poItemId, $barcode, $desc, $qtyReceived, $qtyRejected, $batchNo, $rackLoc);
             if (!$grnItemStmt->execute()) {
                 throw new Exception('Failed to insert GRN item: ' . $connect->error);
             }

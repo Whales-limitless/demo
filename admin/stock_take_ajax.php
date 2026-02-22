@@ -39,7 +39,7 @@ if ($action === 'create') {
     $connect->begin_transaction();
 
     try {
-        $stmt = $connect->prepare("INSERT INTO `stock_take` (`session_code`,`description`,`type`,`filter_cat`,`status`,`created_by`) VALUES (?,?,?,?,'OPEN',?)");
+        $stmt = $connect->prepare("INSERT INTO `stock_take` (`session_code`,`description`,`type`,`filter_cat`,`status`,`created_by`) VALUES (?,?,?,?,'DRAFT',?)");
         $stmt->bind_param("sssss", $sessionCode, $desc, $type, $filterCatVal, $createdBy);
         if (!$stmt->execute()) {
             throw new Exception('Failed to create session: ' . $connect->error);
@@ -83,15 +83,15 @@ if ($action === 'create') {
         exit;
     }
 
-    // Verify session is OPEN or IN_PROGRESS
+    // Verify session is editable (DRAFT or SUBMITTED)
     $chk = $connect->query("SELECT `status` FROM `stock_take` WHERE `id` = $sessionId LIMIT 1");
     if (!$chk || $chk->num_rows === 0) {
         echo json_encode(['error' => 'Session not found.']);
         exit;
     }
     $row = $chk->fetch_assoc();
-    if (!in_array($row['status'], ['OPEN', 'IN_PROGRESS'])) {
-        echo json_encode(['error' => 'Session is completed.']);
+    if (!in_array($row['status'], ['DRAFT', 'SUBMITTED'])) {
+        echo json_encode(['error' => 'Session is already approved and cannot be edited.']);
         exit;
     }
 
@@ -113,17 +113,12 @@ if ($action === 'create') {
             $systemQty = floatval($sysRow['system_qty']);
             $variance = ($countedQty !== null) ? ($countedQty - $systemQty) : null;
 
-            $stmt->bind_param("ddssi" . "i", $countedQty, $variance, $remark, $countedBy, $itemId, $sessionId);
+            $stmt->bind_param("ddssii", $countedQty, $variance, $remark, $countedBy, $itemId, $sessionId);
             $stmt->execute();
             $updated++;
         }
     }
     $stmt->close();
-
-    // Update session status to IN_PROGRESS if it was OPEN
-    if ($row['status'] === 'OPEN') {
-        $connect->query("UPDATE `stock_take` SET `status` = 'IN_PROGRESS' WHERE `id` = $sessionId AND `status` = 'OPEN'");
-    }
 
     echo json_encode(['success' => $updated . ' items updated.']);
 
@@ -141,8 +136,8 @@ if ($action === 'create') {
         exit;
     }
     $row = $chk->fetch_assoc();
-    if ($row['status'] !== 'IN_PROGRESS') {
-        echo json_encode(['error' => 'Session must be IN PROGRESS to apply adjustments.']);
+    if ($row['status'] !== 'SUBMITTED') {
+        echo json_encode(['error' => 'Session must be SUBMITTED to apply adjustments.']);
         exit;
     }
 
@@ -193,20 +188,74 @@ if ($action === 'create') {
         echo json_encode(['error' => $e->getMessage()]);
     }
 
-} elseif ($action === 'complete') {
+} elseif ($action === 'approve') {
     $sessionId = intval($_POST['session_id'] ?? 0);
-    $completedBy = $_SESSION['admin_name'] ?? 'Admin';
+    $approvedBy = $_SESSION['admin_name'] ?? 'Admin';
 
-    $stmt = $connect->prepare("UPDATE `stock_take` SET `status`='COMPLETED', `completed_by`=?, `completed_at`=NOW() WHERE `id`=? AND `status`='IN_PROGRESS'");
-    $stmt->bind_param("si", $completedBy, $sessionId);
-    $stmt->execute();
-
-    if ($stmt->affected_rows > 0) {
-        echo json_encode(['success' => 'Stock take session completed.']);
-    } else {
-        echo json_encode(['error' => 'Session must be IN PROGRESS to complete.']);
+    if ($sessionId <= 0) {
+        echo json_encode(['error' => 'Invalid session.']);
+        exit;
     }
-    $stmt->close();
+
+    $chk = $connect->query("SELECT `status` FROM `stock_take` WHERE `id` = $sessionId LIMIT 1");
+    if (!$chk || $chk->num_rows === 0) {
+        echo json_encode(['error' => 'Session not found.']);
+        exit;
+    }
+    $row = $chk->fetch_assoc();
+    if ($row['status'] !== 'SUBMITTED') {
+        echo json_encode(['error' => 'Session must be SUBMITTED to approve.']);
+        exit;
+    }
+
+    $connect->begin_transaction();
+
+    try {
+        // Apply stock adjustments for all items with variance
+        $curDate = date('Y-m-d');
+        $curTime = date('H:i:s');
+        $salnum = 'STADJ' . date('YmdHis');
+
+        $itemsResult = $connect->query("SELECT * FROM `stock_take_item` WHERE `stock_take_id` = $sessionId AND `counted_qty` IS NOT NULL AND `variance` != 0 AND `adj_applied` = 0");
+
+        $adjCount = 0;
+        if ($itemsResult) {
+            $updateQohStmt = $connect->prepare("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) + ? WHERE `barcode` = ?");
+            $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`IP`,`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`MNO`,`BARCODE`,`PDESC`,`LOOSE`,`PGROUP`,`PRODTYPE`,`QTYADJ`,`SERIALNUMBER`,`REMARK`,`LOSS_REASON`) VALUES ('','STOCKTAKE',?,?,?,?,?,'',?,?,0,'','',?,'',?,'ADJUSTMENT')");
+
+            while ($item = $itemsResult->fetch_assoc()) {
+                $variance = floatval($item['variance']);
+                $barcode = $item['barcode'];
+                $desc = $item['product_desc'];
+                $rmk = 'Stock Take Adj: ' . $item['stock_take_id'] . ' | Sys:' . $item['system_qty'] . ' Count:' . $item['counted_qty'];
+
+                $updateQohStmt->bind_param("ds", $variance, $barcode);
+                $updateQohStmt->execute();
+
+                $adjStmt->bind_param("sssssssds", $approvedBy, $approvedBy, $curDate, $curTime, $salnum, $barcode, $desc, $variance, $rmk);
+                $adjStmt->execute();
+
+                $connect->query("UPDATE `stock_take_item` SET `adj_applied` = 1 WHERE `id` = " . intval($item['id']));
+                $adjCount++;
+            }
+
+            $updateQohStmt->close();
+            $adjStmt->close();
+        }
+
+        // Mark session as APPROVED
+        $stmt = $connect->prepare("UPDATE `stock_take` SET `status`='APPROVED', `approved_by`=?, `approved_at`=NOW(), `completed_by`=?, `completed_at`=NOW() WHERE `id`=?");
+        $stmt->bind_param("ssi", $approvedBy, $approvedBy, $sessionId);
+        $stmt->execute();
+        $stmt->close();
+
+        $connect->commit();
+        echo json_encode(['success' => 'Stock take approved. ' . $adjCount . ' adjustments applied to stock.']);
+
+    } catch (Exception $e) {
+        $connect->rollback();
+        echo json_encode(['error' => $e->getMessage()]);
+    }
 
 } else {
     echo json_encode(['error' => 'Invalid action.']);

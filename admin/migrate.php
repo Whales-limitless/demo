@@ -152,21 +152,6 @@ CREATE TABLE IF NOT EXISTS `stock_take_item` (
 
 // --- ALTER existing tables ---
 
-// Add min_qty and max_qty to PRODUCTS
-$colCheck = $connect->query("SHOW COLUMNS FROM `PRODUCTS` LIKE 'min_qty'");
-if ($colCheck && $colCheck->num_rows === 0) {
-    runMigration($connect, 'Add min_qty to PRODUCTS', "ALTER TABLE `PRODUCTS` ADD COLUMN `min_qty` DOUBLE(8,2) DEFAULT 0.00");
-} else {
-    $results[] = ['skip', 'Add min_qty to PRODUCTS (already exists)'];
-}
-
-$colCheck2 = $connect->query("SHOW COLUMNS FROM `PRODUCTS` LIKE 'max_qty'");
-if ($colCheck2 && $colCheck2->num_rows === 0) {
-    runMigration($connect, 'Add max_qty to PRODUCTS', "ALTER TABLE `PRODUCTS` ADD COLUMN `max_qty` DOUBLE(8,2) DEFAULT 0.00");
-} else {
-    $results[] = ['skip', 'Add max_qty to PRODUCTS (already exists)'];
-}
-
 // Add LOSS_REASON to stockadj
 $colCheck3 = $connect->query("SHOW COLUMNS FROM `stockadj` LIKE 'LOSS_REASON'");
 if ($colCheck3 && $colCheck3->num_rows === 0) {
@@ -188,6 +173,40 @@ if ($colCheck5 && $colCheck5->num_rows === 0) {
     runMigration($connect, 'Add GRN_NUM to parafile', "ALTER TABLE `parafile` ADD COLUMN `GRN_NUM` VARCHAR(8) NOT NULL DEFAULT ''");
 } else {
     $results[] = ['skip', 'Add GRN_NUM to parafile (already exists)'];
+}
+
+// --- Alter stock_take status enum to add DRAFT, SUBMITTED, APPROVED ---
+runMigration($connect, 'Alter stock_take status enum', "
+ALTER TABLE `stock_take` MODIFY COLUMN `status` ENUM('OPEN','IN_PROGRESS','COMPLETED','DRAFT','SUBMITTED','APPROVED') DEFAULT 'DRAFT'
+");
+
+// Add submitted_by and submitted_at columns to stock_take
+$colCheck6 = $connect->query("SHOW COLUMNS FROM `stock_take` LIKE 'submitted_by'");
+if ($colCheck6 && $colCheck6->num_rows === 0) {
+    runMigration($connect, 'Add submitted_by to stock_take', "ALTER TABLE `stock_take` ADD COLUMN `submitted_by` VARCHAR(50) DEFAULT '' AFTER `completed_at`");
+} else {
+    $results[] = ['skip', 'Add submitted_by to stock_take (already exists)'];
+}
+
+$colCheck7 = $connect->query("SHOW COLUMNS FROM `stock_take` LIKE 'submitted_at'");
+if ($colCheck7 && $colCheck7->num_rows === 0) {
+    runMigration($connect, 'Add submitted_at to stock_take', "ALTER TABLE `stock_take` ADD COLUMN `submitted_at` DATETIME DEFAULT NULL AFTER `submitted_by`");
+} else {
+    $results[] = ['skip', 'Add submitted_at to stock_take (already exists)'];
+}
+
+$colCheck8 = $connect->query("SHOW COLUMNS FROM `stock_take` LIKE 'approved_by'");
+if ($colCheck8 && $colCheck8->num_rows === 0) {
+    runMigration($connect, 'Add approved_by to stock_take', "ALTER TABLE `stock_take` ADD COLUMN `approved_by` VARCHAR(50) DEFAULT '' AFTER `submitted_at`");
+} else {
+    $results[] = ['skip', 'Add approved_by to stock_take (already exists)'];
+}
+
+$colCheck9 = $connect->query("SHOW COLUMNS FROM `stock_take` LIKE 'approved_at'");
+if ($colCheck9 && $colCheck9->num_rows === 0) {
+    runMigration($connect, 'Add approved_at to stock_take', "ALTER TABLE `stock_take` ADD COLUMN `approved_at` DATETIME DEFAULT NULL AFTER `approved_by`");
+} else {
+    $results[] = ['skip', 'Add approved_at to stock_take (already exists)'];
 }
 
 // --- Product Category ---
@@ -219,6 +238,44 @@ CREATE TABLE IF NOT EXISTS `product_uom` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `name` VARCHAR(50) NOT NULL UNIQUE,
   `status` ENUM('ACTIVE','INACTIVE') DEFAULT 'ACTIVE',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+// --- Rack ---
+runMigration($connect, 'Create rack table', "
+CREATE TABLE IF NOT EXISTS `rack` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `code` VARCHAR(50) NOT NULL UNIQUE,
+  `description` VARCHAR(200) DEFAULT '',
+  `status` ENUM('ACTIVE','INACTIVE') DEFAULT 'ACTIVE',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+// --- Rack-Product Mapping ---
+runMigration($connect, 'Create rack_product table', "
+CREATE TABLE IF NOT EXISTS `rack_product` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `rack_id` INT NOT NULL,
+  `barcode` VARCHAR(50) NOT NULL,
+  `assigned_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_rack_barcode` (`rack_id`, `barcode`),
+  FOREIGN KEY (`rack_id`) REFERENCES `rack`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+// --- Product Trend Config ---
+runMigration($connect, 'Create product_trend_config table', "
+CREATE TABLE IF NOT EXISTS `product_trend_config` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(100) NOT NULL,
+  `date_from` DATE NOT NULL,
+  `date_to` DATE NOT NULL,
+  `green_min` INT NOT NULL DEFAULT 50,
+  `yellow_min` INT NOT NULL DEFAULT 10,
+  `red_min` INT NOT NULL DEFAULT 1,
+  `is_active` TINYINT(1) DEFAULT 0,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 ");

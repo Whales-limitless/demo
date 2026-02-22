@@ -49,18 +49,6 @@ foreach ($items as $item) {
 
     if ($qty < 1) $qty = 1;
 
-    // Look up product price from PRODUCTS table
-    $retail = 0;
-    $amount = 0;
-    if ($barcode !== '') {
-        $priceResult = mysqli_query($connect, "SELECT oriprice, disprice FROM PRODUCTS WHERE barcode = '" . mysqli_real_escape_string($connect, $barcode) . "' LIMIT 1");
-        if ($priceResult && $priceRow = mysqli_fetch_assoc($priceResult)) {
-            // Use discount price if available, otherwise original price
-            $retail = ($priceRow['disprice'] > 0) ? $priceRow['disprice'] : $priceRow['oriprice'];
-            $amount = $retail * $qty;
-        }
-    }
-
     $escapedAccode = mysqli_real_escape_string($connect, $userAccode);
     $escapedUserName = mysqli_real_escape_string($connect, $userName);
 
@@ -74,8 +62,8 @@ foreach ($items as $item) {
                 '" . mysqli_real_escape_string($connect, $barcode) . "',
                 '" . mysqli_real_escape_string($connect, $name) . "',
                 '$qty',
-                '$retail',
-                '$amount',
+                '0',
+                '0',
                 '',
                 '',
                 '',

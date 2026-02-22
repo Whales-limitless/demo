@@ -38,10 +38,14 @@ if ($itemResult) {
     }
 }
 
+$isDraft = ($session['status'] === 'DRAFT');
+$isSubmitted = ($session['status'] === 'SUBMITTED');
+$isApproved = ($session['status'] === 'APPROVED');
+// Legacy support
 $isOpen = ($session['status'] === 'OPEN');
 $isInProgress = ($session['status'] === 'IN_PROGRESS');
 $isCompleted = ($session['status'] === 'COMPLETED');
-$canEdit = ($isOpen || $isInProgress);
+$canEdit = ($isDraft || $isSubmitted || $isOpen || $isInProgress);
 
 $currentPage = 'stock_take';
 ?>
@@ -71,6 +75,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .badge-OPEN { background: #dbeafe; color: #2563eb; }
 .badge-IN_PROGRESS { background: #fef3c7; color: #d97706; }
 .badge-COMPLETED { background: #dcfce7; color: #16a34a; }
+.badge-DRAFT { background: #dbeafe; color: #2563eb; }
+.badge-SUBMITTED { background: #fef3c7; color: #d97706; }
+.badge-APPROVED { background: #dcfce7; color: #16a34a; }
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .data-table thead th { background: var(--text); color: #fff; font-weight: 600; font-size: 12px; text-transform: uppercase; padding: 10px 12px; white-space: nowrap; text-align: left; }
 .data-table tbody td { padding: 8px 12px; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
@@ -122,6 +129,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             <div class="col-md-2 mb-2"><strong>Type:</strong> <?php echo htmlspecialchars($session['type']); ?></div>
             <div class="col-md-3 mb-2"><strong>Category:</strong> <?php echo htmlspecialchars($session['filter_cat'] ?: 'All'); ?></div>
             <div class="col-md-3 mb-2"><strong>Created:</strong> <?php echo date('d/m/Y H:i', strtotime($session['created_at'])); ?> by <?php echo htmlspecialchars($session['created_by']); ?></div>
+            <?php if (!empty($session['submitted_by'])): ?>
+            <div class="col-md-3 mb-2"><strong>Submitted:</strong> <?php echo !empty($session['submitted_at']) ? date('d/m/Y H:i', strtotime($session['submitted_at'])) : ''; ?> by <?php echo htmlspecialchars($session['submitted_by']); ?></div>
+            <?php endif; ?>
+            <?php if (!empty($session['approved_by'])): ?>
+            <div class="col-md-3 mb-2"><strong>Approved:</strong> <?php echo !empty($session['approved_at']) ? date('d/m/Y H:i', strtotime($session['approved_at'])) : ''; ?> by <?php echo htmlspecialchars($session['approved_by']); ?></div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -209,11 +222,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <?php if ($canEdit): ?>
         <button type="button" class="btn-primary-action" onclick="saveCounts();"><i class="fas fa-save"></i> Save Counts</button>
         <?php endif; ?>
-        <?php if ($isInProgress && $withVariance > 0): ?>
-        <button type="button" class="btn-warning-action" onclick="applyAdjustments();"><i class="fas fa-sync"></i> Apply Adjustments to QOH</button>
-        <?php endif; ?>
-        <?php if ($isInProgress): ?>
-        <button type="button" class="btn-success-action" onclick="completeSession();"><i class="fas fa-check-circle"></i> Complete Session</button>
+        <?php if ($isSubmitted): ?>
+        <button type="button" class="btn-success-action" onclick="approveSession();"><i class="fas fa-check-circle"></i> Approve &amp; Apply Adjustments</button>
         <?php endif; ?>
     </div>
 </div>
@@ -288,49 +298,23 @@ function saveCounts() {
     });
 }
 
-function applyAdjustments() {
+function approveSession() {
     Swal.fire({
-        title: 'Apply Stock Adjustments?',
-        text: 'This will update PRODUCTS.qoh for all items with variance and create stockadj records.',
-        icon: 'warning',
+        title: 'Approve Stock Take?',
+        text: 'This will approve the stock take, apply all adjustments to QOH, and lock the session. No further changes will be allowed.',
+        icon: 'question',
         showCancelButton: true,
-        confirmButtonColor: '#f59e0b',
-        confirmButtonText: 'Yes, Apply'
+        confirmButtonColor: '#22c55e',
+        confirmButtonText: 'Yes, Approve'
     }).then(function(result) {
         if (result.isConfirmed) {
             $.ajax({
                 type: 'POST', url: 'stock_take_ajax.php',
-                data: { action: 'apply_adjustments', session_id: sessionId },
+                data: { action: 'approve', session_id: sessionId },
                 dataType: 'json',
                 success: function(data) {
                     if (data.success) {
                         Swal.fire({ icon: 'success', text: data.success }).then(function() { location.reload(); });
-                    } else {
-                        Swal.fire({ icon: 'error', text: data.error });
-                    }
-                }
-            });
-        }
-    });
-}
-
-function completeSession() {
-    Swal.fire({
-        title: 'Complete this session?',
-        text: 'No further changes will be allowed.',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#22c55e',
-        confirmButtonText: 'Complete'
-    }).then(function(result) {
-        if (result.isConfirmed) {
-            $.ajax({
-                type: 'POST', url: 'stock_take_ajax.php',
-                data: { action: 'complete', session_id: sessionId },
-                dataType: 'json',
-                success: function(data) {
-                    if (data.success) {
-                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { location.reload(); });
                     } else {
                         Swal.fire({ icon: 'error', text: data.error });
                     }

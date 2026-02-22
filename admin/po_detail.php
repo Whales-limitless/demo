@@ -166,9 +166,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>Description</th>
                         <th style="width:90px">Qty Ordered</th>
                         <th style="width:90px">Qty Received</th>
-                        <th style="width:100px">Unit Cost</th>
                         <th style="width:80px">UOM</th>
-                        <th style="width:100px">Subtotal</th>
                         <?php if ($isDraft): ?><th style="width:50px"></th><?php endif; ?>
                     </tr>
                 </thead>
@@ -179,23 +177,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <td><?php echo $idx + 1; ?></td>
                         <td><?php if ($isDraft): ?><input type="text" class="item-barcode" value="<?php echo htmlspecialchars($item['barcode']); ?>" onchange="lookupProduct(this);"><?php else: echo htmlspecialchars($item['barcode']); endif; ?></td>
                         <td><?php if ($isDraft): ?><input type="text" class="item-desc" value="<?php echo htmlspecialchars($item['product_desc']); ?>"><?php else: echo htmlspecialchars($item['product_desc']); endif; ?></td>
-                        <td><?php if ($isDraft): ?><input type="number" class="item-qty" value="<?php echo $item['qty_ordered']; ?>" min="0" step="0.01" onchange="calcRow(this);"><?php else: echo $item['qty_ordered']; endif; ?></td>
+                        <td><?php if ($isDraft): ?><input type="number" class="item-qty" value="<?php echo $item['qty_ordered']; ?>" min="0" step="0.01"><?php else: echo $item['qty_ordered']; endif; ?></td>
                         <td><?php echo $item['qty_received']; ?><?php if ($item['qty_received'] < $item['qty_ordered'] && !$isDraft): ?> <span class="discrepancy" title="Pending"><i class="fas fa-exclamation-circle"></i></span><?php endif; ?></td>
-                        <td><?php if ($isDraft): ?><input type="number" class="item-cost" value="<?php echo $item['unit_cost']; ?>" min="0" step="0.01" onchange="calcRow(this);"><?php else: echo number_format($item['unit_cost'], 2); endif; ?></td>
                         <td><?php if ($isDraft): ?><input type="text" class="item-uom" value="<?php echo htmlspecialchars($item['uom']); ?>"><?php else: echo htmlspecialchars($item['uom']); endif; ?></td>
-                        <td class="item-subtotal"><?php echo number_format($item['qty_ordered'] * $item['unit_cost'], 2); ?></td>
                         <?php if ($isDraft): ?><td><button type="button" class="btn-sm-action btn-remove" onclick="removeRow(this);"><i class="fas fa-times"></i></button></td><?php endif; ?>
                     </tr>
                     <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="<?php echo $isDraft ? 7 : 7; ?>" style="text-align:right;font-weight:700;padding:12px;">Total:</td>
-                        <td style="font-weight:700;font-size:14px;" id="grandTotal"><?php echo number_format($po['total_amount'] ?? 0, 2); ?></td>
-                        <?php if ($isDraft): ?><td></td><?php endif; ?>
-                    </tr>
-                </tfoot>
             </table>
         </div>
 
@@ -235,11 +224,9 @@ function addRow() {
     tr.innerHTML = '<td>' + rowCount + '</td>' +
         '<td><input type="text" class="item-barcode" placeholder="Scan/enter barcode" onchange="lookupProduct(this);"></td>' +
         '<td><input type="text" class="item-desc" placeholder="Product description"></td>' +
-        '<td><input type="number" class="item-qty" value="1" min="0" step="0.01" onchange="calcRow(this);"></td>' +
+        '<td><input type="number" class="item-qty" value="1" min="0" step="0.01"></td>' +
         '<td>0</td>' +
-        '<td><input type="number" class="item-cost" value="0" min="0" step="0.01" onchange="calcRow(this);"></td>' +
         '<td><input type="text" class="item-uom" value=""></td>' +
-        '<td class="item-subtotal">0.00</td>' +
         '<td><button type="button" class="btn-sm-action btn-remove" onclick="removeRow(this);"><i class="fas fa-times"></i></button></td>';
     tbody.appendChild(tr);
 }
@@ -247,7 +234,6 @@ function addRow() {
 function removeRow(btn) {
     btn.closest('tr').remove();
     renumber();
-    calcTotal();
 }
 
 function renumber() {
@@ -265,28 +251,10 @@ function lookupProduct(input) {
         success: function(data) {
             if (data.name) {
                 tr.querySelector('.item-desc').value = data.name;
-                if (data.cost > 0) tr.querySelector('.item-cost').value = data.cost;
                 if (data.uom) tr.querySelector('.item-uom').value = data.uom;
-                calcRow(input);
             }
         }
     });
-}
-
-function calcRow(input) {
-    var tr = input.closest('tr');
-    var qty = parseFloat(tr.querySelector('.item-qty').value) || 0;
-    var cost = parseFloat(tr.querySelector('.item-cost').value) || 0;
-    tr.querySelector('.item-subtotal').textContent = (qty * cost).toFixed(2);
-    calcTotal();
-}
-
-function calcTotal() {
-    var total = 0;
-    document.querySelectorAll('.item-subtotal').forEach(function(td) {
-        total += parseFloat(td.textContent) || 0;
-    });
-    document.getElementById('grandTotal').textContent = total.toFixed(2);
 }
 
 function collectItems() {
@@ -295,11 +263,10 @@ function collectItems() {
         var barcode = (tr.querySelector('.item-barcode')?.value || tr.cells[1].textContent).trim();
         var desc = (tr.querySelector('.item-desc')?.value || tr.cells[2].textContent).trim();
         var qty = parseFloat(tr.querySelector('.item-qty')?.value || tr.cells[3].textContent) || 0;
-        var cost = parseFloat(tr.querySelector('.item-cost')?.value || tr.cells[5].textContent) || 0;
-        var uom = (tr.querySelector('.item-uom')?.value || tr.cells[6].textContent).trim();
+        var uom = (tr.querySelector('.item-uom')?.value || tr.cells[5].textContent).trim();
         var itemId = tr.getAttribute('data-item-id') || '';
         if (barcode !== '' && qty > 0) {
-            items.push({ id: itemId, barcode: barcode, product_desc: desc, qty_ordered: qty, unit_cost: cost, uom: uom });
+            items.push({ id: itemId, barcode: barcode, product_desc: desc, qty_ordered: qty, uom: uom });
         }
     });
     return items;

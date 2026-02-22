@@ -44,14 +44,14 @@ if ($action === 'lookup_product') {
         echo json_encode(['error' => 'No barcode']);
         exit;
     }
-    $stmt = $connect->prepare("SELECT `name`, `cost`, `uom` FROM `PRODUCTS` WHERE `barcode` = ? LIMIT 1");
+    $stmt = $connect->prepare("SELECT `name`, `uom` FROM `PRODUCTS` WHERE `barcode` = ? LIMIT 1");
     $stmt->bind_param("s", $barcode);
     $stmt->execute();
     $result = $stmt->get_result();
     if ($result->num_rows > 0) {
         echo json_encode($result->fetch_assoc());
     } else {
-        echo json_encode(['name' => '', 'cost' => 0, 'uom' => '']);
+        echo json_encode(['name' => '', 'uom' => '']);
     }
     $stmt->close();
 
@@ -74,16 +74,10 @@ if ($action === 'lookup_product') {
 
     $poNumber = generatePONumber($connect);
 
-    // Calculate total
-    $total = 0;
-    foreach ($items as $item) {
-        $total += (floatval($item['qty_ordered'] ?? 0) * floatval($item['unit_cost'] ?? 0));
-    }
-
     $expectedDateVal = $expectedDate !== '' ? $expectedDate : null;
 
-    $stmt = $connect->prepare("INSERT INTO `purchase_order` (`po_number`,`supplier_id`,`order_date`,`expected_date`,`status`,`total_amount`,`remark`,`created_by`) VALUES (?,?,?,?,'DRAFT',?,?,?)");
-    $stmt->bind_param("sissdss", $poNumber, $supplierId, $orderDate, $expectedDateVal, $total, $remark, $createdBy);
+    $stmt = $connect->prepare("INSERT INTO `purchase_order` (`po_number`,`supplier_id`,`order_date`,`expected_date`,`status`,`total_amount`,`remark`,`created_by`) VALUES (?,?,?,?,'DRAFT',0,?,?)");
+    $stmt->bind_param("sissss", $poNumber, $supplierId, $orderDate, $expectedDateVal, $remark, $createdBy);
 
     if (!$stmt->execute()) {
         echo json_encode(['error' => 'Failed to create PO: ' . $connect->error]);
@@ -94,14 +88,13 @@ if ($action === 'lookup_product') {
     $stmt->close();
 
     // Insert items
-    $itemStmt = $connect->prepare("INSERT INTO `purchase_order_item` (`po_id`,`barcode`,`product_desc`,`qty_ordered`,`unit_cost`,`uom`) VALUES (?,?,?,?,?,?)");
+    $itemStmt = $connect->prepare("INSERT INTO `purchase_order_item` (`po_id`,`barcode`,`product_desc`,`qty_ordered`,`unit_cost`,`uom`) VALUES (?,?,?,?,0,?)");
     foreach ($items as $item) {
         $barcode = trim($item['barcode'] ?? '');
         $desc = trim($item['product_desc'] ?? '');
         $qtyOrdered = floatval($item['qty_ordered'] ?? 0);
-        $unitCost = floatval($item['unit_cost'] ?? 0);
         $uom = trim($item['uom'] ?? '');
-        $itemStmt->bind_param("issdds", $newPoId, $barcode, $desc, $qtyOrdered, $unitCost, $uom);
+        $itemStmt->bind_param("issds", $newPoId, $barcode, $desc, $qtyOrdered, $uom);
         $itemStmt->execute();
     }
     $itemStmt->close();
@@ -133,29 +126,23 @@ if ($action === 'lookup_product') {
         exit;
     }
 
-    $total = 0;
-    foreach ($items as $item) {
-        $total += (floatval($item['qty_ordered'] ?? 0) * floatval($item['unit_cost'] ?? 0));
-    }
-
     $expectedDateVal = $expectedDate !== '' ? $expectedDate : null;
 
-    $stmt = $connect->prepare("UPDATE `purchase_order` SET `supplier_id`=?,`order_date`=?,`expected_date`=?,`total_amount`=?,`remark`=? WHERE `id`=?");
-    $stmt->bind_param("issdsi", $supplierId, $orderDate, $expectedDateVal, $total, $remark, $id);
+    $stmt = $connect->prepare("UPDATE `purchase_order` SET `supplier_id`=?,`order_date`=?,`expected_date`=?,`total_amount`=0,`remark`=? WHERE `id`=?");
+    $stmt->bind_param("isssi", $supplierId, $orderDate, $expectedDateVal, $remark, $id);
     $stmt->execute();
     $stmt->close();
 
     // Delete old items and re-insert
     $connect->query("DELETE FROM `purchase_order_item` WHERE `po_id` = $id");
 
-    $itemStmt = $connect->prepare("INSERT INTO `purchase_order_item` (`po_id`,`barcode`,`product_desc`,`qty_ordered`,`unit_cost`,`uom`) VALUES (?,?,?,?,?,?)");
+    $itemStmt = $connect->prepare("INSERT INTO `purchase_order_item` (`po_id`,`barcode`,`product_desc`,`qty_ordered`,`unit_cost`,`uom`) VALUES (?,?,?,?,0,?)");
     foreach ($items as $item) {
         $barcode = trim($item['barcode'] ?? '');
         $desc = trim($item['product_desc'] ?? '');
         $qtyOrdered = floatval($item['qty_ordered'] ?? 0);
-        $unitCost = floatval($item['unit_cost'] ?? 0);
         $uom = trim($item['uom'] ?? '');
-        $itemStmt->bind_param("issdds", $id, $barcode, $desc, $qtyOrdered, $unitCost, $uom);
+        $itemStmt->bind_param("issds", $id, $barcode, $desc, $qtyOrdered, $uom);
         $itemStmt->execute();
     }
     $itemStmt->close();

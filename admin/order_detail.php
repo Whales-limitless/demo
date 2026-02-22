@@ -25,7 +25,7 @@ if (isset($_POST["submit_print"])) {
 $raccode = $roworderid = $rowdate = $rowtrack = $rowname = $rowoutlet = '';
 $rowttime = $rowptype = $rowstatus = $rowto = $rowphone = $rowemail = $rowaddress = '';
 $mer_name = $mer_addr = $mer_cont = '';
-$rowdelfee = 0;
+
 
 $getdata = $connect->query("SELECT * FROM `orderlist` WHERE SALNUM = '$get_id' LIMIT 1");
 
@@ -38,7 +38,6 @@ if ($getdata && $getdata->num_rows > 0) {
     $rowname    = $row['NAME'] ?? '';
     $rowoutlet  = $row['OUTLET'] ?? '';
     $rowttime   = $row['TTIME'] ?? '';
-    $rowdelfee  = $row['DELIFEE'] ?? 0;
     $rowptype   = $row['PTYPE'] ?? '';
     $rowstatus  = $row['STATUS'] ?? '';
     $rowto      = $row['TXTTO'] ?? '';
@@ -65,15 +64,10 @@ if ($getdata && $getdata->num_rows > 0) {
 
 // Get order items
 $order_items = [];
-$sum = 0;
-$discount = 0;
 $item_query = $connect->query("SELECT * FROM `orderlist` WHERE SALNUM = '$roworderid' AND PDESC <> 'USE POINTS'");
 if ($item_query) {
     while ($irow = $item_query->fetch_assoc()) {
-        $qty   = (float)($irow['QTY'] ?? 0);
-        $price = (float)($irow['RETAIL'] ?? 0);
-        $amt   = (float)($irow['AMOUNT'] ?? 0);
-        $disc  = $amt - ($qty * $price);
+        $qty = (float)($irow['QTY'] ?? 0);
 
         // Get rack info
         $rack_info = '';
@@ -87,26 +81,13 @@ if ($item_query) {
             'barcode' => $irow['BARCODE'] ?? '',
             'pdesc'   => $irow['PDESC'] ?? '',
             'qty'     => $qty,
-            'price'   => $price,
-            'disc'    => $disc,
-            'amt'     => $amt,
             'rack'    => $rack_info
         ];
-
-        $sum += $amt;
-        $discount += $disc;
     }
 }
 
-// Payment type label
-$paymentLabel = 'N/A';
-if ($rowptype === 'CS') $paymentLabel = 'Cash';
-elseif ($rowptype === 'SnP') $paymentLabel = 'Senangpay';
-elseif ($rowptype === 'SnPR') $paymentLabel = 'Senangpay Ins';
-
 // Status label
-$statusLabel = 'Unpaid';
-if (in_array($rowstatus, ['PAYMENT', 'DONE'])) $statusLabel = 'Paid';
+$statusLabel = ($rowstatus === 'DONE') ? 'Done' : (($rowstatus === 'DELETED') ? 'Deleted' : 'Pending');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -335,12 +316,9 @@ body {
             <thead>
                 <tr>
                     <td style="width:5%">S/N</td>
-                    <td style="width:15%">Barcode</td>
-                    <td style="width:35%">Item</td>
-                    <td style="width:10%" class="text-right">Qty</td>
-                    <td style="width:12%" class="text-right">Price</td>
-                    <td style="width:11%" class="text-right">Disc</td>
-                    <td style="width:12%" class="text-right">Amt</td>
+                    <td style="width:20%">Barcode</td>
+                    <td style="width:55%">Item</td>
+                    <td style="width:20%" class="text-right">Qty</td>
                 </tr>
             </thead>
             <tbody>
@@ -355,27 +333,9 @@ body {
                         <?php endif; ?>
                     </td>
                     <td class="text-right"><?php echo $item['qty']; ?></td>
-                    <td class="text-right"><?php echo number_format($item['price'], 2); ?></td>
-                    <td class="text-right"><?php echo number_format($item['disc'], 2); ?></td>
-                    <td class="text-right"><?php echo number_format($item['amt'], 2); ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
-            <tfoot>
-                <tr><td colspan="7">&nbsp;</td></tr>
-                <tr>
-                    <td colspan="6" class="text-right">Discount</td>
-                    <td class="text-right"><?php echo number_format($discount, 2); ?></td>
-                </tr>
-                <tr>
-                    <td colspan="6" class="text-right">Delivery Fee</td>
-                    <td class="text-right"><?php echo number_format($rowdelfee, 2); ?></td>
-                </tr>
-                <tr class="total-row">
-                    <td colspan="6" class="text-right">Total (RM)</td>
-                    <td class="text-right"><?php echo number_format($sum + $rowdelfee, 2); ?></td>
-                </tr>
-            </tfoot>
         </table>
 
         <!-- Footer Info -->
@@ -385,11 +345,8 @@ body {
                 <?php echo (!empty($rowdate) ? date('d/m/Y', strtotime($rowdate)) : '') . ' ' . htmlspecialchars($rowttime); ?>
             </p>
             <p>
-                <strong>Payment type:</strong> <?php echo $paymentLabel; ?>
-            </p>
-            <p>
                 <strong>Status:</strong>
-                <span class="status-badge <?php echo $statusLabel === 'Paid' ? 'status-paid' : 'status-unpaid'; ?>">
+                <span class="status-badge <?php echo $statusLabel === 'Done' ? 'status-paid' : 'status-unpaid'; ?>">
                     <?php echo $statusLabel; ?>
                 </span>
             </p>
@@ -450,12 +407,9 @@ body {
                 <thead>
                     <tr>
                         <td style="width:5%">S/N</td>
-                        <td style="width:15%">Barcode</td>
-                        <td style="width:35%">Item</td>
-                        <td style="width:10%" class="text-right">Qty</td>
-                        <td style="width:12%" class="text-right">Price</td>
-                        <td style="width:11%" class="text-right">Disc</td>
-                        <td style="width:12%" class="text-right">Amt</td>
+                        <td style="width:20%">Barcode</td>
+                        <td style="width:55%">Item</td>
+                        <td style="width:20%" class="text-right">Qty</td>
                     </tr>
                 </thead>
                 <tbody>
@@ -470,27 +424,9 @@ body {
                             <?php endif; ?>
                         </td>
                         <td class="text-right"><?php echo $item['qty']; ?></td>
-                        <td class="text-right"><?php echo number_format($item['price'], 2); ?></td>
-                        <td class="text-right"><?php echo number_format($item['disc'], 2); ?></td>
-                        <td class="text-right"><?php echo number_format($item['amt'], 2); ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
-                <tfoot>
-                    <tr><td colspan="7">&nbsp;</td></tr>
-                    <tr>
-                        <td colspan="6" class="text-right">Discount</td>
-                        <td class="text-right"><?php echo number_format($discount, 2); ?></td>
-                    </tr>
-                    <tr>
-                        <td colspan="6" class="text-right">Delivery Fee</td>
-                        <td class="text-right"><?php echo number_format($rowdelfee, 2); ?></td>
-                    </tr>
-                    <tr class="total-row">
-                        <td colspan="6" class="text-right">Total (RM)</td>
-                        <td class="text-right"><?php echo number_format($sum + $rowdelfee, 2); ?></td>
-                    </tr>
-                </tfoot>
             </table>
 
             <table style="width:100%;margin-top:20px;">
