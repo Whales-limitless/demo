@@ -30,6 +30,7 @@
   <ul class="sidebar-nav">
     <li><a href="./">🏠 Home</a></li>
     <li><a href="./">📦 Categories</a></li>
+    <li><a href="all_products.php">🛍️ Products</a></li>
     <li><a href="cart.php">🛒 Cart</a></li>
     <li><a href="staff_stock_take.php">📋 Stock Take</a></li>
     <li><a href="staff_stock_loss.php">⚠️ Stock Loss</a></li>

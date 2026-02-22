@@ -215,7 +215,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .qty-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
 .qty-btn { width: 30px; height: 30px; border: 1px solid #d1d5db; background: var(--surface); border-radius: 6px; font-size: 16px; cursor: pointer; display: grid; place-items: center; transition: all var(--transition); color: var(--text); }
 .qty-btn:hover { border-color: var(--primary); color: var(--primary); }
-.qty-input { width: 44px; height: 30px; border: 1px solid #d1d5db; border-radius: 6px; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; outline: none; transition: border-color var(--transition); }
+.qty-input { flex: 1; min-width: 0; height: 30px; border: 1px solid #d1d5db; border-radius: 6px; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; outline: none; transition: border-color var(--transition); }
 .qty-input:focus { border-color: var(--primary); }
 
 .btn-add-cart { width: 100%; padding: 10px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; transition: all var(--transition); display: flex; align-items: center; justify-content: center; gap: 6px; }
