@@ -15,10 +15,10 @@
       <svg class="tab-icon"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
       Products
     </a>
-    <a href="cart.php" id="tabScan">
+    <button class="footer-tab" id="tabScan" onclick="openScanModal()">
       <svg class="tab-icon"><path d="M1 3h4v18H1z"/><path d="M7 3h2v18H7z"/><path d="M11 3h1v18h-1z"/><path d="M14 3h2v18h-2z"/><path d="M19 3h4v18h-4z"/></svg>
       Scan
-    </a>
+    </button>
     <button class="footer-tab" id="tabInventory" onclick="openInventoryModal()">
       <svg class="tab-icon"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
       Inventory
@@ -58,6 +58,35 @@
   </div>
 </div>
 
+<!-- SCAN MODAL -->
+<div class="scan-modal-overlay" id="scanModalOverlay">
+  <div class="scan-modal-header">
+    <h3>Scan QR Code</h3>
+    <button class="scan-close-btn" onclick="closeScanModal()">
+      <svg style="width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="scan-body">
+    <div class="scan-viewfinder" id="scanViewfinder">
+      <video id="scanVideo" muted playsinline></video>
+      <div class="scan-line"></div>
+      <div class="scan-corners-bottom"></div>
+    </div>
+    <div class="scan-hint" id="scanHint">Point your camera at a QR code</div>
+    <div class="scan-error" id="scanError"></div>
+    <div class="scan-result" id="scanResult">
+      <div class="scan-result-text" id="scanResultText"></div>
+      <div class="scan-result-actions">
+        <button class="scan-result-btn primary" id="scanGoBtn" onclick="goToScannedUrl()">Open Link</button>
+        <button class="scan-result-btn secondary" onclick="scanAgain()">Scan Again</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- QR Scanner library: Nimiq qr-scanner (self-hosted, 60KB vs 375KB html5-qrcode) -->
+<script src="js/qr-scanner.umd.min.js"></script>
+
 <script>
 (function(){
   // Scroll to top
@@ -74,7 +103,6 @@
     'index.php': 'tabCategory',
     '': 'tabCategory',
     'all_products.php': 'tabProducts',
-    'cart.php': 'tabScan',
     'account.php': 'tabAccount',
     'staff_stock_take.php': 'tabInventory',
     'staff_stock_loss.php': 'tabInventory'
@@ -86,6 +114,7 @@
   }
 })();
 
+// ==================== INVENTORY MODAL ====================
 function openInventoryModal() {
   document.getElementById('invModalOverlay').classList.add('active');
 }
@@ -95,4 +124,155 @@ function closeInventoryModal(e) {
     document.getElementById('invModalOverlay').classList.remove('active');
   }
 }
+
+// ==================== QR SCAN MODAL (Nimiq qr-scanner) ====================
+var qrScanner = null;
+var lastScannedText = '';
+
+function showScanError(msg) {
+  document.getElementById('scanHint').style.display = 'none';
+  var errorEl = document.getElementById('scanError');
+  errorEl.textContent = msg;
+  errorEl.classList.add('active');
+}
+
+function openScanModal() {
+  // Check secure context (camera API requires HTTPS or localhost)
+  if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    alert('QR scanning requires HTTPS. Please access this site over HTTPS to use the scanner.');
+    return;
+  }
+
+  // Check if library loaded
+  if (typeof QrScanner === 'undefined') {
+    alert('QR scanner library failed to load. Please check your connection and refresh the page.');
+    return;
+  }
+
+  var overlay = document.getElementById('scanModalOverlay');
+  overlay.classList.add('active');
+  document.getElementById('scanResult').classList.remove('active');
+  document.getElementById('scanError').classList.remove('active');
+  document.getElementById('scanHint').style.display = '';
+  startScanner();
+}
+
+function closeScanModal() {
+  document.getElementById('scanModalOverlay').classList.remove('active');
+  stopScanner();
+}
+
+function startScanner() {
+  var videoEl = document.getElementById('scanVideo');
+
+  try {
+    if (!qrScanner) {
+      qrScanner = new QrScanner(
+        videoEl,
+        function(result) {
+          var decodedText = result.data || result;
+          lastScannedText = decodedText;
+
+          // Pause scanner on success
+          qrScanner.pause();
+
+          // Show result
+          document.getElementById('scanHint').style.display = 'none';
+          document.getElementById('scanError').classList.remove('active');
+          document.getElementById('scanResultText').textContent = decodedText;
+          document.getElementById('scanResult').classList.add('active');
+
+          // Update button text based on content type
+          var goBtn = document.getElementById('scanGoBtn');
+          goBtn.textContent = isValidUrl(decodedText) ? 'Open Link' : 'Copy';
+        },
+        {
+          preferredCamera: 'environment',
+          maxScansPerSecond: 10,
+          returnDetailedScanResult: true,
+          highlightScanRegion: false,
+          highlightCodeOutline: false
+        }
+      );
+    }
+  } catch(e) {
+    showScanError('Scanner failed to initialize. Please refresh and try again.');
+    return;
+  }
+
+  qrScanner.start().catch(function(err) {
+    var msg = String(err);
+    if (msg.indexOf('not allowed') !== -1 || msg.indexOf('NotAllowed') !== -1 || msg.indexOf('Permission') !== -1) {
+      showScanError('Camera access denied. Please allow camera permission in your browser settings and try again.');
+    } else if (msg.indexOf('not found') !== -1 || msg.indexOf('NotFound') !== -1) {
+      showScanError('No camera found on this device.');
+    } else if (msg.indexOf('NotReadable') !== -1 || msg.indexOf('in use') !== -1) {
+      showScanError('Camera is in use by another app. Please close other camera apps and try again.');
+    } else {
+      showScanError('Could not start camera. Please ensure camera permission is allowed.');
+    }
+  });
+}
+
+function stopScanner() {
+  if (qrScanner) {
+    try { qrScanner.stop(); } catch(e) {}
+  }
+}
+
+function isValidUrl(text) {
+  try {
+    var url = new URL(text);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch(e) {
+    return false;
+  }
+}
+
+function goToScannedUrl() {
+  if (isValidUrl(lastScannedText)) {
+    // Open in new tab for safety (prevents open redirect leaving the app)
+    window.open(lastScannedText, '_blank', 'noopener,noreferrer');
+  } else {
+    // Copy non-URL text to clipboard
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(lastScannedText).then(function() {
+        document.getElementById('scanGoBtn').textContent = 'Copied!';
+        setTimeout(function() { document.getElementById('scanGoBtn').textContent = 'Copy'; }, 1500);
+      }).catch(function() {
+        fallbackCopy(lastScannedText);
+      });
+    } else {
+      fallbackCopy(lastScannedText);
+    }
+  }
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(ta);
+  document.getElementById('scanGoBtn').textContent = 'Copied!';
+  setTimeout(function() { document.getElementById('scanGoBtn').textContent = 'Copy'; }, 1500);
+}
+
+function scanAgain() {
+  lastScannedText = '';
+  document.getElementById('scanResult').classList.remove('active');
+  document.getElementById('scanHint').style.display = '';
+
+  if (qrScanner) {
+    qrScanner.start().catch(function() {
+      showScanError('Could not restart camera. Please close and try again.');
+    });
+  }
+}
+
+// Release camera on page unload or tab switch
+window.addEventListener('beforeunload', function() { stopScanner(); });
 </script>
