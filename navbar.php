@@ -3,20 +3,20 @@
   <button class="menu-btn" id="menuBtn" aria-label="Menu">
     <svg class="icon"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
   </button>
-  <div class="nav-search-wrap">
-    <div class="nav-search">
-      <input type="text" placeholder="Search product name or barcode…" id="searchInput" autocomplete="off">
-      <button aria-label="Search">
-        <svg class="icon icon-sm"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      </button>
-    </div>
-    <div class="search-dropdown" id="searchDropdown"></div>
+  <div class="nav-search" id="navSearch">
+    <input type="text" placeholder="Search product name or barcode…" id="searchInput" autocomplete="off">
+    <button aria-label="Search">
+      <svg class="icon icon-sm"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
   </div>
   <a href="cart.php" class="cart-btn" aria-label="Cart">
     <svg class="icon"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
     <span class="cart-badge" id="cartBadge">0</span>
   </a>
 </nav>
+
+<!-- SEARCH DROPDOWN (outside navbar to avoid stacking context issues) -->
+<div class="search-dropdown" id="searchDropdown"></div>
 
 <!-- SIDEBAR -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -52,6 +52,7 @@
 
   // Product search dropdown
   var searchInput = document.getElementById('searchInput');
+  var navSearch = document.getElementById('navSearch');
   var dropdown = document.getElementById('searchDropdown');
   var debounceTimer = null;
 
@@ -66,6 +67,15 @@
     var escaped = escHtml(text);
     var re = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
     return escaped.replace(re, '<mark>$1</mark>');
+  }
+
+  function positionDropdown() {
+    if (!navSearch) return;
+    var rect = navSearch.getBoundingClientRect();
+    dropdown.style.position = 'fixed';
+    dropdown.style.top = (rect.bottom + 6) + 'px';
+    dropdown.style.left = rect.left + 'px';
+    dropdown.style.width = rect.width + 'px';
   }
 
   function doProductSearch(q) {
@@ -93,6 +103,7 @@
   function renderDropdown(products, query) {
     if (products.length === 0) {
       dropdown.innerHTML = '<div class="search-empty">No products found</div>';
+      positionDropdown();
       dropdown.classList.add('active');
       return;
     }
@@ -124,6 +135,7 @@
     }).join('');
 
     dropdown.innerHTML = html;
+    positionDropdown();
     dropdown.classList.add('active');
   }
 
@@ -137,17 +149,21 @@
     searchInput.addEventListener('focus', function() {
       var q = this.value.trim();
       if (q.length >= 1 && dropdown.innerHTML) {
+        positionDropdown();
         dropdown.classList.add('active');
       }
     });
 
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
-      var wrap = document.querySelector('.nav-search-wrap');
-      if (wrap && !wrap.contains(e.target)) {
+      if (!navSearch.contains(e.target) && !dropdown.contains(e.target)) {
         dropdown.classList.remove('active');
       }
     });
+
+    // Reposition on scroll/resize
+    window.addEventListener('scroll', function() { if (dropdown.classList.contains('active')) positionDropdown(); });
+    window.addEventListener('resize', function() { if (dropdown.classList.contains('active')) positionDropdown(); });
   }
 })();
 </script>
