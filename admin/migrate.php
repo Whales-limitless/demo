@@ -201,9 +201,31 @@ if ($action === '') {
         </div>
     </div>
 
-    <!-- Step 3: Optimize -->
+    <!-- Step 3: Rebuild Tables -->
     <div class="card mb-3">
-        <div class="card-header bg-success text-white"><strong>Step 3: Optimize Database</strong></div>
+        <div class="card-header bg-warning text-dark"><strong>Step 3: Rebuild Tables (Fix "Table Full" Errors)</strong></div>
+        <div class="card-body">
+            <p class="small text-muted mb-3">Rebuilds PRODUCTS and/or orderlist by creating a lean copy with only needed columns + indexes, then swaps. Fixes "table full" and corrupt index errors. Run one at a time.</p>
+            <div class="d-flex gap-2 flex-wrap">
+                <form method="post" class="d-inline">
+                    <input type="hidden" name="action" value="rebuild_products">
+                    <button type="submit" class="btn btn-warning" onclick="this.disabled=true;this.innerHTML='Rebuilding…';this.form.submit();return true;">Rebuild PRODUCTS</button>
+                </form>
+                <form method="post" class="d-inline">
+                    <input type="hidden" name="action" value="rebuild_orderlist">
+                    <button type="submit" class="btn btn-warning" onclick="this.disabled=true;this.innerHTML='Rebuilding…';this.form.submit();return true;">Rebuild orderlist</button>
+                </form>
+                <form method="post" class="d-inline">
+                    <input type="hidden" name="action" value="rebuild_both">
+                    <button type="submit" class="btn btn-outline-warning text-dark" onclick="this.disabled=true;this.innerHTML='Rebuilding…';this.form.submit();return true;">Rebuild Both</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 4: Optimize -->
+    <div class="card mb-3">
+        <div class="card-header bg-success text-white"><strong>Step 4: Optimize Database</strong></div>
         <div class="card-body">
             <p class="small text-muted mb-3">Add indexes for fast product search (name, barcode), optimize tables, and analyze table statistics. Run this after import/migration to ensure the best search and browsing performance with large data.</p>
             <form method="post">
@@ -214,6 +236,174 @@ if ($action === '') {
     </div>
 
     <a href="dashboard.php" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+</body>
+</html>
+<?php
+    exit;
+}
+
+// =====================================================================
+// --- HANDLE REBUILD TABLES ---
+// =====================================================================
+if ($action === 'rebuild_products' || $action === 'rebuild_orderlist' || $action === 'rebuild_both') {
+    set_time_limit(0);
+    ini_set('memory_limit', '512M');
+    $rebuildResults = [];
+
+    function rebuildTable($connect, $tableName, $createSql, $columns, &$out) {
+        $tmpName = $tableName . '_new';
+
+        // Check source table exists
+        $check = $connect->query("SHOW TABLES LIKE '$tableName'");
+        if (!$check || $check->num_rows === 0) {
+            $out[] = ['fail', "`$tableName` table not found"];
+            return false;
+        }
+
+        // Count rows
+        $cntRes = $connect->query("SELECT COUNT(*) AS cnt FROM `$tableName`");
+        $rowCount = $cntRes ? $cntRes->fetch_assoc()['cnt'] : '?';
+        $out[] = ['info', "`$tableName`: $rowCount rows to copy"];
+
+        // Drop temp table if leftover from a previous failed attempt
+        $connect->query("DROP TABLE IF EXISTS `$tmpName`");
+
+        // Step 1: Create new lean table
+        if (!$connect->query($createSql)) {
+            $out[] = ['fail', "Create `$tmpName` failed: " . $connect->error];
+            return false;
+        }
+        $out[] = ['ok', "Created `$tmpName` with indexes"];
+
+        // Step 2: Copy data
+        $colList = '`' . implode('`,`', $columns) . '`';
+        $copySql = "INSERT INTO `$tmpName` ($colList) SELECT $colList FROM `$tableName`";
+        if (!$connect->query($copySql)) {
+            $out[] = ['fail', "Copy data to `$tmpName` failed: " . $connect->error];
+            $connect->query("DROP TABLE IF EXISTS `$tmpName`");
+            return false;
+        }
+
+        // Verify row count matches
+        $newCnt = $connect->query("SELECT COUNT(*) AS cnt FROM `$tmpName`");
+        $newCount = $newCnt ? $newCnt->fetch_assoc()['cnt'] : 0;
+        $out[] = ['ok', "Copied $newCount rows to `$tmpName`"];
+
+        if ((int)$newCount !== (int)$rowCount) {
+            $out[] = ['fail', "Row count mismatch! Original: $rowCount, New: $newCount. Aborting — old table preserved."];
+            $connect->query("DROP TABLE IF EXISTS `$tmpName`");
+            return false;
+        }
+
+        // Step 3: Drop old table
+        if (!$connect->query("DROP TABLE `$tableName`")) {
+            $out[] = ['fail', "Drop old `$tableName` failed: " . $connect->error];
+            return false;
+        }
+        $out[] = ['ok', "Dropped old `$tableName`"];
+
+        // Step 4: Rename
+        if (!$connect->query("RENAME TABLE `$tmpName` TO `$tableName`")) {
+            $out[] = ['fail', "Rename `$tmpName` to `$tableName` failed: " . $connect->error];
+            return false;
+        }
+        $out[] = ['ok', "Renamed `$tmpName` -> `$tableName`"];
+
+        // Analyze
+        $connect->query("ANALYZE TABLE `$tableName`");
+        $out[] = ['ok', "`$tableName` rebuild complete"];
+        return true;
+    }
+
+    // --- PRODUCTS rebuild ---
+    if ($action === 'rebuild_products' || $action === 'rebuild_both') {
+        $rebuildResults[] = ['info', '--- PRODUCTS ---'];
+        rebuildTable($connect, 'PRODUCTS',
+            "CREATE TABLE `PRODUCTS_new` (
+                `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                `cat_code` VARCHAR(50) DEFAULT '',
+                `sub_code` VARCHAR(50) DEFAULT '',
+                `barcode` VARCHAR(50) DEFAULT '',
+                `code` VARCHAR(50) DEFAULT '',
+                `cat` VARCHAR(50) DEFAULT '',
+                `sub_cat` VARCHAR(50) DEFAULT '',
+                `name` VARCHAR(255) DEFAULT '',
+                `description` TEXT,
+                `img1` VARCHAR(255) DEFAULT '',
+                `qoh` DOUBLE DEFAULT 0,
+                `uom` VARCHAR(20) DEFAULT '',
+                `checked` VARCHAR(5) DEFAULT 'Y',
+                `stkcode` VARCHAR(50) DEFAULT '',
+                `rack` VARCHAR(70) DEFAULT '',
+                INDEX `idx_products_barcode` (`barcode`),
+                INDEX `idx_products_name` (`name`),
+                INDEX `idx_products_cat_code` (`cat_code`),
+                INDEX `idx_products_checked` (`checked`),
+                INDEX `idx_products_search` (`name`, `barcode`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            ['id','cat_code','sub_code','barcode','code','cat','sub_cat','name','description','img1','qoh','uom','checked','stkcode','rack'],
+            $rebuildResults
+        );
+    }
+
+    // --- orderlist rebuild ---
+    if ($action === 'rebuild_orderlist' || $action === 'rebuild_both') {
+        $rebuildResults[] = ['info', '--- orderlist ---'];
+        rebuildTable($connect, 'orderlist',
+            "CREATE TABLE `orderlist_new` (
+                `ID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                `OUTLET` VARCHAR(20) DEFAULT '',
+                `SDATE` DATE DEFAULT NULL,
+                `ACCODE` VARCHAR(20) DEFAULT '',
+                `NAME` VARCHAR(100) DEFAULT '',
+                `SALNUM` VARCHAR(50) DEFAULT '',
+                `BARCODE` VARCHAR(50) DEFAULT '',
+                `PDESC` VARCHAR(100) DEFAULT '',
+                `QTY` DOUBLE(8,2) DEFAULT 0,
+                `PTYPE` VARCHAR(20) DEFAULT '',
+                `TRANSNO` VARCHAR(50) DEFAULT '',
+                `TDATE` DATE DEFAULT NULL,
+                `TTIME` TIME DEFAULT NULL,
+                `STATUS` VARCHAR(20) DEFAULT '',
+                `PRINT` VARCHAR(5) DEFAULT '',
+                `view_status` VARCHAR(20) DEFAULT '',
+                `ADMINRMK` VARCHAR(500) DEFAULT '',
+                `SOUND` VARCHAR(5) DEFAULT '',
+                `TXTTO` VARCHAR(100) DEFAULT '',
+                INDEX `idx_orderlist_barcode` (`BARCODE`),
+                INDEX `idx_orderlist_sdate_status` (`SDATE`, `STATUS`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            ['ID','OUTLET','SDATE','ACCODE','NAME','SALNUM','BARCODE','PDESC','QTY','PTYPE','TRANSNO','TDATE','TTIME','STATUS','PRINT','view_status','ADMINRMK','SOUND','TXTTO'],
+            $rebuildResults
+        );
+    }
+
+    // --- Show results ---
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rebuild Tables Results</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-4" style="max-width:700px;">
+    <h2 class="mb-4">Rebuild Tables Results</h2>
+    <table class="table table-bordered">
+        <thead class="table-dark"><tr><th style="width:80px">Status</th><th>Detail</th></tr></thead>
+        <tbody>
+        <?php foreach ($rebuildResults as $r): ?>
+            <tr class="<?php echo $r[0]==='ok' ? 'table-success' : ($r[0]==='info' ? 'table-info' : ($r[0]==='skip' ? 'table-secondary' : 'table-danger')); ?>">
+                <td><strong><?php echo strtoupper($r[0]); ?></strong></td>
+                <td><?php echo htmlspecialchars($r[1]); ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <a href="dashboard.php" class="btn btn-primary me-2">Back to Dashboard</a>
+    <a href="migrate.php" class="btn btn-outline-secondary">Run Again</a>
 </div>
 </body>
 </html>
