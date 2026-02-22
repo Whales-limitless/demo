@@ -190,6 +190,40 @@ if ($colCheck5 && $colCheck5->num_rows === 0) {
     $results[] = ['skip', 'Add GRN_NUM to parafile (already exists)'];
 }
 
+// --- Alter stock_take status enum to add DRAFT, SUBMITTED, APPROVED ---
+runMigration($connect, 'Alter stock_take status enum', "
+ALTER TABLE `stock_take` MODIFY COLUMN `status` ENUM('OPEN','IN_PROGRESS','COMPLETED','DRAFT','SUBMITTED','APPROVED') DEFAULT 'DRAFT'
+");
+
+// Add submitted_by and submitted_at columns to stock_take
+$colCheck6 = $connect->query("SHOW COLUMNS FROM `stock_take` LIKE 'submitted_by'");
+if ($colCheck6 && $colCheck6->num_rows === 0) {
+    runMigration($connect, 'Add submitted_by to stock_take', "ALTER TABLE `stock_take` ADD COLUMN `submitted_by` VARCHAR(50) DEFAULT '' AFTER `completed_at`");
+} else {
+    $results[] = ['skip', 'Add submitted_by to stock_take (already exists)'];
+}
+
+$colCheck7 = $connect->query("SHOW COLUMNS FROM `stock_take` LIKE 'submitted_at'");
+if ($colCheck7 && $colCheck7->num_rows === 0) {
+    runMigration($connect, 'Add submitted_at to stock_take', "ALTER TABLE `stock_take` ADD COLUMN `submitted_at` DATETIME DEFAULT NULL AFTER `submitted_by`");
+} else {
+    $results[] = ['skip', 'Add submitted_at to stock_take (already exists)'];
+}
+
+$colCheck8 = $connect->query("SHOW COLUMNS FROM `stock_take` LIKE 'approved_by'");
+if ($colCheck8 && $colCheck8->num_rows === 0) {
+    runMigration($connect, 'Add approved_by to stock_take', "ALTER TABLE `stock_take` ADD COLUMN `approved_by` VARCHAR(50) DEFAULT '' AFTER `submitted_at`");
+} else {
+    $results[] = ['skip', 'Add approved_by to stock_take (already exists)'];
+}
+
+$colCheck9 = $connect->query("SHOW COLUMNS FROM `stock_take` LIKE 'approved_at'");
+if ($colCheck9 && $colCheck9->num_rows === 0) {
+    runMigration($connect, 'Add approved_at to stock_take', "ALTER TABLE `stock_take` ADD COLUMN `approved_at` DATETIME DEFAULT NULL AFTER `approved_by`");
+} else {
+    $results[] = ['skip', 'Add approved_at to stock_take (already exists)'];
+}
+
 // --- Product Category ---
 runMigration($connect, 'Create product_category table', "
 CREATE TABLE IF NOT EXISTS `product_category` (

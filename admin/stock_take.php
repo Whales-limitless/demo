@@ -68,6 +68,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .badge-OPEN { background: #dbeafe; color: #2563eb; }
 .badge-IN_PROGRESS { background: #fef3c7; color: #d97706; }
 .badge-COMPLETED { background: #dcfce7; color: #16a34a; }
+.badge-DRAFT { background: #dbeafe; color: #2563eb; }
+.badge-SUBMITTED { background: #fef3c7; color: #d97706; }
+.badge-APPROVED { background: #dcfce7; color: #16a34a; }
 .btn-action { padding: 5px 12px; border: none; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); display: inline-block; margin: 1px; color: #fff; text-decoration: none; }
 .btn-view { background: #6b7280; } .btn-view:hover { background: #4b5563; color: #fff; }
 .btn-delete { background: #ef4444; } .btn-delete:hover { background: #dc2626; }

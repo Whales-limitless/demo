@@ -25,8 +25,9 @@ $action = $_POST['action'] ?? '';
 $staffName = $_SESSION['user_name'] ?? 'Staff';
 
 if ($action === 'list_sessions') {
+    // Show DRAFT sessions (for counting) and SUBMITTED sessions (view only)
     $sessions = [];
-    $result = $connect->query("SELECT `id`, `session_code`, `description`, `type`, `filter_cat`, `status`, `created_by`, `created_at` FROM `stock_take` WHERE `status` IN ('OPEN', 'IN_PROGRESS') ORDER BY `id` DESC");
+    $result = $connect->query("SELECT `id`, `session_code`, `description`, `type`, `filter_cat`, `status`, `created_by`, `created_at` FROM `stock_take` WHERE `status` IN ('DRAFT', 'SUBMITTED') ORDER BY `id` DESC");
     if ($result) {
         while ($r = $result->fetch_assoc()) {
             $sid = intval($r['id']);
@@ -53,8 +54,8 @@ if ($action === 'list_sessions') {
         exit;
     }
     $row = $chk->fetch_assoc();
-    if (!in_array($row['status'], ['OPEN', 'IN_PROGRESS'])) {
-        echo json_encode(['error' => 'Session is completed.']);
+    if (!in_array($row['status'], ['DRAFT'])) {
+        echo json_encode(['error' => 'Session is not available for counting.']);
         exit;
     }
 
@@ -62,7 +63,6 @@ if ($action === 'list_sessions') {
     $result = $connect->query("SELECT `id`, `barcode`, `product_desc`, `system_qty`, `counted_qty`, `variance`, `remark`, `counted_by`, `adj_applied` FROM `stock_take_item` WHERE `stock_take_id` = $sessionId ORDER BY `id` ASC");
     if ($result) {
         while ($r = $result->fetch_assoc()) {
-            // Map product_desc to description for frontend compatibility
             $r['description'] = $r['product_desc'];
             $items[] = $r;
         }
@@ -76,6 +76,7 @@ if ($action === 'list_sessions') {
     ]);
 
 } elseif ($action === 'save_counts') {
+    // Save counts without submitting (draft save)
     $sessionId = intval($_POST['session_id'] ?? 0);
     $countsRaw = $_POST['counts'] ?? '[]';
     $counts = is_array($countsRaw) ? $countsRaw : json_decode($countsRaw, true);
@@ -91,8 +92,8 @@ if ($action === 'list_sessions') {
         exit;
     }
     $row = $chk->fetch_assoc();
-    if (!in_array($row['status'], ['OPEN', 'IN_PROGRESS'])) {
-        echo json_encode(['error' => 'Session is completed.']);
+    if ($row['status'] !== 'DRAFT') {
+        echo json_encode(['error' => 'Session is not available for counting.']);
         exit;
     }
 
@@ -100,7 +101,6 @@ if ($action === 'list_sessions') {
 
     $updated = 0;
     foreach ($counts as $c) {
-        // Accept both 'id' and 'item_id' keys
         $itemId = intval($c['item_id'] ?? ($c['id'] ?? 0));
         $countedQty = ($c['counted_qty'] !== '' && $c['counted_qty'] !== null) ? floatval($c['counted_qty']) : null;
         $remark = trim($c['remark'] ?? '');
@@ -119,11 +119,71 @@ if ($action === 'list_sessions') {
     }
     $stmt->close();
 
-    if ($row['status'] === 'OPEN') {
-        $connect->query("UPDATE `stock_take` SET `status` = 'IN_PROGRESS' WHERE `id` = $sessionId AND `status` = 'OPEN'");
+    echo json_encode(['success' => $updated . ' items saved.']);
+
+} elseif ($action === 'submit') {
+    // Save counts AND submit for admin review
+    $sessionId = intval($_POST['session_id'] ?? 0);
+    $countsRaw = $_POST['counts'] ?? '[]';
+    $counts = is_array($countsRaw) ? $countsRaw : json_decode($countsRaw, true);
+
+    if ($sessionId <= 0 || empty($counts)) {
+        echo json_encode(['error' => 'Invalid data.']);
+        exit;
     }
 
-    echo json_encode(['success' => $updated . ' items updated.']);
+    $chk = $connect->query("SELECT `status` FROM `stock_take` WHERE `id` = $sessionId LIMIT 1");
+    if (!$chk || $chk->num_rows === 0) {
+        echo json_encode(['error' => 'Session not found.']);
+        exit;
+    }
+    $row = $chk->fetch_assoc();
+    if ($row['status'] !== 'DRAFT') {
+        echo json_encode(['error' => 'Session is not available for submission.']);
+        exit;
+    }
+
+    $connect->begin_transaction();
+
+    try {
+        // Save counts first
+        $stmt = $connect->prepare("UPDATE `stock_take_item` SET `counted_qty`=?, `variance`=?, `remark`=?, `counted_by`=?, `counted_at`=NOW() WHERE `id`=? AND `stock_take_id`=?");
+
+        foreach ($counts as $c) {
+            $itemId = intval($c['item_id'] ?? ($c['id'] ?? 0));
+            $countedQty = ($c['counted_qty'] !== '' && $c['counted_qty'] !== null) ? floatval($c['counted_qty']) : null;
+            $remark = trim($c['remark'] ?? '');
+
+            if ($itemId <= 0) continue;
+
+            $sysResult = $connect->query("SELECT `system_qty` FROM `stock_take_item` WHERE `id` = $itemId LIMIT 1");
+            if ($sysResult && $sysRow = $sysResult->fetch_assoc()) {
+                $systemQty = floatval($sysRow['system_qty']);
+                $variance = ($countedQty !== null) ? ($countedQty - $systemQty) : null;
+
+                $stmt->bind_param("ddssii", $countedQty, $variance, $remark, $staffName, $itemId, $sessionId);
+                $stmt->execute();
+            }
+        }
+        $stmt->close();
+
+        // Update session status to SUBMITTED
+        $submitStmt = $connect->prepare("UPDATE `stock_take` SET `status`='SUBMITTED', `submitted_by`=?, `submitted_at`=NOW() WHERE `id`=? AND `status`='DRAFT'");
+        $submitStmt->bind_param("si", $staffName, $sessionId);
+        $submitStmt->execute();
+
+        if ($submitStmt->affected_rows === 0) {
+            throw new Exception('Failed to submit session.');
+        }
+        $submitStmt->close();
+
+        $connect->commit();
+        echo json_encode(['success' => 'Stock take submitted for review.']);
+
+    } catch (Exception $e) {
+        $connect->rollback();
+        echo json_encode(['error' => $e->getMessage()]);
+    }
 
 } else {
     echo json_encode(['error' => 'Invalid action.']);

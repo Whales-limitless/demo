@@ -153,14 +153,19 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             flex-shrink: 0;
         }
 
-        .status-badge.open {
+        .status-badge.draft {
             background: #dbeafe;
             color: #2563eb;
         }
 
-        .status-badge.in-progress {
-            background: #fef3c7;
-            color: #d97706;
+        .status-badge.submitted {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .status-badge.approved {
+            background: #f3e8ff;
+            color: #7c3aed;
         }
 
         .session-card-bottom {
@@ -622,13 +627,19 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
     </div>
 
-    <!-- Fixed Save Bar (only visible in count view) -->
+    <!-- Fixed Bottom Bar (only visible in count view) -->
     <div class="save-bar" id="saveBar" style="display: none;">
-        <button class="save-btn" onclick="saveCounts()">
+        <button class="save-btn" style="background:#6b7280;" onclick="saveDraft()">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"/>
             </svg>
-            Save Counts
+            Save Draft
+        </button>
+        <button class="save-btn" style="margin-left:10px;" onclick="submitCount()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/>
+            </svg>
+            Submit
         </button>
     </div>
 
@@ -658,7 +669,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                         '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">' +
                         '<path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>' +
                         '</svg>' +
-                        '<p>No open stock take sessions found.</p>' +
+                        '<p>No stock take sessions available.</p>' +
                         '</div>';
                 } else {
                     container.innerHTML = '<div class="empty-state"><p>Error loading sessions. Please try again.</p></div>';
@@ -675,11 +686,16 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             let html = '';
 
             sessions.forEach(session => {
-                const statusClass = session.status === 'IN_PROGRESS' ? 'in-progress' : 'open';
-                const statusLabel = session.status === 'IN_PROGRESS' ? 'In Progress' : 'Open';
+                let statusClass = 'draft';
+                let statusLabel = 'Draft';
+                if (session.status === 'SUBMITTED') { statusClass = 'submitted'; statusLabel = 'Submitted'; }
+                else if (session.status === 'APPROVED') { statusClass = 'approved'; statusLabel = 'Approved'; }
+
                 const counted = parseInt(session.counted) || 0;
                 const total = parseInt(session.total) || 0;
                 const progressPct = total > 0 ? Math.round((counted / total) * 100) : 0;
+                const isDraft = session.status === 'DRAFT';
+                const btnLabel = isDraft ? 'Start Count' : 'View';
 
                 html += '<div class="session-card">' +
                     '<div class="session-card-top">' +
@@ -696,12 +712,14 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                                 '<div class="progress-bar-fill" style="width: ' + progressPct + '%"></div>' +
                             '</div>' +
                         '</div>' +
+                        (isDraft ?
                         '<button class="open-session-btn" onclick="openSession(' + session.id + ')">' +
                             '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">' +
                                 '<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>' +
                             '</svg>' +
-                            'Open' +
-                        '</button>' +
+                            'Start Count' +
+                        '</button>'
+                        : '') +
                     '</div>' +
                 '</div>';
             });
@@ -883,7 +901,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             loadSessions();
         }
 
-        function saveCounts() {
+        function gatherCounts() {
             const itemCards = document.querySelectorAll('#itemsContainer .item-card');
             const counts = [];
 
@@ -904,62 +922,80 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                 }
             });
 
+            return counts;
+        }
+
+        function saveDraft() {
+            const counts = gatherCounts();
             if (counts.length === 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'No Counts',
-                    text: 'Please enter at least one counted quantity before saving.',
-                    confirmButtonColor: '#C8102E'
-                });
+                Swal.fire({ icon: 'warning', title: 'No Counts', text: 'Please enter at least one counted quantity before saving.', confirmButtonColor: '#C8102E' });
                 return;
             }
 
-            const saveBtn = document.querySelector('.save-btn');
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = '<div class="loading-spinner" style="width:20px;height:20px;border-width:2px;margin:0;"></div> Saving...';
+            const btns = document.querySelectorAll('.save-bar .save-btn');
+            btns.forEach(b => b.disabled = true);
 
             fetch('staff_stock_take_ajax.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'save_counts',
-                    session_id: currentSessionId,
-                    counts: counts
-                })
+                body: JSON.stringify({ action: 'save_counts', session_id: currentSessionId, counts: counts })
             })
             .then(response => response.json())
             .then(data => {
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg> Save Counts';
-
+                btns.forEach(b => b.disabled = false);
                 if (data.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Counts Saved',
-                        text: 'Stock take counts have been saved successfully.',
-                        confirmButtonColor: '#C8102E'
-                    }).then(() => {
+                    Swal.fire({ icon: 'success', title: 'Draft Saved', text: 'Your counts have been saved. You can continue counting later.', confirmButtonColor: '#C8102E' }).then(() => {
                         openSession(currentSessionId);
                     });
                 } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Save Failed',
-                        text: data.message || 'An error occurred while saving counts.',
-                        confirmButtonColor: '#C8102E'
-                    });
+                    Swal.fire({ icon: 'error', title: 'Save Failed', text: data.message || data.error || 'An error occurred.', confirmButtonColor: '#C8102E' });
                 }
             })
             .catch(error => {
-                console.error('Error saving counts:', error);
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg> Save Counts';
+                btns.forEach(b => b.disabled = false);
+                Swal.fire({ icon: 'error', title: 'Save Failed', text: 'A network error occurred. Please try again.', confirmButtonColor: '#C8102E' });
+            });
+        }
 
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Save Failed',
-                    text: 'A network error occurred. Please try again.',
-                    confirmButtonColor: '#C8102E'
+        function submitCount() {
+            const counts = gatherCounts();
+            if (counts.length === 0) {
+                Swal.fire({ icon: 'warning', title: 'No Counts', text: 'Please enter at least one counted quantity before submitting.', confirmButtonColor: '#C8102E' });
+                return;
+            }
+
+            Swal.fire({
+                title: 'Submit Stock Take?',
+                text: 'Once submitted, you cannot edit the counts anymore. Admin will review and approve.',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#C8102E',
+                confirmButtonText: 'Yes, Submit'
+            }).then(result => {
+                if (!result.isConfirmed) return;
+
+                const btns = document.querySelectorAll('.save-bar .save-btn');
+                btns.forEach(b => b.disabled = true);
+
+                fetch('staff_stock_take_ajax.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'submit', session_id: currentSessionId, counts: counts })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    btns.forEach(b => b.disabled = false);
+                    if (data.success) {
+                        Swal.fire({ icon: 'success', title: 'Submitted!', text: 'Stock take has been submitted for admin review.', confirmButtonColor: '#C8102E' }).then(() => {
+                            backToList();
+                        });
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Submit Failed', text: data.message || data.error || 'An error occurred.', confirmButtonColor: '#C8102E' });
+                    }
+                })
+                .catch(error => {
+                    btns.forEach(b => b.disabled = false);
+                    Swal.fire({ icon: 'error', title: 'Submit Failed', text: 'A network error occurred. Please try again.', confirmButtonColor: '#C8102E' });
                 });
             });
         }
