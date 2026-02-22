@@ -163,7 +163,7 @@ if ($action === 'create') {
         $adjCount = 0;
         if ($itemsResult) {
             $updateQohStmt = $connect->prepare("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) + ? WHERE `barcode` = ?");
-            $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`IP`,`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`MNO`,`BARCODE`,`PDESC`,`LOOSE`,`PGROUP`,`PRODTYPE`,`QTYADJ`,`SERIALNUMBER`,`REMARK`,`LOSS_REASON`) VALUES ('','STOCKTAKE',?,?,?,?,?,'',?,?,0,'','',?,'',?,'ADJUSTMENT')");
+            $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`BARCODE`,`PDESC`,`QTYADJ`,`REMARK`,`LOSS_REASON`) VALUES ('STOCKTAKE',?,?,?,?,?,?,?,?,?,'ADJUSTMENT')");
 
             while ($item = $itemsResult->fetch_assoc()) {
                 $variance = floatval($item['variance']);
@@ -229,7 +229,7 @@ if ($action === 'create') {
         $adjCount = 0;
         if ($itemsResult) {
             $updateQohStmt = $connect->prepare("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) + ? WHERE `barcode` = ?");
-            $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`IP`,`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`MNO`,`BARCODE`,`PDESC`,`LOOSE`,`PGROUP`,`PRODTYPE`,`QTYADJ`,`SERIALNUMBER`,`REMARK`,`LOSS_REASON`) VALUES ('','STOCKTAKE',?,?,?,?,?,'',?,?,0,'','',?,'',?,'ADJUSTMENT')");
+            $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`BARCODE`,`PDESC`,`QTYADJ`,`REMARK`,`LOSS_REASON`) VALUES ('STOCKTAKE',?,?,?,?,?,?,?,?,?,'ADJUSTMENT')");
 
             while ($item = $itemsResult->fetch_assoc()) {
                 $variance = floatval($item['variance']);

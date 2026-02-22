@@ -90,7 +90,7 @@ if ($action === 'get') {
     // Auto-generate code
     $code = generateCode($connect);
 
-    $stmt = $connect->prepare("INSERT INTO `sysfile` (`USER1`,`USER2`,`USER_NAME`,`USERNAME`,`TYPE`,`STATUS`,`OUTLET`,`PUSHID`) VALUES (?,?,?,?,?,'Y','MAIN','')");
+    $stmt = $connect->prepare("INSERT INTO `sysfile` (`USER1`,`USER2`,`USER_NAME`,`USERNAME`,`TYPE`,`STATUS`,`OUTLET`) VALUES (?,?,?,?,?,'Y','MAIN')");
     $stmt->bind_param("sssss", $username, $password, $name, $code, $type);
 
     if ($stmt->execute()) {

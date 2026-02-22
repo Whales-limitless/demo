@@ -279,6 +279,81 @@ CREATE TABLE IF NOT EXISTS `product_trend_config` (
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 ");
+
+// =====================================================================
+// --- CLEANUP: Drop unused columns from legacy/imported tables ---
+// =====================================================================
+// When importing old parkdeptmain data, tables come with many columns
+// that are no longer used in the new inventory program. This section
+// automatically detects and drops those unused columns.
+
+// Define the columns each table SHOULD keep (used by the new program)
+$keepColumns = [
+    'PRODUCTS' => ['id', 'cat_code', 'sub_code', 'barcode', 'code', 'cat', 'sub_cat', 'name', 'description', 'img1', 'qoh', 'uom', 'checked', 'stkcode', 'rack'],
+    'orderlist' => ['ID', 'OUTLET', 'SDATE', 'ACCODE', 'NAME', 'SALNUM', 'BARCODE', 'PDESC', 'QTY', 'PTYPE', 'TRANSNO', 'TDATE', 'TTIME', 'STATUS', 'PRINT', 'view_status', 'ADMINRMK', 'SOUND', 'TXTTO'],
+    'stockadj' => ['ID', 'ACCODE', 'USER', 'OUTLET', 'SDATE', 'STIME', 'SALNUM', 'BARCODE', 'PDESC', 'QTYADJ', 'REMARK', 'LOSS_REASON'],
+    'sysfile' => ['ID', 'USER1', 'USER2', 'USER_NAME', 'USERNAME', 'TYPE', 'STATUS', 'OUTLET'],
+];
+
+foreach ($keepColumns as $table => $keep) {
+    // Check if table exists
+    $tableCheck = $connect->query("SHOW TABLES LIKE '$table'");
+    if (!$tableCheck || $tableCheck->num_rows === 0) {
+        continue; // Table doesn't exist, skip
+    }
+
+    // Get current columns
+    $colResult = $connect->query("SHOW COLUMNS FROM `$table`");
+    if (!$colResult) continue;
+
+    $currentCols = [];
+    while ($col = $colResult->fetch_assoc()) {
+        $currentCols[] = $col['Field'];
+    }
+
+    // Find columns to drop (case-insensitive comparison)
+    $keepLower = array_map('strtolower', $keep);
+    $dropCols = [];
+    foreach ($currentCols as $col) {
+        if (!in_array(strtolower($col), $keepLower)) {
+            $dropCols[] = $col;
+        }
+    }
+
+    if (empty($dropCols)) {
+        $results[] = ['skip', "Cleanup $table: no unused columns found"];
+    } else {
+        // Drop each unused column
+        foreach ($dropCols as $dropCol) {
+            $sql = "ALTER TABLE `$table` DROP COLUMN `$dropCol`";
+            if ($connect->query($sql)) {
+                $results[] = ['ok', "Cleanup $table: dropped column `$dropCol`"];
+            } else {
+                $err = $connect->error;
+                if (strpos($err, "check that column/key exists") !== false || strpos($err, "Unknown column") !== false) {
+                    $results[] = ['skip', "Cleanup $table: column `$dropCol` already removed"];
+                } else {
+                    $results[] = ['fail', "Cleanup $table: drop `$dropCol` failed: $err"];
+                }
+            }
+        }
+    }
+}
+
+// --- Drop unused legacy tables ---
+$dropTables = ['cat_group', 'stockin', 'stockout'];
+foreach ($dropTables as $dropTable) {
+    $tableCheck = $connect->query("SHOW TABLES LIKE '$dropTable'");
+    if ($tableCheck && $tableCheck->num_rows > 0) {
+        if ($connect->query("DROP TABLE `$dropTable`")) {
+            $results[] = ['ok', "Cleanup: dropped unused table `$dropTable`"];
+        } else {
+            $results[] = ['fail', "Cleanup: drop table `$dropTable` failed: " . $connect->error];
+        }
+    } else {
+        $results[] = ['skip', "Cleanup: table `$dropTable` does not exist"];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
