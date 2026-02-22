@@ -194,6 +194,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 15px; }
 
+.load-sentinel { display: flex; align-items: center; justify-content: center; padding: 32px 0; gap: 10px; color: var(--text-muted); font-size: 14px; font-weight: 500; }
+.load-spinner { width: 24px; height: 24px; border: 3px solid #e5e7eb; border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 @media (max-width: 768px) { .main { padding: 16px 12px 80px; } .product-grid { gap: 10px; } .product-name { font-size: 12px; } .product-info { padding: 10px; } .page-title { font-size: 20px; } .toolbar { gap: 8px; } .category-header h2 { font-size: 17px; } }
 @media (min-width: 993px) { .product-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 1200px) { .product-grid { grid-template-columns: repeat(4, 1fr); } }
@@ -220,6 +224,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   </div>
 
   <div id="productSections"></div>
+  <div class="load-sentinel" id="loadSentinel" style="display:none;">
+    <div class="load-spinner"></div>
+    <span>Loading more products…</span>
+  </div>
 </main>
 
 <?php include('mobile-bottombar.php'); ?>
@@ -228,6 +236,23 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 var allCategories = <?php echo json_encode($allCategories); ?>;
 
 var trendLabels = { green: 'Hot', yellow: 'Moderate', red: 'Slow', black: 'Dead' };
+var BATCH_SIZE = 2; // Categories per batch
+var loadedIndex = 0; // Next category index to render
+var isLoading = false;
+var allOOS = []; // Collected during rendering
+var oosRendered = false;
+var isSearchMode = false;
+var totalProducts = 0;
+
+// Pre-compute total and OOS list
+(function() {
+  allCategories.forEach(function(cat) {
+    cat.subcategories.forEach(function(sc) {
+      totalProducts += sc.products.length;
+    });
+  });
+  document.getElementById('productTotal').textContent = totalProducts + ' products';
+})();
 
 function renderProductCard(p, index) {
   var imgHtml;
@@ -278,60 +303,131 @@ function renderProductCard(p, index) {
   '</div>';
 }
 
-function renderSections() {
-  var sections = document.getElementById('productSections');
-  var totalProducts = 0;
-  var allOOS = [];
-
-  var html = allCategories.map(function(cat) {
-    var catProducts = 0;
-    var catHtml = cat.subcategories.map(function(sc) {
-      var inStock = sc.products.filter(function(p) { return p.inStock; });
-      sc.products.filter(function(p) { return !p.inStock; }).forEach(function(p) {
-        allOOS.push(Object.assign({}, p, { category: cat.name, subcategory: sc.name }));
-      });
-      catProducts += sc.products.length;
-      if (inStock.length === 0) return '';
-      return '<div class="subcat-section">' +
-        '<h3 class="subcat-heading">' + sc.name + '</h3>' +
-        '<div class="product-grid">' + inStock.map(function(p, i) { return renderProductCard(p, i); }).join('') + '</div>' +
-      '</div>';
-    }).join('');
-
-    totalProducts += catProducts;
-
-    if (catProducts === 0) return '';
-
-    return '<div class="category-section" id="cat_' + cat.id + '">' +
-      '<div class="category-header">' +
-        '<h2>' + cat.name + '</h2>' +
-        '<span class="cat-product-count">' + catProducts + '</span>' +
-        '<a href="products.php?cat=' + encodeURIComponent(cat.id) + '">View Category →</a>' +
-      '</div>' +
-      catHtml +
+function renderCategoryHtml(cat) {
+  var catProducts = 0;
+  var catOOS = [];
+  var catHtml = cat.subcategories.map(function(sc) {
+    var inStock = sc.products.filter(function(p) { return p.inStock; });
+    sc.products.filter(function(p) { return !p.inStock; }).forEach(function(p) {
+      catOOS.push(Object.assign({}, p, { category: cat.name, subcategory: sc.name }));
+    });
+    catProducts += sc.products.length;
+    if (inStock.length === 0) return '';
+    return '<div class="subcat-section">' +
+      '<h3 class="subcat-heading">' + sc.name + '</h3>' +
+      '<div class="product-grid">' + inStock.map(function(p, i) { return renderProductCard(p, i); }).join('') + '</div>' +
     '</div>';
   }).join('');
 
-  // Out of stock section at the bottom
-  if (allOOS.length > 0) {
-    html += '<div class="oos-section"><div class="oos-heading">Out of Stock <span class="oos-count">' + allOOS.length + '</span></div>' +
-      '<div class="product-grid">' + allOOS.map(function(p, i) { return renderProductCard(p, i); }).join('') + '</div></div>';
-  }
+  // Collect OOS for later
+  catOOS.forEach(function(p) { allOOS.push(p); });
 
-  sections.innerHTML = html || '<div class="empty-state">No products found.</div>';
-  document.getElementById('productTotal').textContent = totalProducts + ' products';
+  if (catProducts === 0) return '';
+
+  return '<div class="category-section" id="cat_' + cat.id + '">' +
+    '<div class="category-header">' +
+      '<h2>' + cat.name + '</h2>' +
+      '<span class="cat-product-count">' + catProducts + '</span>' +
+      '<a href="products.php?cat=' + encodeURIComponent(cat.id) + '">View Category →</a>' +
+    '</div>' +
+    catHtml +
+  '</div>';
 }
 
-// Product search
+function loadNextBatch() {
+  if (isLoading || isSearchMode) return;
+  if (loadedIndex >= allCategories.length) {
+    // All categories loaded - now render OOS if any
+    if (!oosRendered && allOOS.length > 0) {
+      oosRendered = true;
+      var oosHtml = '<div class="oos-section"><div class="oos-heading">Out of Stock <span class="oos-count">' + allOOS.length + '</span></div>' +
+        '<div class="product-grid">' + allOOS.map(function(p, i) { return renderProductCard(p, i); }).join('') + '</div></div>';
+      document.getElementById('productSections').insertAdjacentHTML('beforeend', oosHtml);
+    }
+    document.getElementById('loadSentinel').style.display = 'none';
+    return;
+  }
+
+  isLoading = true;
+  var sections = document.getElementById('productSections');
+  var end = Math.min(loadedIndex + BATCH_SIZE, allCategories.length);
+
+  for (var i = loadedIndex; i < end; i++) {
+    var html = renderCategoryHtml(allCategories[i]);
+    if (html) sections.insertAdjacentHTML('beforeend', html);
+  }
+
+  loadedIndex = end;
+  isLoading = false;
+
+  // Check if more to load
+  if (loadedIndex >= allCategories.length) {
+    // Load OOS on next trigger
+    if (!oosRendered && allOOS.length > 0) {
+      document.getElementById('loadSentinel').style.display = 'flex';
+    } else {
+      document.getElementById('loadSentinel').style.display = 'none';
+    }
+  } else {
+    document.getElementById('loadSentinel').style.display = 'flex';
+  }
+}
+
+// ==================== INFINITE SCROLL ====================
+var sentinel = document.getElementById('loadSentinel');
+var observer = new IntersectionObserver(function(entries) {
+  if (entries[0].isIntersecting && !isSearchMode) {
+    loadNextBatch();
+  }
+}, { rootMargin: '400px' }); // Trigger 400px before sentinel is visible
+
+observer.observe(sentinel);
+
+// Initial render - first batch
+loadNextBatch();
+
+// ==================== SEARCH ====================
+var searchDebounce = null;
+
+function renderAllForSearch() {
+  // Render remaining categories that haven't been loaded yet
+  var sections = document.getElementById('productSections');
+  while (loadedIndex < allCategories.length) {
+    var html = renderCategoryHtml(allCategories[loadedIndex]);
+    if (html) sections.insertAdjacentHTML('beforeend', html);
+    loadedIndex++;
+  }
+  if (!oosRendered && allOOS.length > 0) {
+    oosRendered = true;
+    var oosHtml = '<div class="oos-section"><div class="oos-heading">Out of Stock <span class="oos-count">' + allOOS.length + '</span></div>' +
+      '<div class="product-grid">' + allOOS.map(function(p, i) { return renderProductCard(p, i); }).join('') + '</div></div>';
+    sections.insertAdjacentHTML('beforeend', oosHtml);
+  }
+  document.getElementById('loadSentinel').style.display = 'none';
+}
+
 function filterProducts(query) {
   var q = query.toLowerCase();
+
+  if (q.length > 0) {
+    isSearchMode = true;
+    // Make sure everything is rendered before filtering
+    if (loadedIndex < allCategories.length || !oosRendered) {
+      renderAllForSearch();
+    }
+  } else {
+    isSearchMode = false;
+  }
+
   document.querySelectorAll('.product-card').forEach(function(card) {
+    if (!q) { card.style.display = ''; return; }
     var nameMatch = card.getAttribute('data-name').indexOf(q) !== -1;
     var skuMatch = card.getAttribute('data-sku').indexOf(q) !== -1;
     var barcodeMatch = card.getAttribute('data-barcode').indexOf(q) !== -1;
     card.style.display = (nameMatch || skuMatch || barcodeMatch) ? '' : 'none';
   });
-  // Hide empty sections
+
+  // Show/hide empty sections
   document.querySelectorAll('.subcat-section').forEach(function(sec) {
     var any = Array.from(sec.querySelectorAll('.product-card')).some(function(c) { return c.style.display !== 'none'; });
     sec.style.display = any ? '' : 'none';
@@ -346,9 +442,13 @@ function filterProducts(query) {
   });
 }
 
-document.getElementById('productSearchInput').addEventListener('input', function() { filterProducts(this.value); });
+document.getElementById('productSearchInput').addEventListener('input', function() {
+  var val = this.value;
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(function() { filterProducts(val); }, 200);
+});
 
-// Cart functionality
+// ==================== CART ====================
 function updateQty(action, id) {
   var input = document.getElementById('qty_' + id);
   var val = parseInt(input.value) || 1;
@@ -417,9 +517,6 @@ function addToCart(productId) {
     document.getElementById('cartBadge').textContent = cart.length;
   } catch(e) {}
 })();
-
-// Render
-renderSections();
 </script>
 </body>
 </html>
