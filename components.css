@@ -267,15 +267,41 @@
 .sidebar-nav { list-style: none; padding: 12px 0; }
 
 .sidebar-nav li a {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 12px 20px;
   color: #fff;
   text-decoration: none;
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 500;
   transition: background var(--transition);
 }
 
 .sidebar-nav li a:hover { background: rgba(255,255,255,0.1); }
+.sidebar-nav li a.active { background: rgba(255,255,255,0.15); border-left: 3px solid #fff; }
+
+.sidebar-nav .nav-icon { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.sidebar-divider { height: 1px; background: rgba(255,255,255,0.12); margin: 8px 16px; }
+
+.sidebar-section-label { padding: 16px 20px 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.5; }
+
+/* Desktop: sidebar always visible, push content */
+@media (min-width: 993px) {
+  .sidebar {
+    left: 0;
+    top: 64px;
+    height: calc(100vh - 64px);
+    width: 240px;
+    z-index: 50;
+  }
+  .sidebar-header { display: none; }
+  .sidebar-overlay { display: none !important; }
+  .menu-btn { display: none; }
+  .navbar { padding-left: 24px; }
+  .page-body { margin-left: 240px; }
+}
 
 /* ── MOBILE FOOTER ── */
 .mobile-footer {
@@ -284,10 +310,11 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--primary);
+  background: #fff;
   z-index: 100;
   padding: 0;
-  box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 -1px 12px rgba(0,0,0,0.08);
+  border-top: 1px solid #e5e7eb;
 }
 
 .mobile-footer .footer-inner {
@@ -298,41 +325,96 @@
   position: relative;
 }
 
-.mobile-footer a {
-  color: #fff;
+.mobile-footer a,
+.mobile-footer button.footer-tab {
+  color: var(--text-muted);
   text-decoration: none;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 600;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  min-width: 52px;
+  transition: color var(--transition);
+  font-family: 'DM Sans', sans-serif;
 }
 
-.mobile-footer .home-btn {
-  width: 56px;
-  height: 56px;
-  background: var(--primary);
-  border: 3px solid var(--bg);
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  margin-top: -24px;
-  box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+.mobile-footer a:hover,
+.mobile-footer button.footer-tab:hover,
+.mobile-footer a.tab-active,
+.mobile-footer button.footer-tab.tab-active { color: var(--primary); }
+
+.mobile-footer .tab-icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ── INVENTORY MODAL ── */
+.inv-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 500;
+  align-items: flex-end;
+  justify-content: center;
 }
 
-.mobile-footer .home-btn .logo-sm {
-  width: 36px;
-  height: 36px;
+.inv-modal-overlay.active { display: flex; }
+
+.inv-modal {
   background: #fff;
-  border-radius: 50%;
+  border-radius: 20px 20px 0 0;
+  width: 100%;
+  max-width: 480px;
+  padding: 0 0 24px;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+.inv-modal-handle { width: 40px; height: 4px; background: #d1d5db; border-radius: 4px; margin: 12px auto 16px; }
+
+.inv-modal-title { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 20px; color: var(--text); }
+
+.inv-modal-buttons { display: flex; flex-direction: column; gap: 10px; padding: 0 20px; }
+
+.inv-modal-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--bg);
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  text-decoration: none;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  transition: all var(--transition);
+  cursor: pointer;
+}
+
+.inv-modal-btn:hover { border-color: var(--primary); background: #fef2f2; }
+
+.inv-modal-btn .inv-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
-  font-weight: 800;
-  color: var(--primary);
-  font-family: 'Outfit', sans-serif;
-  font-size: 11px;
+  flex-shrink: 0;
 }
+
+.inv-modal-btn .inv-icon svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.inv-modal-btn .inv-icon.stock-take { background: #2563eb; }
+.inv-modal-btn .inv-icon.stock-loss { background: #dc2626; }
+
+.inv-modal-btn .inv-label { display: flex; flex-direction: column; gap: 2px; }
+.inv-modal-btn .inv-label small { font-size: 12px; font-weight: 400; color: var(--text-muted); }
 
 /* ── SCROLL TO TOP ── */
 .scroll-top {
@@ -362,12 +444,15 @@
 .icon-sm { width: 18px; height: 18px; }
 
 /* ── SHARED RESPONSIVE ── */
-.mobile-footer { display: block; }
-
-@media (max-width: 480px) {
-  .scroll-top { bottom: 72px; }
+@media (max-width: 992px) {
+  .mobile-footer { display: block; }
 }
 
 @media (max-width: 480px) {
+  .scroll-top { bottom: 72px; }
   .navbar { padding: 0 12px; height: 56px; }
+}
+
+@media (min-width: 993px) {
+  .scroll-top { bottom: 24px; }
 }
