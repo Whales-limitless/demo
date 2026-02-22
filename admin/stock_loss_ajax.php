@@ -73,7 +73,7 @@ if ($action === 'lookup') {
         $desc = substr($product['name'], 0, 48);
 
         // Insert stockadj record with LOSS_REASON
-        $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`IP`,`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`MNO`,`BARCODE`,`PDESC`,`LOOSE`,`PGROUP`,`PRODTYPE`,`QTYADJ`,`SERIALNUMBER`,`REMARK`,`LOSS_REASON`) VALUES ('','STOCKLOSS',?,?,?,?,?,'',?,?,0,'','',?,'',?,?)");
+        $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`BARCODE`,`PDESC`,`QTYADJ`,`REMARK`,`LOSS_REASON`) VALUES ('STOCKLOSS',?,?,?,?,?,?,?,?,?,?)");
         $adjStmt->bind_param("sssssssdss", $adminUser, $adminUser, $curDate, $curTime, $salnum, $barcode, $desc, $negQty, $remark, $reason);
         if (!$adjStmt->execute()) {
             throw new Exception('Failed to insert adjustment: ' . $connect->error);

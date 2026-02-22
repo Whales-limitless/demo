@@ -52,7 +52,7 @@ foreach ($items as $item) {
     $escapedAccode = mysqli_real_escape_string($connect, $userAccode);
     $escapedUserName = mysqli_real_escape_string($connect, $userName);
 
-    $sql = "INSERT INTO `orderlist` (OUTLET, SDATE, ACCODE, NAME, SALNUM, BARCODE, PDESC, QTY, RETAIL, AMOUNT, REMARK, REDEEM, BILL, DELIVERY, PTYPE, TRANSNO, TDATE, TTIME, STATUS, PRINT, view_status, ADMINRMK, SOUND, TXTTO)
+    $sql = "INSERT INTO `orderlist` (OUTLET, SDATE, ACCODE, NAME, SALNUM, BARCODE, PDESC, QTY, PTYPE, TRANSNO, TDATE, TTIME, STATUS, PRINT, view_status, ADMINRMK, SOUND, TXTTO)
             VALUES (
                 '$outlet',
                 '$curDate',
@@ -62,12 +62,6 @@ foreach ($items as $item) {
                 '" . mysqli_real_escape_string($connect, $barcode) . "',
                 '" . mysqli_real_escape_string($connect, $name) . "',
                 '$qty',
-                '0',
-                '0',
-                '',
-                '',
-                '',
-                '',
                 '$ptype',
                 '',
                 '$curDate',
