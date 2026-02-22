@@ -68,7 +68,7 @@
   </div>
   <div class="scan-body">
     <div class="scan-viewfinder" id="scanViewfinder">
-      <div id="qrReader"></div>
+      <video id="scanVideo" muted playsinline></video>
       <div class="scan-line"></div>
       <div class="scan-corners-bottom"></div>
     </div>
@@ -84,8 +84,8 @@
   </div>
 </div>
 
-<!-- html5-qrcode library (self-hosted for reliability) -->
-<script src="js/html5-qrcode.min.js"></script>
+<!-- QR Scanner library: Nimiq qr-scanner (self-hosted, 60KB vs 375KB html5-qrcode) -->
+<script src="js/qr-scanner.umd.min.js"></script>
 
 <script>
 (function(){
@@ -125,10 +125,9 @@ function closeInventoryModal(e) {
   }
 }
 
-// ==================== QR SCAN MODAL ====================
-var html5QrCode = null;
+// ==================== QR SCAN MODAL (Nimiq qr-scanner) ====================
+var qrScanner = null;
 var lastScannedText = '';
-var scannerLibLoaded = typeof Html5Qrcode !== 'undefined';
 
 function showScanError(msg) {
   document.getElementById('scanHint').style.display = 'none';
@@ -138,18 +137,17 @@ function showScanError(msg) {
 }
 
 function openScanModal() {
-  // Check HTTPS (camera API requires secure context)
+  // Check secure context (camera API requires HTTPS or localhost)
   if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     alert('QR scanning requires HTTPS. Please access this site over HTTPS to use the scanner.');
     return;
   }
 
   // Check if library loaded
-  if (!scannerLibLoaded && typeof Html5Qrcode === 'undefined') {
+  if (typeof QrScanner === 'undefined') {
     alert('QR scanner library failed to load. Please check your connection and refresh the page.');
     return;
   }
-  scannerLibLoaded = true;
 
   var overlay = document.getElementById('scanModalOverlay');
   overlay.classList.add('active');
@@ -160,85 +158,65 @@ function openScanModal() {
 }
 
 function closeScanModal() {
-  var overlay = document.getElementById('scanModalOverlay');
-  overlay.classList.remove('active');
+  document.getElementById('scanModalOverlay').classList.remove('active');
   stopScanner();
 }
 
 function startScanner() {
-  var readerEl = document.getElementById('qrReader');
-  readerEl.innerHTML = '';
+  var videoEl = document.getElementById('scanVideo');
 
   try {
-    if (!html5QrCode) {
-      html5QrCode = new Html5Qrcode('qrReader');
+    if (!qrScanner) {
+      qrScanner = new QrScanner(
+        videoEl,
+        function(result) {
+          var decodedText = result.data || result;
+          lastScannedText = decodedText;
+
+          // Pause scanner on success
+          qrScanner.pause();
+
+          // Show result
+          document.getElementById('scanHint').style.display = 'none';
+          document.getElementById('scanError').classList.remove('active');
+          document.getElementById('scanResultText').textContent = decodedText;
+          document.getElementById('scanResult').classList.add('active');
+
+          // Update button text based on content type
+          var goBtn = document.getElementById('scanGoBtn');
+          goBtn.textContent = isValidUrl(decodedText) ? 'Open Link' : 'Copy';
+        },
+        {
+          preferredCamera: 'environment',
+          maxScansPerSecond: 10,
+          returnDetailedScanResult: true,
+          highlightScanRegion: false,
+          highlightCodeOutline: false
+        }
+      );
     }
   } catch(e) {
     showScanError('Scanner failed to initialize. Please refresh and try again.');
     return;
   }
 
-  var viewfinder = document.getElementById('scanViewfinder');
-  var size = Math.min(viewfinder.offsetWidth, viewfinder.offsetHeight);
-  var qrboxSize = Math.max(150, Math.floor(size * 0.65));
-
-  html5QrCode.start(
-    { facingMode: 'environment' },
-    {
-      fps: 10,
-      qrbox: { width: qrboxSize, height: qrboxSize },
-      aspectRatio: 1,
-      disableFlip: false
-    },
-    function onSuccess(decodedText) {
-      lastScannedText = decodedText;
-
-      // Pause scanner on success
-      try { html5QrCode.pause(true); } catch(e) {}
-
-      // Show result
-      document.getElementById('scanHint').style.display = 'none';
-      document.getElementById('scanError').classList.remove('active');
-      document.getElementById('scanResultText').textContent = decodedText;
-      document.getElementById('scanResult').classList.add('active');
-
-      // Check if it's a URL and update button accordingly
-      var goBtn = document.getElementById('scanGoBtn');
-      if (isValidUrl(decodedText)) {
-        goBtn.textContent = 'Open Link';
-      } else {
-        goBtn.textContent = 'Copy';
-      }
-    },
-    function onError() {
-      // Ignore scan failures (no QR in frame yet)
-    }
-  ).catch(function(err) {
+  qrScanner.start().catch(function(err) {
     var msg = String(err);
-    if (msg.indexOf('NotAllowedError') !== -1 || msg.indexOf('Permission') !== -1) {
+    if (msg.indexOf('not allowed') !== -1 || msg.indexOf('NotAllowed') !== -1 || msg.indexOf('Permission') !== -1) {
       showScanError('Camera access denied. Please allow camera permission in your browser settings and try again.');
-    } else if (msg.indexOf('NotFoundError') !== -1 || msg.indexOf('device') !== -1) {
+    } else if (msg.indexOf('not found') !== -1 || msg.indexOf('NotFound') !== -1) {
       showScanError('No camera found on this device.');
-    } else if (msg.indexOf('NotReadableError') !== -1) {
+    } else if (msg.indexOf('NotReadable') !== -1 || msg.indexOf('in use') !== -1) {
       showScanError('Camera is in use by another app. Please close other camera apps and try again.');
     } else {
       showScanError('Could not start camera. Please ensure camera permission is allowed.');
     }
   });
-
-  // Hide the library's default UI decorations via CSS (more reliable than DOM manipulation)
-  readerEl.style.border = 'none';
 }
 
 function stopScanner() {
-  if (!html5QrCode) return;
-  try {
-    var state = html5QrCode.getState();
-    if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
-      html5QrCode.stop().catch(function() {});
-    }
-  } catch(e) {
-    try { html5QrCode.stop().catch(function() {}); } catch(e2) {}
+  if (qrScanner) {
+    try { qrScanner.stop(); } catch(e) {}
   }
 }
 
@@ -253,16 +231,14 @@ function isValidUrl(text) {
 
 function goToScannedUrl() {
   if (isValidUrl(lastScannedText)) {
-    // Open external URLs in a new tab for safety (prevents leaving the app)
+    // Open in new tab for safety (prevents open redirect leaving the app)
     window.open(lastScannedText, '_blank', 'noopener,noreferrer');
   } else {
     // Copy non-URL text to clipboard
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(lastScannedText).then(function() {
         document.getElementById('scanGoBtn').textContent = 'Copied!';
-        setTimeout(function() {
-          document.getElementById('scanGoBtn').textContent = 'Copy';
-        }, 1500);
+        setTimeout(function() { document.getElementById('scanGoBtn').textContent = 'Copy'; }, 1500);
       }).catch(function() {
         fallbackCopy(lastScannedText);
       });
@@ -282,9 +258,7 @@ function fallbackCopy(text) {
   try { document.execCommand('copy'); } catch(e) {}
   document.body.removeChild(ta);
   document.getElementById('scanGoBtn').textContent = 'Copied!';
-  setTimeout(function() {
-    document.getElementById('scanGoBtn').textContent = 'Copy';
-  }, 1500);
+  setTimeout(function() { document.getElementById('scanGoBtn').textContent = 'Copy'; }, 1500);
 }
 
 function scanAgain() {
@@ -292,21 +266,13 @@ function scanAgain() {
   document.getElementById('scanResult').classList.remove('active');
   document.getElementById('scanHint').style.display = '';
 
-  if (html5QrCode) {
-    try {
-      var state = html5QrCode.getState();
-      if (state === Html5QrcodeScannerState.PAUSED) {
-        html5QrCode.resume();
-        return;
-      }
-    } catch(e) {}
+  if (qrScanner) {
+    qrScanner.start().catch(function() {
+      showScanError('Could not restart camera. Please close and try again.');
+    });
   }
-  startScanner();
 }
 
-// Release camera when user navigates away or closes tab
+// Release camera on page unload or tab switch
 window.addEventListener('beforeunload', function() { stopScanner(); });
-document.addEventListener('visibilitychange', function() {
-  if (document.hidden) stopScanner();
-});
 </script>
