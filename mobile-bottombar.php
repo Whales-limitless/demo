@@ -8,23 +8,23 @@
 <footer class="mobile-footer">
   <div class="footer-inner">
     <a href="./" id="tabCategory">
-      <svg class="tab-icon"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      <svg class="tab-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
       Category
     </a>
     <a href="all_products.php" id="tabProducts">
-      <svg class="tab-icon"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+      <svg class="tab-icon" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
       Products
     </a>
     <button class="footer-tab" id="tabScan" onclick="openScanModal()">
-      <svg class="tab-icon"><path d="M1 3h4v18H1z"/><path d="M7 3h2v18H7z"/><path d="M11 3h1v18h-1z"/><path d="M14 3h2v18h-2z"/><path d="M19 3h4v18h-4z"/></svg>
+      <svg class="tab-icon" viewBox="0 0 24 24"><path d="M1 3h4v18H1z"/><path d="M7 3h2v18H7z"/><path d="M11 3h1v18h-1z"/><path d="M14 3h2v18h-2z"/><path d="M19 3h4v18h-4z"/></svg>
       Scan
     </button>
     <button class="footer-tab" id="tabInventory" onclick="openInventoryModal()">
-      <svg class="tab-icon"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      <svg class="tab-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
       Inventory
     </button>
     <a href="account.php" id="tabAccount">
-      <svg class="tab-icon"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <svg class="tab-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Account
     </a>
   </div>
