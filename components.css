@@ -477,10 +477,11 @@
 }
 
 .scan-viewfinder video { width: 100% !important; height: 100% !important; object-fit: cover !important; border: none !important; }
-#qrReader { width: 100% !important; height: 100% !important; border: none !important; }
+#qrReader { width: 100% !important; height: 100% !important; border: none !important; overflow: hidden; }
 #qrReader video { border-radius: 20px; }
-#qrReader img[alt="Info icon"] { display: none !important; }
+#qrReader img { display: none !important; }
 #qr-shaded-region { display: none !important; }
+#qrReader > div:not(:first-child) { border: none !important; }
 
 /* Scanner corner brackets */
 .scan-viewfinder::before,

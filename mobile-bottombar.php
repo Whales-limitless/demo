@@ -84,8 +84,8 @@
   </div>
 </div>
 
-<!-- html5-qrcode library -->
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- html5-qrcode library (self-hosted for reliability) -->
+<script src="js/html5-qrcode.min.js"></script>
 
 <script>
 (function(){
@@ -127,9 +127,30 @@ function closeInventoryModal(e) {
 
 // ==================== QR SCAN MODAL ====================
 var html5QrCode = null;
-var lastScannedUrl = '';
+var lastScannedText = '';
+var scannerLibLoaded = typeof Html5Qrcode !== 'undefined';
+
+function showScanError(msg) {
+  document.getElementById('scanHint').style.display = 'none';
+  var errorEl = document.getElementById('scanError');
+  errorEl.textContent = msg;
+  errorEl.classList.add('active');
+}
 
 function openScanModal() {
+  // Check HTTPS (camera API requires secure context)
+  if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    alert('QR scanning requires HTTPS. Please access this site over HTTPS to use the scanner.');
+    return;
+  }
+
+  // Check if library loaded
+  if (!scannerLibLoaded && typeof Html5Qrcode === 'undefined') {
+    alert('QR scanner library failed to load. Please check your connection and refresh the page.');
+    return;
+  }
+  scannerLibLoaded = true;
+
   var overlay = document.getElementById('scanModalOverlay');
   overlay.classList.add('active');
   document.getElementById('scanResult').classList.remove('active');
@@ -148,13 +169,18 @@ function startScanner() {
   var readerEl = document.getElementById('qrReader');
   readerEl.innerHTML = '';
 
-  if (!html5QrCode) {
-    html5QrCode = new Html5Qrcode('qrReader');
+  try {
+    if (!html5QrCode) {
+      html5QrCode = new Html5Qrcode('qrReader');
+    }
+  } catch(e) {
+    showScanError('Scanner failed to initialize. Please refresh and try again.');
+    return;
   }
 
   var viewfinder = document.getElementById('scanViewfinder');
   var size = Math.min(viewfinder.offsetWidth, viewfinder.offsetHeight);
-  var qrboxSize = Math.floor(size * 0.65);
+  var qrboxSize = Math.max(150, Math.floor(size * 0.65));
 
   html5QrCode.start(
     { facingMode: 'environment' },
@@ -165,10 +191,10 @@ function startScanner() {
       disableFlip: false
     },
     function onSuccess(decodedText) {
-      lastScannedUrl = decodedText;
+      lastScannedText = decodedText;
 
       // Pause scanner on success
-      html5QrCode.pause(true);
+      try { html5QrCode.pause(true); } catch(e) {}
 
       // Show result
       document.getElementById('scanHint').style.display = 'none';
@@ -176,52 +202,47 @@ function startScanner() {
       document.getElementById('scanResultText').textContent = decodedText;
       document.getElementById('scanResult').classList.add('active');
 
-      // Check if it's a URL
+      // Check if it's a URL and update button accordingly
       var goBtn = document.getElementById('scanGoBtn');
-      if (isUrl(decodedText)) {
+      if (isValidUrl(decodedText)) {
         goBtn.textContent = 'Open Link';
-        goBtn.style.display = '';
       } else {
         goBtn.textContent = 'Copy';
-        goBtn.style.display = '';
       }
     },
     function onError() {
       // Ignore scan failures (no QR in frame yet)
     }
   ).catch(function(err) {
-    document.getElementById('scanHint').style.display = 'none';
-    var errorEl = document.getElementById('scanError');
-    errorEl.textContent = 'Camera access denied. Please allow camera permission and try again.';
-    errorEl.classList.add('active');
+    var msg = String(err);
+    if (msg.indexOf('NotAllowedError') !== -1 || msg.indexOf('Permission') !== -1) {
+      showScanError('Camera access denied. Please allow camera permission in your browser settings and try again.');
+    } else if (msg.indexOf('NotFoundError') !== -1 || msg.indexOf('device') !== -1) {
+      showScanError('No camera found on this device.');
+    } else if (msg.indexOf('NotReadableError') !== -1) {
+      showScanError('Camera is in use by another app. Please close other camera apps and try again.');
+    } else {
+      showScanError('Could not start camera. Please ensure camera permission is allowed.');
+    }
   });
 
-  // Hide the library's default UI elements
-  setTimeout(function() {
-    var inner = readerEl.querySelector('#qr-shaded-region');
-    if (inner) inner.style.display = 'none';
-    // Hide the built-in scan region border
-    var borders = readerEl.querySelectorAll('[style*="border"]');
-    borders.forEach(function(b) {
-      if (b.id !== 'qrReader') b.style.border = 'none';
-    });
-  }, 500);
+  // Hide the library's default UI decorations via CSS (more reliable than DOM manipulation)
+  readerEl.style.border = 'none';
 }
 
 function stopScanner() {
-  if (html5QrCode) {
-    try {
-      var state = html5QrCode.getState();
-      if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
-        html5QrCode.stop().catch(function() {});
-      }
-    } catch(e) {
+  if (!html5QrCode) return;
+  try {
+    var state = html5QrCode.getState();
+    if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
       html5QrCode.stop().catch(function() {});
     }
+  } catch(e) {
+    try { html5QrCode.stop().catch(function() {}); } catch(e2) {}
   }
 }
 
-function isUrl(text) {
+function isValidUrl(text) {
   try {
     var url = new URL(text);
     return url.protocol === 'http:' || url.protocol === 'https:';
@@ -231,22 +252,43 @@ function isUrl(text) {
 }
 
 function goToScannedUrl() {
-  if (isUrl(lastScannedUrl)) {
-    window.location.href = lastScannedUrl;
+  if (isValidUrl(lastScannedText)) {
+    // Open external URLs in a new tab for safety (prevents leaving the app)
+    window.open(lastScannedText, '_blank', 'noopener,noreferrer');
   } else {
-    // Copy to clipboard for non-URL text
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(lastScannedUrl);
-      document.getElementById('scanGoBtn').textContent = 'Copied!';
-      setTimeout(function() {
-        document.getElementById('scanGoBtn').textContent = 'Copy';
-      }, 1500);
+    // Copy non-URL text to clipboard
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(lastScannedText).then(function() {
+        document.getElementById('scanGoBtn').textContent = 'Copied!';
+        setTimeout(function() {
+          document.getElementById('scanGoBtn').textContent = 'Copy';
+        }, 1500);
+      }).catch(function() {
+        fallbackCopy(lastScannedText);
+      });
+    } else {
+      fallbackCopy(lastScannedText);
     }
   }
 }
 
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(ta);
+  document.getElementById('scanGoBtn').textContent = 'Copied!';
+  setTimeout(function() {
+    document.getElementById('scanGoBtn').textContent = 'Copy';
+  }, 1500);
+}
+
 function scanAgain() {
-  lastScannedUrl = '';
+  lastScannedText = '';
   document.getElementById('scanResult').classList.remove('active');
   document.getElementById('scanHint').style.display = '';
 
@@ -261,4 +303,10 @@ function scanAgain() {
   }
   startScanner();
 }
+
+// Release camera when user navigates away or closes tab
+window.addEventListener('beforeunload', function() { stopScanner(); });
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) stopScanner();
+});
 </script>
