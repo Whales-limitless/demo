@@ -97,29 +97,38 @@ if ($action === 'list_sessions') {
         exit;
     }
 
-    $stmt = $connect->prepare("UPDATE `stock_take_item` SET `counted_qty`=?, `variance`=?, `remark`=?, `counted_by`=?, `counted_at`=NOW() WHERE `id`=? AND `stock_take_id`=?");
+    $connect->begin_transaction();
 
-    $updated = 0;
-    foreach ($counts as $c) {
-        $itemId = intval($c['item_id'] ?? ($c['id'] ?? 0));
-        $countedQty = ($c['counted_qty'] !== '' && $c['counted_qty'] !== null) ? floatval($c['counted_qty']) : null;
-        $remark = trim($c['remark'] ?? '');
+    try {
+        // Calculate variance directly in SQL to avoid nested queries
+        $stmt = $connect->prepare("UPDATE `stock_take_item` SET `counted_qty`=?, `variance`= ? - `system_qty`, `remark`=?, `counted_by`=?, `counted_at`=NOW() WHERE `id`=? AND `stock_take_id`=?");
+        if (!$stmt) {
+            throw new Exception('Failed to prepare statement: ' . $connect->error);
+        }
 
-        if ($itemId <= 0) continue;
+        $updated = 0;
+        foreach ($counts as $c) {
+            $itemId = intval($c['item_id'] ?? ($c['id'] ?? 0));
+            $countedQty = ($c['counted_qty'] !== '' && $c['counted_qty'] !== null) ? floatval($c['counted_qty']) : null;
+            $remark = trim($c['remark'] ?? '');
 
-        $sysResult = $connect->query("SELECT `system_qty` FROM `stock_take_item` WHERE `id` = $itemId LIMIT 1");
-        if ($sysResult && $sysRow = $sysResult->fetch_assoc()) {
-            $systemQty = floatval($sysRow['system_qty']);
-            $variance = ($countedQty !== null) ? ($countedQty - $systemQty) : null;
+            if ($itemId <= 0) continue;
 
-            $stmt->bind_param("ddssii", $countedQty, $variance, $remark, $staffName, $itemId, $sessionId);
-            $stmt->execute();
+            $stmt->bind_param("ddssii", $countedQty, $countedQty, $remark, $staffName, $itemId, $sessionId);
+            if (!$stmt->execute()) {
+                throw new Exception('Failed to update item ' . $itemId . ': ' . $stmt->error);
+            }
             $updated++;
         }
-    }
-    $stmt->close();
+        $stmt->close();
 
-    echo json_encode(['success' => $updated . ' items saved.']);
+        $connect->commit();
+        echo json_encode(['success' => $updated . ' items saved.']);
+
+    } catch (Exception $e) {
+        $connect->rollback();
+        echo json_encode(['error' => $e->getMessage()]);
+    }
 
 } elseif ($action === 'submit') {
     // Save counts AND submit for admin review
@@ -146,8 +155,11 @@ if ($action === 'list_sessions') {
     $connect->begin_transaction();
 
     try {
-        // Save counts first
-        $stmt = $connect->prepare("UPDATE `stock_take_item` SET `counted_qty`=?, `variance`=?, `remark`=?, `counted_by`=?, `counted_at`=NOW() WHERE `id`=? AND `stock_take_id`=?");
+        // Save counts first - calculate variance directly in SQL
+        $stmt = $connect->prepare("UPDATE `stock_take_item` SET `counted_qty`=?, `variance`= ? - `system_qty`, `remark`=?, `counted_by`=?, `counted_at`=NOW() WHERE `id`=? AND `stock_take_id`=?");
+        if (!$stmt) {
+            throw new Exception('Failed to prepare statement: ' . $connect->error);
+        }
 
         foreach ($counts as $c) {
             $itemId = intval($c['item_id'] ?? ($c['id'] ?? 0));
@@ -156,13 +168,9 @@ if ($action === 'list_sessions') {
 
             if ($itemId <= 0) continue;
 
-            $sysResult = $connect->query("SELECT `system_qty` FROM `stock_take_item` WHERE `id` = $itemId LIMIT 1");
-            if ($sysResult && $sysRow = $sysResult->fetch_assoc()) {
-                $systemQty = floatval($sysRow['system_qty']);
-                $variance = ($countedQty !== null) ? ($countedQty - $systemQty) : null;
-
-                $stmt->bind_param("ddssii", $countedQty, $variance, $remark, $staffName, $itemId, $sessionId);
-                $stmt->execute();
+            $stmt->bind_param("ddssii", $countedQty, $countedQty, $remark, $staffName, $itemId, $sessionId);
+            if (!$stmt->execute()) {
+                throw new Exception('Failed to update item ' . $itemId . ': ' . $stmt->error);
             }
         }
         $stmt->close();
