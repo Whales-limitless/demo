@@ -1,0 +1,73 @@
+DELIVERY DATA MIGRATION INSTRUCTIONS
+=====================================
+
+You already have an `orderlist` table in pw_main (for sales).
+The old delivery SQL dump also has an `orderlist` table.
+Follow these steps carefully to avoid conflicts.
+
+
+STEP 1: RENAME YOUR EXISTING ORDERLIST TABLE
+---------------------------------------------
+Run this BEFORE importing the SQL dump:
+
+    ALTER TABLE `orderlist` RENAME TO `orderlist_backup`;
+
+
+STEP 2: IMPORT THE SQL DUMP
+----------------------------
+Import the file: delivery/u921536699_parkwaydeliver.sql
+into pw_main database via phpMyAdmin or CLI.
+
+This will create these tables:
+  blobtest, customer, driver, location, orderlist,
+  orderlistdesc, orderlisttemp, ordertemp, ordertempedit,
+  outlet, parafile, product, ptype, sign, uom, users
+
+
+STEP 3: DROP UNWANTED COLUMNS
+-------------------------------
+
+    ALTER TABLE `customer` DROP COLUMN `POSTCODE`, DROP COLUMN `STATE`, DROP COLUMN `AREA`;
+    ALTER TABLE `orderlist` DROP COLUMN `IMG1BLOB`;
+    ALTER TABLE `sign` DROP COLUMN `CREATEON`;
+
+
+STEP 4: RENAME DELIVERY TABLES TO del_ PREFIX
+-----------------------------------------------
+
+    RENAME TABLE
+      `customer` TO `del_customer`,
+      `driver` TO `del_driver`,
+      `location` TO `del_location`,
+      `orderlist` TO `del_orderlist`,
+      `orderlistdesc` TO `del_orderlistdesc`,
+      `orderlisttemp` TO `del_orderlisttemp`,
+      `sign` TO `del_sign`,
+      `uom` TO `del_uom`;
+
+
+STEP 5: DROP REDUNDANT TABLES
+-------------------------------
+
+    DROP TABLE IF EXISTS `blobtest`, `ordertemp`, `ordertempedit`,
+      `outlet`, `parafile`, `product`, `ptype`, `users`;
+
+
+STEP 6: RESTORE YOUR ORIGINAL ORDERLIST TABLE
+-----------------------------------------------
+
+    ALTER TABLE `orderlist_backup` RENAME TO `orderlist`;
+
+
+DONE!
+-----
+Your pw_main database should now have:
+  - `orderlist`          (your original sales table, restored)
+  - `del_orderlist`      (delivery orders from old system)
+  - `del_customer`       (delivery customers)
+  - `del_driver`         (drivers)
+  - `del_location`       (locations)
+  - `del_orderlistdesc`  (delivery order line items)
+  - `del_orderlisttemp`  (temp staging items)
+  - `del_sign`           (signatures)
+  - `del_uom`            (units of measurement)
