@@ -29,16 +29,24 @@ PART A: FRESH INSTALL (Empty Database)
 PART B: DELIVERY DATA MIGRATION
 =============================================
 
-After Part A, your database has an `orderlist` table (sales).
-The old delivery SQL dump also has an `orderlist` table.
+After Part A, your database already has these tables that CONFLICT
+with the delivery SQL dump:
+  - orderlist  (sales orders)
+  - parafile   (system counters)
+  - outlet     (outlet/branch info)
+
+The delivery dump will try to CREATE these same table names.
 Follow these steps to avoid the conflict.
 
 
-STEP 1: RENAME YOUR EXISTING ORDERLIST TABLE
----------------------------------------------
+STEP 1: RENAME ALL CONFLICTING TABLES
+---------------------------------------
 Run this BEFORE importing the delivery SQL dump:
 
-    ALTER TABLE `orderlist` RENAME TO `orderlist_backup`;
+    RENAME TABLE
+      `orderlist` TO `orderlist_backup`,
+      `parafile`  TO `parafile_backup`,
+      `outlet`    TO `outlet_backup`;
 
 
 STEP 2: IMPORT THE DELIVERY SQL DUMP
@@ -74,17 +82,21 @@ STEP 4: RENAME DELIVERY TABLES TO del_ PREFIX
       `uom` TO `del_uom`;
 
 
-STEP 5: DROP REDUNDANT TABLES
--------------------------------
+STEP 5: DROP REDUNDANT DELIVERY TABLES
+----------------------------------------
+These delivery tables are duplicates of main app tables or not needed:
 
     DROP TABLE IF EXISTS `blobtest`, `ordertemp`, `ordertempedit`,
       `outlet`, `parafile`, `product`, `ptype`, `users`;
 
 
-STEP 6: RESTORE YOUR ORIGINAL ORDERLIST TABLE
------------------------------------------------
+STEP 6: RESTORE YOUR ORIGINAL TABLES
+--------------------------------------
 
-    ALTER TABLE `orderlist_backup` RENAME TO `orderlist`;
+    RENAME TABLE
+      `orderlist_backup` TO `orderlist`,
+      `parafile_backup`  TO `parafile`,
+      `outlet_backup`    TO `outlet`;
 
 
 =============================================
