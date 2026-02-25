@@ -1,22 +1,50 @@
-DELIVERY DATA MIGRATION INSTRUCTIONS
+FULL SETUP & MIGRATION INSTRUCTIONS
 =====================================
 
-You already have an `orderlist` table in pw_main (for sales).
+
+=============================================
+PART A: FRESH INSTALL (Empty Database)
+=============================================
+
+1. Create an empty database called `pw_main` and a database user.
+
+2. Open admin/migrate.php in your browser.
+
+3. Select `parkdeptmain (3).sql` to import your old program data,
+   then click "Import SQL & Run Migration".
+   This will:
+   - Import old tables (category, PRODUCTS, orderlist, etc.)
+   - Create new tables (sysfile, supplier, purchase_order, grn,
+     stock_take, etc.)
+   - Clean up old columns and drop legacy tables
+   - Seed default admin account
+
+4. Done for the main app. Continue to Part B for delivery.
+
+   NOTE: If you want a clean install WITHOUT old data,
+   select `pw_main.sql` instead at step 3.
+
+
+=============================================
+PART B: DELIVERY DATA MIGRATION
+=============================================
+
+After Part A, your database has an `orderlist` table (sales).
 The old delivery SQL dump also has an `orderlist` table.
-Follow these steps carefully to avoid conflicts.
+Follow these steps to avoid the conflict.
 
 
 STEP 1: RENAME YOUR EXISTING ORDERLIST TABLE
 ---------------------------------------------
-Run this BEFORE importing the SQL dump:
+Run this BEFORE importing the delivery SQL dump:
 
     ALTER TABLE `orderlist` RENAME TO `orderlist_backup`;
 
 
-STEP 2: IMPORT THE SQL DUMP
-----------------------------
+STEP 2: IMPORT THE DELIVERY SQL DUMP
+--------------------------------------
 Import the file: delivery/u921536699_parkwaydeliver.sql
-into pw_main database via phpMyAdmin or CLI.
+into pw_main database via phpMyAdmin.
 
 This will create these tables:
   blobtest, customer, driver, location, orderlist,
@@ -59,15 +87,38 @@ STEP 6: RESTORE YOUR ORIGINAL ORDERLIST TABLE
     ALTER TABLE `orderlist_backup` RENAME TO `orderlist`;
 
 
-DONE!
------
-Your pw_main database should now have:
-  - `orderlist`          (your original sales table, restored)
-  - `del_orderlist`      (delivery orders from old system)
-  - `del_customer`       (delivery customers)
-  - `del_driver`         (drivers)
-  - `del_location`       (locations)
-  - `del_orderlistdesc`  (delivery order line items)
-  - `del_orderlisttemp`  (temp staging items)
-  - `del_sign`           (signatures)
-  - `del_uom`            (units of measurement)
+=============================================
+PART C: FRESH DELIVERY (No Old Delivery Data)
+=============================================
+
+If you do NOT have old delivery data to migrate, just import
+the empty delivery table structures:
+
+    Import: del_tables.sql
+
+This creates all 8 empty del_ tables. No conflict with orderlist
+since they are already prefixed with del_.
+
+
+=============================================
+FINAL RESULT
+=============================================
+
+Your pw_main database should have:
+
+  Main App:
+  - category, PRODUCTS, orderlist, sysfile, supplier,
+    purchase_order, purchase_order_item, grn, grn_item,
+    stock_take, stock_take_item, stockadj, parafile,
+    product_category, product_sub_category, product_uom,
+    rack, rack_product, MEMBER, outlet, etc.
+
+  Delivery Module:
+  - del_customer        (delivery customers)
+  - del_driver          (drivers)
+  - del_location        (locations with distance/commission)
+  - del_orderlist       (delivery orders)
+  - del_orderlistdesc   (delivery order line items)
+  - del_orderlisttemp   (temp staging items)
+  - del_sign            (signatures)
+  - del_uom             (units of measurement)
