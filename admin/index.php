@@ -11,7 +11,7 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
 // Handle login form submission
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    include('../dbconnection.php');
+    include('../staff/dbconnection.php');
 
     $username = trim($_POST['username'] ?? '');
     $password = trim($_POST['password'] ?? '');

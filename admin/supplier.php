@@ -7,7 +7,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
-include('../dbconnection.php');
+include('../staff/dbconnection.php');
 $connect->set_charset("utf8mb4");
 
 // Fetch suppliers
