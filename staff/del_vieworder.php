@@ -22,9 +22,9 @@ if (!$order) { header("Location: del_dashboard.php"); exit; }
 
 // Fetch customer details
 $customer = null;
-if (!empty($order['CUSTOMER'])) {
+if (!empty($order['CUSTOMERCODE'])) {
     $stmt = $connect->prepare("SELECT `HP`, `ADDRESS` FROM `del_customer` WHERE `CODE` = ? LIMIT 1");
-    $stmt->bind_param("s", $order['CUSTOMER']);
+    $stmt->bind_param("s", $order['CUSTOMERCODE']);
     $stmt->execute();
     $customer = $stmt->get_result()->fetch_assoc();
     $stmt->close();

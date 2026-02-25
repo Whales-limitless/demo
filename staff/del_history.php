@@ -24,7 +24,7 @@ $orders = [];
 if ($driverCode !== '') {
     $sql = "SELECT o.*, c.NAME AS CUSTNAME, c.HP AS CUSTPHONE, c.ADDRESS AS CUSTADDRESS
             FROM `del_orderlist` o
-            LEFT JOIN `del_customer` c ON o.CUSTOMER = c.CODE
+            LEFT JOIN `del_customer` c ON o.CUSTOMERCODE = c.CODE
             WHERE o.DRIVERCODE = ? AND (o.STATUS = 'D' OR o.STATUS = 'C')
             ORDER BY o.DELDATE DESC, o.ORDNO ASC";
     $stmt = $connect->prepare($sql);
