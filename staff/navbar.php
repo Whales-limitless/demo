@@ -58,6 +58,22 @@
     </a></li>
 
     <div class="sidebar-divider"></div>
+    <div class="sidebar-section-label">Delivery</div>
+
+    <li><a href="del_dashboard.php" data-page="del_dashboard.php">
+      <svg class="nav-icon" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      My Deliveries
+    </a></li>
+    <li><a href="del_history.php" data-page="del_history.php">
+      <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Delivery History
+    </a></li>
+    <li><a href="del_report.php" data-page="del_report.php">
+      <svg class="nav-icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Delivery Reports
+    </a></li>
+
+    <div class="sidebar-divider"></div>
 
     <li><a href="account.php" data-page="account.php">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>

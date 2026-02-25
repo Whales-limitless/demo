@@ -23,6 +23,10 @@
       <svg class="tab-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
       Inventory
     </button>
+    <button class="footer-tab" id="tabDelivery" onclick="openDeliveryModal()">
+      <svg class="tab-icon" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      Delivery
+    </button>
     <a href="account.php" id="tabAccount">
       <svg class="tab-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Account
@@ -52,6 +56,43 @@
         <div class="inv-label">
           Stock Loss
           <small>Record damaged or lost stock</small>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- DELIVERY MODAL -->
+<div class="inv-modal-overlay" id="delModalOverlay" onclick="closeDeliveryModal(event)">
+  <div class="inv-modal" onclick="event.stopPropagation()">
+    <div class="inv-modal-handle"></div>
+    <div class="inv-modal-title">Delivery</div>
+    <div class="inv-modal-buttons">
+      <a href="del_dashboard.php" class="inv-modal-btn">
+        <div class="inv-icon stock-take">
+          <svg><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        </div>
+        <div class="inv-label">
+          My Deliveries
+          <small>View assigned deliveries</small>
+        </div>
+      </a>
+      <a href="del_history.php" class="inv-modal-btn">
+        <div class="inv-icon stock-loss">
+          <svg><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="inv-label">
+          Delivery History
+          <small>View completed deliveries</small>
+        </div>
+      </a>
+      <a href="del_report.php" class="inv-modal-btn">
+        <div class="inv-icon" style="background:#dbeafe;color:#2563eb;">
+          <svg><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <div class="inv-label">
+          Delivery Reports
+          <small>View your delivery reports</small>
         </div>
       </a>
     </div>
@@ -104,7 +145,13 @@
     'all_products.php': 'tabProducts',
     'account.php': 'tabAccount',
     'staff_stock_take.php': 'tabInventory',
-    'staff_stock_loss.php': 'tabInventory'
+    'staff_stock_loss.php': 'tabInventory',
+    'del_dashboard.php': 'tabDelivery',
+    'del_history.php': 'tabDelivery',
+    'del_report.php': 'tabDelivery',
+    'del_work.php': 'tabDelivery',
+    'del_vieworder.php': 'tabDelivery',
+    'del_sign.php': 'tabDelivery'
   };
   var activeTab = tabMap[path];
   if (activeTab) {
@@ -112,6 +159,17 @@
     if (el) el.classList.add('tab-active');
   }
 })();
+
+// ==================== DELIVERY MODAL ====================
+function openDeliveryModal() {
+  document.getElementById('delModalOverlay').classList.add('active');
+}
+
+function closeDeliveryModal(e) {
+  if (e && e.target === document.getElementById('delModalOverlay')) {
+    document.getElementById('delModalOverlay').classList.remove('active');
+  }
+}
 
 // ==================== INVENTORY MODAL ====================
 function openInventoryModal() {
