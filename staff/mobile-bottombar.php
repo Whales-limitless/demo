@@ -7,7 +7,7 @@
 <!-- MOBILE FOOTER -->
 <footer class="mobile-footer">
   <div class="footer-inner">
-    <a href="./" id="tabCategory">
+    <a href="category.php" id="tabCategory">
       <svg class="tab-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
       Category
     </a>
@@ -100,8 +100,7 @@
   // Highlight active bottom tab based on current page
   var path = window.location.pathname.split('/').pop() || 'index.php';
   var tabMap = {
-    'index.php': 'tabCategory',
-    '': 'tabCategory',
+    'category.php': 'tabCategory',
     'all_products.php': 'tabProducts',
     'account.php': 'tabAccount',
     'staff_stock_take.php': 'tabInventory',
