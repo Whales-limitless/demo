@@ -11,7 +11,7 @@ $connect->set_charset("utf8mb4");
 $orderId = intval($_GET['id'] ?? 0);
 if ($orderId <= 0) { header("Location: del_dashboard.php"); exit; }
 
-$stmt = $connect->prepare("SELECT o.*, c.NAME AS CUSTNAME FROM `del_orderlist` o LEFT JOIN `del_customer` c ON o.CUSTOMER = c.CODE WHERE o.ID = ? LIMIT 1");
+$stmt = $connect->prepare("SELECT o.*, c.NAME AS CUSTNAME FROM `del_orderlist` o LEFT JOIN `del_customer` c ON o.CUSTOMERCODE = c.CODE WHERE o.ID = ? LIMIT 1");
 $stmt->bind_param("i", $orderId);
 $stmt->execute();
 $order = $stmt->get_result()->fetch_assoc();
