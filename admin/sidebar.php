@@ -17,6 +17,15 @@ $sidebarSections = [
         ['page' => 'stock_take',  'href' => 'stock_take.php',       'icon' => 'fas fa-clipboard-check',      'label' => 'Stock Take'],
         ['page' => 'stock_loss',  'href' => 'stock_loss.php',       'icon' => 'fas fa-exclamation-triangle', 'label' => 'Stock Loss'],
     ],
+    'DELIVERY' => [
+        ['page' => 'del_dashboard', 'href' => 'del_dashboard.php', 'icon' => 'fas fa-truck',             'label' => 'Delivery Board'],
+        ['page' => 'del_order',     'href' => 'del_order.php',     'icon' => 'fas fa-file-invoice',      'label' => 'Delivery Orders'],
+        ['page' => 'del_assign',    'href' => 'del_assign.php',    'icon' => 'fas fa-user-check',        'label' => 'Assign Driver'],
+        ['page' => 'del_customer',  'href' => 'del_customer.php',  'icon' => 'fas fa-address-book',      'label' => 'Customers'],
+        ['page' => 'del_location',  'href' => 'del_location.php',  'icon' => 'fas fa-map-marker-alt',    'label' => 'Locations'],
+        ['page' => 'del_driver',    'href' => 'del_driver.php',    'icon' => 'fas fa-id-card',           'label' => 'Drivers'],
+        ['page' => 'del_report',    'href' => 'del_report.php',    'icon' => 'fas fa-chart-bar',         'label' => 'Delivery Reports'],
+    ],
     'ADMIN' => [
         ['page' => 'user',        'href' => 'user.php',             'icon' => 'fas fa-users',                'label' => 'Users'],
     ],

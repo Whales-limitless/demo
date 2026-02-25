@@ -272,6 +272,61 @@ if ($stResult && $row = $stResult->fetch_assoc()) {
             </div>
         </div>
 
+        <!-- Delivery Section -->
+        <div class="menu-section">
+            <div class="menu-section-title">Delivery</div>
+            <div class="menu-list">
+                <a href="del_dashboard.php" class="menu-item">
+                    <div class="menu-icon blue">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+                        </svg>
+                    </div>
+                    <div class="menu-text">
+                        <h3>My Deliveries</h3>
+                        <p>View assigned deliveries</p>
+                    </div>
+                    <div class="menu-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                        </svg>
+                    </div>
+                </a>
+                <a href="del_history.php" class="menu-item">
+                    <div class="menu-icon orange">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </div>
+                    <div class="menu-text">
+                        <h3>Delivery History</h3>
+                        <p>View completed deliveries</p>
+                    </div>
+                    <div class="menu-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                        </svg>
+                    </div>
+                </a>
+                <a href="del_report.php" class="menu-item">
+                    <div class="menu-icon blue">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                        </svg>
+                    </div>
+                    <div class="menu-text">
+                        <h3>Delivery Reports</h3>
+                        <p>View your delivery reports</p>
+                    </div>
+                    <div class="menu-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                        </svg>
+                    </div>
+                </a>
+            </div>
+        </div>
+
         <!-- Account Section -->
         <div class="menu-section">
             <div class="menu-section-title">Account</div>
