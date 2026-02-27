@@ -1,5 +1,5 @@
 <?php
-include "../../dbconnection.php";
+include "../../../staff/dbconnection.php";
 include "../validation.php";
 
 $sdate	= isset($_GET['s']) ? $_GET['s'] : date("Y-m-01");
@@ -8,7 +8,7 @@ $did	= isset($_GET['d']) ? $_GET['d'] : '';
 $lid	= isset($_GET['l']) ? $_GET['l'] : '';
 $type	= isset($_GET['t']) ? $_GET['t'] : '1';
 
-$sql11 = $connect->query("SELECT CODE,NAME FROM `driver` WHERE ID = '".$did."' ");
+$sql11 = $connect->query("SELECT `USERNAME` AS CODE, `USER_NAME` AS NAME FROM `sysfile` WHERE ID = '".$did."' AND `TYPE` = 'D' ");
 if($sql11->num_rows > 0){
 	while($row = $sql11->fetch_assoc()){
 		$dcode = $row['CODE'];
@@ -19,7 +19,7 @@ if($sql11->num_rows > 0){
 	$dname = '';
 }
 
-$sql21 = $connect->query("SELECT NAME FROM `location` WHERE ID = '".$lid."' ");
+$sql21 = $connect->query("SELECT NAME FROM `del_location` WHERE ID = '".$lid."' ");
 if($sql21->num_rows > 0){
 	while($row = $sql21->fetch_assoc()){
 		$lname = $row['NAME'];
@@ -132,7 +132,7 @@ if($type == '1'){
 							<select class="w-100" id="location">
                                 <option disabled selected value="<?php echo $lid; ?>" ><?php echo $lname; ?></option>
 								<?php
-								$sql89 = $connect->query("SELECT ID,NAME FROM `location` ORDER BY NAME ASC");
+								$sql89 = $connect->query("SELECT ID,NAME FROM `del_location` ORDER BY NAME ASC");
 								while($row = $sql89->fetch_assoc()){
 									?>
 									<option value="<?php echo $row["ID"]; ?>"><?php echo $row["NAME"]; ?></option>
@@ -201,7 +201,7 @@ if($type == '1'){
 								$ttxt2 = "AND LOCATION = '".$lname."'";
 							}
 
-							$sql = $connect->query("SELECT DRIVER, COUNT(ORDNO) AS CORDNO, SUM(DISTANT) AS SDISTANT, SUM(RETAIL) AS SRETAIL FROM `orderlist` WHERE DRIVERCODE = '".$_COOKIE["parkwaydelivery_driver"]."' AND STATUS = 'C' AND DELDATE BETWEEN '".$sdate."' AND '".$edate."' $ttxt1 $ttxt2 GROUP BY DRIVERCODE");
+							$sql = $connect->query("SELECT DRIVER, COUNT(ORDNO) AS CORDNO, SUM(DISTANT) AS SDISTANT, SUM(RETAIL) AS SRETAIL FROM `del_orderlist` WHERE DRIVERCODE = '".$_COOKIE["parkwaydelivery_driver"]."' AND STATUS = 'C' AND DELDATE BETWEEN '".$sdate."' AND '".$edate."' $ttxt1 $ttxt2 GROUP BY DRIVERCODE");
 							while($row = $sql->fetch_assoc()){
 								?>
 								<tr>
@@ -237,7 +237,7 @@ if($type == '1'){
 						</tbody>
 						<tfoot>
 							<?php
-							$sql12 = $connect->query("SELECT COUNT(ORDNO) AS CORDNO, SUM(DISTANT) AS SUMDISTANT, SUM(RETAIL) AS SUMRETAIL FROM `orderlist` WHERE DRIVERCODE = '".$_COOKIE["parkwaydelivery_driver"]."' AND STATUS = 'C' AND DELDATE BETWEEN '".$sdate."' AND '".$edate."' $ttxt1 $ttxt2 ");
+							$sql12 = $connect->query("SELECT COUNT(ORDNO) AS CORDNO, SUM(DISTANT) AS SUMDISTANT, SUM(RETAIL) AS SUMRETAIL FROM `del_orderlist` WHERE DRIVERCODE = '".$_COOKIE["parkwaydelivery_driver"]."' AND STATUS = 'C' AND DELDATE BETWEEN '".$sdate."' AND '".$edate."' $ttxt1 $ttxt2 ");
 							if($sql12->num_rows > 0){
 								while($row = $sql12->fetch_assoc()){
                                     $countordno = number_format($row['CORDNO'],2);

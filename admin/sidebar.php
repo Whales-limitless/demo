@@ -23,7 +23,6 @@ $sidebarSections = [
         ['page' => 'del_assign',    'href' => 'del_assign.php',    'icon' => 'fas fa-user-check',        'label' => 'Assign Driver'],
         ['page' => 'del_customer',  'href' => 'del_customer.php',  'icon' => 'fas fa-address-book',      'label' => 'Customers'],
         ['page' => 'del_location',  'href' => 'del_location.php',  'icon' => 'fas fa-map-marker-alt',    'label' => 'Locations'],
-        ['page' => 'del_driver',    'href' => 'del_driver.php',    'icon' => 'fas fa-id-card',           'label' => 'Drivers'],
         ['page' => 'del_report',    'href' => 'del_report.php',    'icon' => 'fas fa-chart-bar',         'label' => 'Delivery Reports'],
     ],
     'ADMIN' => [

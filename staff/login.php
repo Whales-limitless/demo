@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === '' || $password === '') {
         $error = 'Please enter both username and password.';
     } else {
-        $stmt = $connect->prepare("SELECT * FROM `sysfile` WHERE `USER1` = ? AND `USER2` = ? AND `TYPE` = 'S' LIMIT 1");
+        $stmt = $connect->prepare("SELECT * FROM `sysfile` WHERE `USER1` = ? AND `USER2` = ? AND `TYPE` IN ('A','S','D') LIMIT 1");
         $stmt->bind_param("ss", $username, $password);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -34,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_level'] = $user['LEVEL'] ?? 0;
             $_SESSION['user_outlet'] = $user['OUTLET'] ?? '';
             $_SESSION['user_dept'] = $user['DEPT'] ?? '';
+            $_SESSION['user_type'] = $user['TYPE'] ?? 'S';
             header("Location: index.php");
             exit;
         } else {

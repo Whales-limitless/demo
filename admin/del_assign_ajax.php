@@ -41,9 +41,9 @@ if ($action === 'load') {
 
     if ($id <= 0 || $driverCode === '') { echo json_encode(['error' => 'Invalid data.']); exit; }
 
-    // Get driver name
+    // Get driver name from sysfile
     $driverName = '';
-    $ds = $connect->prepare("SELECT NAME FROM `del_driver` WHERE `CODE` = ? LIMIT 1");
+    $ds = $connect->prepare("SELECT `USER_NAME` AS `NAME` FROM `sysfile` WHERE `USERNAME` = ? AND `TYPE` = 'D' LIMIT 1");
     $ds->bind_param("s", $driverCode);
     $ds->execute();
     $dr = $ds->get_result();

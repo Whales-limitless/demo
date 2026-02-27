@@ -11,7 +11,7 @@ include('../staff/dbconnection.php');
 $connect->set_charset("utf8mb4");
 
 $drivers = [];
-$result = $connect->query("SELECT * FROM `del_driver` ORDER BY `NAME` ASC");
+$result = $connect->query("SELECT `USERNAME` AS `CODE`, `USER_NAME` AS `NAME` FROM `sysfile` WHERE `TYPE` = 'D' ORDER BY `USER_NAME` ASC");
 if ($result) { while ($r = $result->fetch_assoc()) { $drivers[] = $r; } }
 
 $selectedDriver = $_GET['driver'] ?? '';

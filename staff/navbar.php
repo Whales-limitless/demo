@@ -1,8 +1,10 @@
 <!-- NAVBAR -->
+<?php $navUserType = $_SESSION['user_type'] ?? 'S'; ?>
 <nav class="navbar">
   <button class="menu-btn" id="menuBtn" aria-label="Menu">
     <svg class="icon" viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
   </button>
+  <?php if ($navUserType === 'A' || $navUserType === 'S'): ?>
   <div class="nav-search" id="navSearch">
     <input type="text" placeholder="Search product name or barcode…" id="searchInput" autocomplete="off">
     <button aria-label="Search">
@@ -13,6 +15,7 @@
     <svg class="icon" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
     <span class="cart-badge" id="cartBadge">0</span>
   </a>
+  <?php endif; ?>
 </nav>
 
 <!-- SEARCH DROPDOWN (outside navbar to avoid stacking context issues) -->
@@ -27,11 +30,13 @@
       <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
   </div>
+  <?php $userType = $_SESSION['user_type'] ?? 'S'; ?>
   <ul class="sidebar-nav">
     <li><a href="./" data-page="index.php">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       Home
     </a></li>
+    <?php if ($userType === 'A' || $userType === 'S'): ?>
     <li><a href="category.php" data-page="category.php">
       <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
       Categories
@@ -56,7 +61,9 @@
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       Stock Loss
     </a></li>
+    <?php endif; ?>
 
+    <?php if ($userType === 'A' || $userType === 'D'): ?>
     <div class="sidebar-divider"></div>
     <div class="sidebar-section-label">Delivery</div>
 
@@ -72,6 +79,7 @@
       <svg class="nav-icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       Delivery Reports
     </a></li>
+    <?php endif; ?>
 
     <div class="sidebar-divider"></div>
 

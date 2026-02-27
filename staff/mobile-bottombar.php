@@ -5,8 +5,10 @@
 <button class="scroll-top" id="scrollTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
 
 <!-- MOBILE FOOTER -->
+<?php $footerUserType = $_SESSION['user_type'] ?? 'S'; ?>
 <footer class="mobile-footer">
   <div class="footer-inner">
+    <?php if ($footerUserType === 'A' || $footerUserType === 'S'): ?>
     <a href="category.php" id="tabCategory">
       <svg class="tab-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
       Category
@@ -23,10 +25,13 @@
       <svg class="tab-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
       Inventory
     </button>
+    <?php endif; ?>
+    <?php if ($footerUserType === 'A' || $footerUserType === 'D'): ?>
     <button class="footer-tab" id="tabDelivery" onclick="openDeliveryModal()">
       <svg class="tab-icon" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
       Delivery
     </button>
+    <?php endif; ?>
     <a href="account.php" id="tabAccount">
       <svg class="tab-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Account

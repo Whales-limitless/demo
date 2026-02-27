@@ -45,7 +45,7 @@ $cr = $connect->query("SELECT * FROM `del_customer` ORDER BY `NAME` ASC");
 if ($cr) { while ($row = $cr->fetch_assoc()) { $customers[] = $row; } }
 
 $drivers = [];
-$dr = $connect->query("SELECT * FROM `del_driver` ORDER BY `NAME` ASC");
+$dr = $connect->query("SELECT `USERNAME` AS `CODE`, `USER_NAME` AS `NAME` FROM `sysfile` WHERE `TYPE` = 'D' ORDER BY `USER_NAME` ASC");
 if ($dr) { while ($row = $dr->fetch_assoc()) { $drivers[] = $row; } }
 
 $uoms = [];

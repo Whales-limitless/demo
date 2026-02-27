@@ -226,11 +226,18 @@ if ($stResult && $row = $stResult->fetch_assoc()) {
             </div>
             <div class="profile-info">
                 <h2><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></h2>
-                <p>Staff<?php echo !empty($_SESSION['user_outlet']) ? ' &middot; ' . htmlspecialchars($_SESSION['user_outlet']) : ''; ?></p>
+                <?php
+                $acctType = $_SESSION['user_type'] ?? 'S';
+                $roleLabel = 'Staff';
+                if ($acctType === 'A') $roleLabel = 'Admin';
+                elseif ($acctType === 'D') $roleLabel = 'Delivery';
+                ?>
+                <p><?php echo $roleLabel; ?><?php echo !empty($_SESSION['user_outlet']) ? ' &middot; ' . htmlspecialchars($_SESSION['user_outlet']) : ''; ?></p>
             </div>
         </div>
 
         <!-- Inventory Section -->
+        <?php if ($acctType === 'A' || $acctType === 'S'): ?>
         <div class="menu-section">
             <div class="menu-section-title">Inventory</div>
             <div class="menu-list">
@@ -271,8 +278,10 @@ if ($stResult && $row = $stResult->fetch_assoc()) {
                 </a>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- Delivery Section -->
+        <?php if ($acctType === 'A' || $acctType === 'D'): ?>
         <div class="menu-section">
             <div class="menu-section-title">Delivery</div>
             <div class="menu-list">
@@ -326,6 +335,7 @@ if ($stResult && $row = $stResult->fetch_assoc()) {
                 </a>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- Account Section -->
         <div class="menu-section">
