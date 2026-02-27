@@ -1,5 +1,5 @@
 <?php 
-include "../dbconnection.php";
+include "../../staff/dbconnection.php";
 include "validation.php";
 $getid = $_GET["id"];
 $drivercode = $_COOKIE["parkwaydelivery_driver"];
@@ -47,7 +47,7 @@ $drivercode = $_COOKIE["parkwaydelivery_driver"];
 		//include "navbar.php";
 		if(isset($_POST["done"])){
 			$donedatetime = date("Y-m-d H:i:s");
-			$sql = $connect->query("UPDATE orderlist SET STATUS = 'D', DONEDATETIME = '$donedatetime' WHERE ID = '$getid'");
+			$sql = $connect->query("UPDATE del_orderlist SET STATUS = 'D', DONEDATETIME = '$donedatetime' WHERE ID = '$getid'");
 			if($sql){
 		?>
 		<script>

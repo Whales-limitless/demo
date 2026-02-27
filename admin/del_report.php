@@ -11,7 +11,7 @@ include('../staff/dbconnection.php');
 $connect->set_charset("utf8mb4");
 
 $drivers = [];
-$dr = $connect->query("SELECT `CODE`, `NAME` FROM `del_driver` ORDER BY `NAME` ASC");
+$dr = $connect->query("SELECT `USERNAME` AS `CODE`, `USER_NAME` AS `NAME` FROM `sysfile` WHERE `TYPE` = 'D' ORDER BY `USER_NAME` ASC");
 if ($dr) { while ($r = $dr->fetch_assoc()) { $drivers[] = $r; } }
 
 $locations = [];

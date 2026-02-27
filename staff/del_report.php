@@ -8,17 +8,12 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 include('dbconnection.php');
 $connect->set_charset("utf8mb4");
 
-// Look up driver code
+// Use sysfile user_code as driver code for delivery users
 $driverCode = '';
-$staffUser = $_SESSION['user_name'] ?? '';
-$stmt = $connect->prepare("SELECT `CODE` FROM `del_driver` WHERE `USERNAME` = ? LIMIT 1");
-$stmt->bind_param("s", $staffUser);
-$stmt->execute();
-$dResult = $stmt->get_result();
-if ($dResult->num_rows > 0) {
-    $driverCode = $dResult->fetch_assoc()['CODE'];
+$userType = $_SESSION['user_type'] ?? 'S';
+if ($userType === 'D' || $userType === 'A') {
+    $driverCode = $_SESSION['user_code'] ?? '';
 }
-$stmt->close();
 
 // Fetch locations for filter
 $locations = [];

@@ -1,9 +1,9 @@
 <?php
-include "../dbconnection.php";
+include "../../staff/dbconnection.php";
 include "validation.php";
 $ordno = $_GET["ordno"];
 
-$sql = $connect->query("SELECT * FROM `orderlist` WHERE ORDNO = '$ordno'");
+$sql = $connect->query("SELECT * FROM `del_orderlist` WHERE ORDNO = '$ordno'");
 while($row = $sql->fetch_assoc()){
 	$deldate = $row["DELDATE"];
 	$ordno = $row["ORDNO"];
@@ -15,13 +15,13 @@ while($row = $sql->fetch_assoc()){
 	$customerc = $row["CUSTOMERCODE"];
 }
 
-$sql2 = $connect->query("SELECT HP,ADDRESS FROM `customer` WHERE CODE= '".$customerc."'");
+$sql2 = $connect->query("SELECT HP,ADDRESS FROM `del_customer` WHERE CODE= '".$customerc."'");
 while($row = $sql2->fetch_assoc()){
 	$hp = $row["HP"];
 	$addr = $row["ADDRESS"];
 }
 
-$query12 = $connect->query("SELECT ORDNO FROM `sign` WHERE ORDNO = '".$_GET['ordno']."'");
+$query12 = $connect->query("SELECT ORDNO FROM `del_sign` WHERE ORDNO = '".$_GET['ordno']."'");
 if($query12->num_rows > 0){
 	while($row = $query12->fetch_assoc()){
 		$chk = 'Y';
@@ -119,7 +119,7 @@ window.onload = function() { window.print(); }
 
                     <tbody>
                         <?php
-                        $query3  = "SELECT * FROM `orderlistdesc` WHERE ORDERNO = '".$ordno."'";
+                        $query3  = "SELECT * FROM `del_orderlistdesc` WHERE ORDERNO = '".$ordno."'";
                         $result  = mysqli_query($connect,$query3);
                         
                         $num_rows = $result->num_rows;
@@ -321,7 +321,7 @@ window.onload = function() { window.print(); }
 
                     <tbody>
                         <?php
-                        $query3  = "SELECT * FROM `orderlistdesc` WHERE ORDERNO = '".$ordno."'";
+                        $query3  = "SELECT * FROM `del_orderlistdesc` WHERE ORDERNO = '".$ordno."'";
                         $result  = mysqli_query($connect,$query3);
                         
                         $num_rows = $result->num_rows;

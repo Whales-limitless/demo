@@ -1,11 +1,11 @@
 <?php 
-include "../dbconnection.php";
+include "../../staff/dbconnection.php";
 include "validation.php";
 
 $drivercode = $_COOKIE["parkwaydelivery_driver"];
 $orderid = $_GET["id"];
 
-$check = $connect->query("SELECT * FROM orderlist WHERE ID = '$orderid'");
+$check = $connect->query("SELECT * FROM del_orderlist WHERE ID = '$orderid'");
 $checkrow = $check->fetch_assoc();
 $img1 = $checkrow["IMG1"];
 $img2 = $checkrow["IMG2"];
@@ -58,7 +58,7 @@ $img3 = $checkrow["IMG3"];
 <?php
 		if(isset($_POST["done"])){
 	$donedatetime = date("Y-m-d H:i:s");
-	$sql = $connect->query("UPDATE orderlist SET STATUS = 'D', DONEDATETIME = '$donedatetime' WHERE ID = '$getid'");
+	$sql = $connect->query("UPDATE del_orderlist SET STATUS = 'D', DONEDATETIME = '$donedatetime' WHERE ID = '$getid'");
 	if($sql){
 ?>
 <script>
@@ -233,17 +233,17 @@ $img3 = $checkrow["IMG3"];
 					//sql
 
 					if(!empty($_FILES["image1"]["name"])) { 
-						$sql1 = $connect->query("UPDATE orderlist SET IMG1 = '$fileName1' WHERE ID = '$orderid'");
+						$sql1 = $connect->query("UPDATE del_orderlist SET IMG1 = '$fileName1' WHERE ID = '$orderid'");
 					}
 					if(!empty($_FILES["image2"]["name"])) { 
-						$sql2 = $connect->query("UPDATE orderlist SET IMG2 = '$fileName2' WHERE ID = '$orderid'");	
+						$sql2 = $connect->query("UPDATE del_orderlist SET IMG2 = '$fileName2' WHERE ID = '$orderid'");	
 					}
 					if(!empty($_FILES["image3"]["name"])) { 
-						$sql3 = $connect->query("UPDATE orderlist SET IMG3 = '$fileName3' WHERE ID = '$orderid'");	
+						$sql3 = $connect->query("UPDATE del_orderlist SET IMG3 = '$fileName3' WHERE ID = '$orderid'");	
 					}
 
 					//check if there is atleast 1 pic
-					$check = $connect->query("SELECT * FROM orderlist WHERE ID = '$orderid' AND IMG1 <> '' OR IMG2 <> '' OR IMG3 <> ''");
+					$check = $connect->query("SELECT * FROM del_orderlist WHERE ID = '$orderid' AND IMG1 <> '' OR IMG2 <> '' OR IMG3 <> ''");
 					if($check->num_rows > 0){
 						echo '<script>window.location.href="workdone.php?id='.$orderid.'";</script>';
 					}else{

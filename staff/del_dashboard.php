@@ -8,20 +8,14 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 include('dbconnection.php');
 $connect->set_charset("utf8mb4");
 
-// Look up driver code from del_driver table by matching staff username
+// Use sysfile user_code as driver code for delivery users
 $driverCode = '';
 $driverName = '';
-$staffUser = $_SESSION['user_name'] ?? '';
-$stmt = $connect->prepare("SELECT `CODE`, `NAME` FROM `del_driver` WHERE `USERNAME` = ? LIMIT 1");
-$stmt->bind_param("s", $staffUser);
-$stmt->execute();
-$dResult = $stmt->get_result();
-if ($dResult->num_rows > 0) {
-    $dRow = $dResult->fetch_assoc();
-    $driverCode = $dRow['CODE'];
-    $driverName = $dRow['NAME'];
+$userType = $_SESSION['user_type'] ?? 'S';
+if ($userType === 'D' || $userType === 'A') {
+    $driverCode = $_SESSION['user_code'] ?? '';
+    $driverName = $_SESSION['user_name'] ?? '';
 }
-$stmt->close();
 
 // Get filter
 $filter = $_GET['filter'] ?? 'today';

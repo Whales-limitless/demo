@@ -1,23 +1,24 @@
 <?php
-include "../dbconnection.php";
+include "../../staff/dbconnection.php";
 
 if(isset($_POST["submit"])){
-	//check database if user exists
 	$username = $_POST["username"];
 	$password = $_POST["password"];
-	$check = $connect->query("SELECT * FROM driver WHERE USERNAME = '$username' AND PASSWORD = '$password'");
+	$stmt = $connect->prepare("SELECT `USERNAME`, `USER_NAME` FROM `sysfile` WHERE `USER1` = ? AND `USER2` = ? AND `TYPE` = 'D' LIMIT 1");
+	$stmt->bind_param("ss", $username, $password);
+	$stmt->execute();
+	$check = $stmt->get_result();
 	if($check->num_rows > 0){
-		//user exists
 		$checkrow = $check->fetch_assoc();
-		$sys_username = $checkrow["CODE"];
+		$sys_username = $checkrow["USERNAME"];
 
 		setcookie("parkwaydelivery_driver", $sys_username, time() + (86400 * 30), "/"); // 86400 = 1 day
 
 		header("location: index.php");
 	}else{
 		echo "<script type='text/javascript'>alert('User not found.');</script>";
-
 	}
+	$stmt->close();
 }
 ?>
 <!DOCTYPE html>

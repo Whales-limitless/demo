@@ -1,5 +1,5 @@
 <?php 
-include "../dbconnection.php";
+include "../../staff/dbconnection.php";
 include "validation.php";
 
 $drivercode = $_COOKIE["parkwaydelivery_driver"];
@@ -84,12 +84,12 @@ if($getfilter == "yesterday"){
 
 
 						<?php
-						$sql = $connect->query("SELECT * FROM orderlist WHERE DRIVERCODE = '$drivercode' AND STATUS = 'D' OR DRIVERCODE = '$drivercode' AND STATUS = 'C' ORDER BY DELDATE DESC");
+						$sql = $connect->query("SELECT * FROM del_orderlist WHERE DRIVERCODE = '$drivercode' AND STATUS = 'D' OR DRIVERCODE = '$drivercode' AND STATUS = 'C' ORDER BY DELDATE DESC");
 						while($row = $sql->fetch_assoc()){
 							$ordno = $row["ORDNO"];
 							$remark = $row["REMARK"];
 							$custcode = $row["CUSTOMERCODE"];
-							$cust = $connect->query("SELECT * FROM customer WHERE CODE = '$custcode'");
+							$cust = $connect->query("SELECT * FROM del_customer WHERE CODE = '$custcode'");
 							$custrow = $cust->fetch_assoc();
 							$custaddress = $custrow["ADDRESS"];
 							$custhp = $custrow["HP"];
@@ -136,7 +136,7 @@ if($getfilter == "yesterday"){
 												<div class="modal-body">
 													<ul class="list-group">
 														<?php
-														$item = $connect->query("SELECT * FROM orderlistdesc WHERE ORDERNO = '$ordno' ORDER BY PDESC ASC");
+														$item = $connect->query("SELECT * FROM del_orderlistdesc WHERE ORDERNO = '$ordno' ORDER BY PDESC ASC");
 														while($itemrow = $item->fetch_assoc()){
 														?>
 														<li class="list-group-item d-flex justify-content-between align-items-center">

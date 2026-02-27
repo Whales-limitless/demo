@@ -79,7 +79,13 @@ body {
 <main class="main">
   <div class="welcome-card">
     <h1>Welcome, <span class="user-name"><?php echo $userName; ?></span></h1>
-    <p>You are logged in to the staff portal.</p>
+    <?php
+    $indexType = $_SESSION['user_type'] ?? 'S';
+    $portalLabel = 'staff';
+    if ($indexType === 'A') $portalLabel = 'admin';
+    elseif ($indexType === 'D') $portalLabel = 'delivery';
+    ?>
+    <p>You are logged in as <?php echo $portalLabel; ?>.</p>
   </div>
 </main>
 

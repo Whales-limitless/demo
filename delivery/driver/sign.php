@@ -1,9 +1,9 @@
 <?php
-include "../dbconnection.php";
+include "../../staff/dbconnection.php";
 include "validation.php";
 $ordno = $_GET["ordno"];
 
-$sql = $connect->query("SELECT * FROM `orderlist` WHERE ID= '".$_GET["id"]."'");
+$sql = $connect->query("SELECT * FROM `del_orderlist` WHERE ID= '".$_GET["id"]."'");
 while($row = $sql->fetch_assoc()){
 	$deldate = $row["DELDATE"];
 	$ordno = $row["ORDNO"];
@@ -15,7 +15,7 @@ while($row = $sql->fetch_assoc()){
 	$customerc = $row["CUSTOMERCODE"];
 }
 
-$sql2 = $connect->query("SELECT HP,ADDRESS FROM `customer` WHERE CODE= '".$customerc."'");
+$sql2 = $connect->query("SELECT HP,ADDRESS FROM `del_customer` WHERE CODE= '".$customerc."'");
 while($row = $sql2->fetch_assoc()){
 	$hp = $row["HP"];
 	$addr = $row["ADDRESS"];
