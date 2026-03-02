@@ -92,15 +92,18 @@ body {
   overflow: hidden;
   box-shadow: var(--shadow-sm);
   cursor: pointer;
-  transition: box-shadow var(--transition), transform var(--transition);
   text-decoration: none;
   color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-.cat-card .cat-img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; transition: transform 0.4s ease; background: var(--bg); }
+.cat-card .cat-img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: var(--bg); }
 .cat-card .img-wrap { overflow: hidden; position: relative; }
 
 @media (hover: hover) and (pointer: fine) {
+  .cat-card { transition: box-shadow var(--transition), transform var(--transition); }
+  .cat-card .cat-img { transition: transform 0.4s ease; }
   .cat-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-4px); }
   .cat-card:hover .cat-img { transform: scale(1.04); }
 }

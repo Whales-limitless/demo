@@ -170,15 +170,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .oos-heading { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 14px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
 .oos-count { background: #fee2e2; color: var(--primary); font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 10px; }
 .oos-section .product-card { opacity: 0.7; }
-.oos-section .product-card:hover { opacity: 1; }
+@media (hover: hover) and (pointer: fine) { .oos-section .product-card:hover { opacity: 1; } }
 
 .product-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 
-.product-card { background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; transition: box-shadow var(--transition), transform var(--transition); }
+.product-card { background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 .product-img-wrap { position: relative; overflow: hidden; }
-.product-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; transition: transform 0.4s ease; background: var(--bg); }
+.product-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--bg); }
 
 @media (hover: hover) and (pointer: fine) {
+  .product-card { transition: box-shadow var(--transition), transform var(--transition); }
+  .product-img { transition: transform 0.4s ease; }
   .product-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
   .product-card:hover .product-img { transform: scale(1.03); }
 }

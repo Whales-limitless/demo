@@ -340,14 +340,17 @@
   cursor: pointer;
   padding: 4px 0;
   min-width: 52px;
-  transition: color var(--transition);
   font-family: 'DM Sans', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .mobile-footer a.tab-active,
 .mobile-footer button.footer-tab.tab-active { color: var(--primary); }
 
 @media (hover: hover) and (pointer: fine) {
+  .mobile-footer a,
+  .mobile-footer button.footer-tab { transition: color var(--transition); }
   .mobile-footer a:hover,
   .mobile-footer button.footer-tab:hover { color: var(--primary); }
 }
