@@ -607,6 +607,16 @@
 .icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .icon-sm { width: 18px; height: 18px; }
 
+/* ── SCROLLBAR (visible on desktop) ── */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #b0b4bc #e5e7eb;
+}
+html::-webkit-scrollbar { width: 8px; }
+html::-webkit-scrollbar-track { background: #e5e7eb; }
+html::-webkit-scrollbar-thumb { background: #b0b4bc; border-radius: 4px; }
+html::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
 /* ── SHARED RESPONSIVE ── */
 @media (max-width: 992px) {
   .mobile-footer { display: block; }
