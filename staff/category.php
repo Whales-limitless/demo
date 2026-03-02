@@ -97,10 +97,13 @@ body {
   color: var(--text);
 }
 
-.cat-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-4px); }
 .cat-card .cat-img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; transition: transform 0.4s ease; background: var(--bg); }
-.cat-card:hover .cat-img { transform: scale(1.04); }
 .cat-card .img-wrap { overflow: hidden; position: relative; }
+
+@media (hover: hover) {
+  .cat-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-4px); }
+  .cat-card:hover .cat-img { transform: scale(1.04); }
+}
 
 .cat-card .cat-name {
   padding: 12px 14px;

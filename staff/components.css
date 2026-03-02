@@ -344,10 +344,13 @@
   font-family: 'DM Sans', sans-serif;
 }
 
-.mobile-footer a:hover,
-.mobile-footer button.footer-tab:hover,
 .mobile-footer a.tab-active,
 .mobile-footer button.footer-tab.tab-active { color: var(--primary); }
+
+@media (hover: hover) {
+  .mobile-footer a:hover,
+  .mobile-footer button.footer-tab:hover { color: var(--primary); }
+}
 
 .mobile-footer .tab-icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 

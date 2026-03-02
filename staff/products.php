@@ -117,7 +117,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 100px; }
 
 .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; margin-bottom: 12px; transition: color var(--transition); }
-.back-link:hover { color: var(--primary); }
+@media (hover: hover) { .back-link:hover { color: var(--primary); } }
 
 .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 
@@ -175,10 +175,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .product-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 
 .product-card { background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; transition: box-shadow var(--transition), transform var(--transition); }
-.product-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
 .product-img-wrap { position: relative; overflow: hidden; }
 .product-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; transition: transform 0.4s ease; background: var(--bg); }
-.product-card:hover .product-img { transform: scale(1.03); }
+
+@media (hover: hover) {
+  .product-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .product-card:hover .product-img { transform: scale(1.03); }
+}
 
 .no-img-product { width: 100%; aspect-ratio: 1; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 11px; font-weight: 600; text-align: center; padding: 12px; font-family: 'DM Sans', sans-serif; }
 
@@ -237,7 +240,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <?php include('navbar.php'); ?>
 
 <main class="main">
-  <a href="index.php" class="back-link">
+  <a href="category.php" class="back-link">
     <svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><polyline points="15 18 9 12 15 6"/></svg>
     Back to Categories
   </a>
