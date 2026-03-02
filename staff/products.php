@@ -117,7 +117,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 100px; }
 
 .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; margin-bottom: 12px; transition: color var(--transition); }
-@media (hover: hover) { .back-link:hover { color: var(--primary); } }
+@media (hover: hover) and (pointer: fine) { .back-link:hover { color: var(--primary); } }
 
 .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 
@@ -178,7 +178,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .product-img-wrap { position: relative; overflow: hidden; }
 .product-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; transition: transform 0.4s ease; background: var(--bg); }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .product-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
   .product-card:hover .product-img { transform: scale(1.03); }
 }
