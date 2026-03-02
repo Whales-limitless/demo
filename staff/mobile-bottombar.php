@@ -147,6 +147,7 @@
   var path = window.location.pathname.split('/').pop() || 'index.php';
   var tabMap = {
     'category.php': 'tabCategory',
+    'products.php': 'tabCategory',
     'all_products.php': 'tabProducts',
     'account.php': 'tabAccount',
     'staff_stock_take.php': 'tabInventory',
