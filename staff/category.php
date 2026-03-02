@@ -151,16 +151,6 @@ body {
 @media (max-width: 768px) { .cat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } .section-title { font-size: 19px; } .cat-card .cat-name { font-size: 12px; padding: 10px; } }
 @media (max-width: 480px) { .cat-card .cat-name { font-size: 11px; padding: 8px; } }
 
-@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-.cat-card { animation: fadeUp 0.4s ease both; }
-.cat-card:nth-child(1) { animation-delay: 0.05s; }
-.cat-card:nth-child(2) { animation-delay: 0.1s; }
-.cat-card:nth-child(3) { animation-delay: 0.15s; }
-.cat-card:nth-child(4) { animation-delay: 0.2s; }
-.cat-card:nth-child(5) { animation-delay: 0.25s; }
-.cat-card:nth-child(6) { animation-delay: 0.3s; }
-.cat-card:nth-child(7) { animation-delay: 0.35s; }
-.cat-card:nth-child(8) { animation-delay: 0.4s; }
 </style>
 </head>
 <body>
@@ -173,39 +163,33 @@ body {
       <h2 class="section-title">Categories</h2>
       <span class="cat-count" id="catCount"></span>
     </div>
-    <div class="cat-grid" id="catGrid"></div>
+    <div class="cat-grid" id="catGrid">
+      <?php if (empty($categories)): ?>
+        <div class="empty-msg" style="grid-column:1/-1;">No categories found.</div>
+      <?php else: ?>
+        <?php foreach ($categories as $c): ?>
+          <a href="products.php?cat=<?php echo htmlspecialchars($c['id']); ?>" class="cat-card">
+            <div class="img-wrap">
+              <?php if (!empty($c['image'])): ?>
+                <img class="cat-img" src="<?php echo htmlspecialchars($c['image']); ?>" alt="<?php echo htmlspecialchars($c['name']); ?>">
+              <?php else: ?>
+                <div class="no-img-placeholder"><svg style="width:40px;height:40px;stroke:#9ca3af;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;"><rect x="3" y="3" width="34" height="34" rx="4"/><circle cx="13" cy="15" r="4"/><polyline points="37 27 27 17 7 37"/></svg></div>
+              <?php endif; ?>
+            </div>
+            <div class="cat-name"><?php echo htmlspecialchars($c['name']); ?></div>
+          </a>
+        <?php endforeach; ?>
+      <?php endif; ?>
+    </div>
   </section>
 </main>
 
 <?php include('mobile-bottombar.php'); ?>
 
 <script>
-var categories = <?php echo json_encode($categories); ?>;
-
-function renderGrid(list) {
-  var data = list || categories;
-  var grid = document.getElementById('catGrid');
-
-  if (data.length === 0) {
-    grid.innerHTML = '<div class="empty-msg" style="grid-column:1/-1;">No categories found.</div>';
-    document.getElementById('catCount').textContent = '';
-    return;
-  }
-
-  document.getElementById('catCount').textContent = data.length + ' categories';
-
-  grid.innerHTML = data.map(function(c, i) {
-    var imgHtml = c.image
-      ? '<img class="cat-img" src="' + c.image + '" alt="' + c.name + '" loading="lazy">'
-      : '<div class="no-img-placeholder"><svg style="width:40px;height:40px;stroke:#9ca3af;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;"><rect x="3" y="3" width="34" height="34" rx="4"/><circle cx="13" cy="15" r="4"/><polyline points="37 27 27 17 7 37"/></svg></div>';
-    return '<a href="products.php?cat=' + c.id + '" class="cat-card" style="animation-delay:' + ((i+1)*0.05) + 's">' +
-      '<div class="img-wrap">' + imgHtml + '</div>' +
-      '<div class="cat-name">' + c.name + '</div>' +
-    '</a>';
-  }).join('');
-}
-
-renderGrid();
+var catCount = document.getElementById('catCount');
+var total = document.querySelectorAll('.cat-card').length;
+if (total > 0) catCount.textContent = total + ' categories';
 </script>
 </body>
 </html>
