@@ -6,15 +6,19 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 }
 require_once 'dbconnection.php';
 
-// Fetch distinct categories from database
+// Fetch distinct categories with images from cat_group
 $categories = [];
-$result = mysqli_query($connect, "SELECT cat_code, cat_name, MIN(sort_no) AS sort_order FROM category GROUP BY cat_code, cat_name ORDER BY sort_order ASC, cat_name ASC");
+$result = mysqli_query($connect, "SELECT c.cat_code, c.cat_name, MIN(c.sort_no) AS sort_order, cg.cat_img
+    FROM category c
+    LEFT JOIN cat_group cg ON c.cat_code = cg.ccode
+    GROUP BY c.cat_code, c.cat_name, cg.cat_img
+    ORDER BY sort_order ASC, c.cat_name ASC");
 if ($result) {
     while ($row = mysqli_fetch_assoc($result)) {
         $categories[] = [
             'id' => $row['cat_code'],
             'name' => $row['cat_name'],
-            'image' => null
+            'image' => !empty($row['cat_img']) ? '../category_img/' . $row['cat_img'] : null
         ];
     }
 }
