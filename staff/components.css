@@ -347,7 +347,7 @@
 .mobile-footer a.tab-active,
 .mobile-footer button.footer-tab.tab-active { color: var(--primary); }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .mobile-footer a:hover,
   .mobile-footer button.footer-tab:hover { color: var(--primary); }
 }
