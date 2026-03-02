@@ -233,8 +233,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 @media (min-width: 993px) { .product-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 1200px) { .product-grid { grid-template-columns: repeat(4, 1fr); } }
 
-@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-.product-card { animation: fadeUp 0.35s ease both; }
 </style>
 </head>
 <body>
@@ -303,7 +301,7 @@ var trendLabels = { green: 'Hot', yellow: 'Moderate', red: 'Slow', black: 'Dead'
 function renderProductCard(p, index) {
   var imgHtml;
   if (p.image) {
-    imgHtml = '<img class="product-img" src="/img/' + p.image + '" alt="' + p.name + '" loading="lazy">';
+    imgHtml = '<img class="product-img" src="/img/' + p.image + '" alt="' + p.name + '">';
   } else {
     imgHtml = '<div class="no-img-product">' + (p.sku || 'NO IMAGE') + '</div>';
   }
@@ -332,7 +330,7 @@ function renderProductCard(p, index) {
   var bc = p.inStock ? 'active' : 'disabled';
   var bt = p.inStock ? 'Add to Cart' : 'Out of Stock';
 
-  return '<div class="product-card" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" data-barcode="' + (p.barcode || '').toLowerCase() + '" style="animation-delay:' + (index+1)*0.05 + 's">' +
+  return '<div class="product-card" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" data-barcode="' + (p.barcode || '').toLowerCase() + '">' +
     '<div class="product-img-wrap">' + imgHtml + badgeHtml + '</div>' +
     '<div class="product-info">' +
       '<div class="product-name">' + p.name + '</div>' +
