@@ -105,8 +105,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="page-header">
         <h1><i class="fas fa-boxes-stacked" style="color:var(--primary);margin-right:8px;"></i>Product Management</h1>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn-add" onclick="openManageCatModal();" style="background:#6366f1;">
-                <i class="fas fa-tags"></i> Manage Categories
+            <a href="cat_group.php" class="btn-add" style="background:#6366f1;text-decoration:none;">
+                <i class="fas fa-layer-group"></i> Category Groups
+            </a>
+            <button class="btn-add" onclick="openManageCatModal();" style="background:#8b5cf6;">
+                <i class="fas fa-tags"></i> Manage Sub-Categories
             </button>
             <button class="btn-add" onclick="openManageUomModal();" style="background:#0891b2;">
                 <i class="fas fa-ruler"></i> Manage UOM
@@ -245,36 +248,24 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
-<!-- Manage Categories Modal -->
+<!-- Manage Sub Categories Modal -->
 <div class="modal fade" id="manageCatModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-tags"></i> Manage Categories & Sub Categories</h5>
+                <h5 class="modal-title"><i class="fas fa-tags"></i> Manage Sub Categories</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6 class="fw-bold mb-2">Categories</h6>
-                        <div class="manage-add-row">
-                            <input type="text" id="newCatName" placeholder="New category name">
-                            <button class="btn btn-sm btn-success" onclick="createCategory();"><i class="fas fa-plus"></i> Add</button>
-                        </div>
-                        <div class="manage-list" id="catListManage"></div>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 class="fw-bold mb-2">Sub Categories</h6>
-                        <div class="manage-add-row">
-                            <select id="newSubCatParent" style="max-width:140px;">
-                                <option value="">Category...</option>
-                            </select>
-                            <input type="text" id="newSubCatName" placeholder="New sub category">
-                            <button class="btn btn-sm btn-success" onclick="createSubCategory();"><i class="fas fa-plus"></i> Add</button>
-                        </div>
-                        <div class="manage-list" id="subCatListManage"></div>
-                    </div>
+                <p class="text-muted mb-3" style="font-size:13px;">Category groups are managed from the <a href="cat_group.php">Category Groups</a> page. Here you can manage sub categories under each group.</p>
+                <div class="manage-add-row">
+                    <select id="newSubCatParent" style="max-width:200px;">
+                        <option value="">Category group...</option>
+                    </select>
+                    <input type="text" id="newSubCatName" placeholder="New sub category name">
+                    <button class="btn btn-sm btn-success" onclick="createSubCategory();"><i class="fas fa-plus"></i> Add</button>
                 </div>
+                <div class="manage-list" id="subCatListManage"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -478,7 +469,8 @@ function refreshCatSelect() {
     var val = sel.value;
     sel.innerHTML = '<option value="">-- Select --</option>';
     categoriesCache.forEach(function(c) {
-        sel.innerHTML += '<option value="' + escHtml(c.name) + '">' + escHtml(c.name) + '</option>';
+        // value = ccode (cat_code), display = cat_name, store id as data attr
+        sel.innerHTML += '<option value="' + escHtml(c.ccode) + '" data-name="' + escHtml(c.name) + '" data-id="' + c.id + '">' + escHtml(c.name) + '</option>';
     });
     sel.value = val;
 
@@ -512,22 +504,23 @@ function refreshRackSelect() {
     sel.value = val;
 }
 
-function loadSubCatOptions() {
-    var catName = document.getElementById('fCat').value;
+function loadSubCatOptions(preselectSubCode) {
+    var catCode = document.getElementById('fCat').value;
     var sel = document.getElementById('fSubCat');
     sel.innerHTML = '<option value="">-- Select --</option>';
 
-    if (!catName) return;
+    if (!catCode) return;
 
-    // Find category id
-    var catObj = categoriesCache.find(function(c) { return c.name === catName; });
+    // Find category group id from ccode
+    var catObj = categoriesCache.find(function(c) { return c.ccode === catCode; });
     if (!catObj) return;
 
     $.post('product_ajax.php', { action: 'subcat_list', category_id: catObj.id }, function(subs) {
-        var active = (subs || []).filter(function(s) { return s.status === 'ACTIVE'; });
-        active.forEach(function(s) {
-            sel.innerHTML += '<option value="' + escHtml(s.name) + '">' + escHtml(s.name) + '</option>';
+        (subs || []).forEach(function(s) {
+            // value = sub_code, display = sub_cat name
+            sel.innerHTML += '<option value="' + escHtml(s.sub_code) + '" data-name="' + escHtml(s.name) + '">' + escHtml(s.name) + '</option>';
         });
+        if (preselectSubCode) sel.value = preselectSubCode;
     }, 'json');
 }
 
@@ -569,7 +562,6 @@ function openEditModal(id) {
             document.getElementById('fCode').value = data.code || '';
             document.getElementById('fName').value = data.name || '';
             document.getElementById('fDescription').value = data.description || '';
-            document.getElementById('fCat').value = data.cat || '';
             document.getElementById('fUom').value = data.uom || '';
             document.getElementById('fQoh').value = data.qoh || '0';
             // Try to match rack text to a rack code in the select
@@ -578,20 +570,18 @@ function openEditModal(id) {
             document.getElementById('fRack').value = rackVal;
             document.getElementById('fChecked').value = data.checked || 'Y';
 
-            // Load sub categories then set value
-            var catName = data.cat || '';
-            if (catName) {
-                var catObj = categoriesCache.find(function(c) { return c.name === catName; });
+            // Set category by cat_code, then load sub-cats and set by sub_code
+            var catCode = data.cat_code || '';
+            var subCode = data.sub_code || '';
+            if (catCode) {
+                document.getElementById('fCat').value = catCode;
+                loadSubCatOptions(subCode);
+            } else if (data.cat) {
+                // Fallback: try to match by name for legacy products
+                var catObj = categoriesCache.find(function(c) { return c.name === data.cat; });
                 if (catObj) {
-                    $.post('product_ajax.php', { action: 'subcat_list', category_id: catObj.id }, function(subs) {
-                        var sel = document.getElementById('fSubCat');
-                        sel.innerHTML = '<option value="">-- Select --</option>';
-                        var active = (subs || []).filter(function(s) { return s.status === 'ACTIVE'; });
-                        active.forEach(function(s) {
-                            sel.innerHTML += '<option value="' + escHtml(s.name) + '">' + escHtml(s.name) + '</option>';
-                        });
-                        sel.value = data.sub_cat || '';
-                    }, 'json');
+                    document.getElementById('fCat').value = catObj.ccode;
+                    loadSubCatOptions(subCode);
                 }
             }
 
@@ -615,14 +605,26 @@ function saveProduct() {
     // Use rack select value if chosen, otherwise fall back to rack remark
     var rackValue = rackSelect || rackRemark;
 
+    // Resolve cat_code / sub_code and text names
+    var catSel = document.getElementById('fCat');
+    var subSel = document.getElementById('fSubCat');
+    var catCode = catSel.value.trim();
+    var subCode = subSel.value.trim();
+    var catName = catSel.selectedOptions[0] ? (catSel.selectedOptions[0].getAttribute('data-name') || catSel.selectedOptions[0].textContent) : '';
+    var subName = subSel.selectedOptions[0] ? (subSel.selectedOptions[0].getAttribute('data-name') || subSel.selectedOptions[0].textContent) : '';
+    if (catSel.value === '') { catName = ''; catCode = ''; }
+    if (subSel.value === '') { subName = ''; subCode = ''; }
+
     var postData = {
         action: editId ? 'update' : 'create',
         barcode: barcode,
         code: document.getElementById('fCode').value.trim(),
         name: name,
         description: document.getElementById('fDescription').value.trim(),
-        cat: document.getElementById('fCat').value.trim(),
-        sub_cat: document.getElementById('fSubCat').value.trim(),
+        cat: catName,
+        sub_cat: subName,
+        cat_code: catCode,
+        sub_code: subCode,
         uom: document.getElementById('fUom').value.trim(),
         qoh: document.getElementById('fQoh').value,
         rack: rackValue,
@@ -676,84 +678,8 @@ function deactivateProduct(id, name) {
 // ===================== CATEGORY MANAGEMENT =====================
 
 function openManageCatModal() {
-    loadManageCategories();
     loadManageSubCategories();
     manageCatModal.show();
-}
-
-function loadManageCategories() {
-    $.post('product_ajax.php', { action: 'cat_list' }, function(cats) {
-        var all = cats || [];
-        categoriesCache = all.filter(function(c) { return c.status === 'ACTIVE'; });
-        refreshCatSelect();
-
-        var html = '';
-        all.forEach(function(c) {
-            var inactive = c.status !== 'ACTIVE';
-            html += '<div class="manage-item">';
-            html += '<span class="item-name ' + (inactive ? 'inactive' : '') + '">' + escHtml(c.name) + '</span>';
-            html += '<div class="item-actions">';
-            html += '<button style="background:#3b82f6;" onclick="editCategory(' + c.id + ',\'' + escHtml(c.name).replace(/'/g, "\\'") + '\');"><i class="fas fa-pen"></i></button>';
-            if (inactive) {
-                html += '<button style="background:#16a34a;" onclick="activateCategory(' + c.id + ');"><i class="fas fa-check"></i></button>';
-            } else {
-                html += '<button style="background:#ef4444;" onclick="deleteCategory(' + c.id + ');"><i class="fas fa-ban"></i></button>';
-            }
-            html += '</div></div>';
-        });
-        if (all.length === 0) html = '<div style="padding:20px;text-align:center;color:var(--text-muted);">No categories yet</div>';
-        document.getElementById('catListManage').innerHTML = html;
-    }, 'json');
-}
-
-function createCategory() {
-    var name = document.getElementById('newCatName').value.trim();
-    if (!name) return;
-    $.post('product_ajax.php', { action: 'cat_create', name: name }, function(r) {
-        if (r.success) {
-            document.getElementById('newCatName').value = '';
-            loadManageCategories();
-            loadCategoryFilter();
-        } else {
-            Swal.fire({ icon: 'error', text: r.error });
-        }
-    }, 'json');
-}
-
-function editCategory(id, oldName) {
-    Swal.fire({
-        title: 'Edit Category',
-        input: 'text',
-        inputValue: oldName,
-        showCancelButton: true,
-        confirmButtonText: 'Save',
-        inputValidator: function(v) { if (!v || !v.trim()) return 'Name is required.'; }
-    }).then(function(result) {
-        if (result.isConfirmed) {
-            $.post('product_ajax.php', { action: 'cat_update', id: id, name: result.value.trim() }, function(r) {
-                if (r.success) {
-                    loadManageCategories();
-                    loadCategoryFilter();
-                } else {
-                    Swal.fire({ icon: 'error', text: r.error });
-                }
-            }, 'json');
-        }
-    });
-}
-
-function deleteCategory(id) {
-    $.post('product_ajax.php', { action: 'cat_delete', id: id }, function(r) {
-        if (r.success) { loadManageCategories(); loadCategoryFilter(); }
-        else Swal.fire({ icon: 'error', text: r.error });
-    }, 'json');
-}
-
-function activateCategory(id) {
-    $.post('product_ajax.php', { action: 'cat_activate', id: id }, function(r) {
-        if (r.success) { loadManageCategories(); loadCategoryFilter(); }
-        else Swal.fire({ icon: 'error', text: r.error });
-    }, 'json');
 }
 
 // ===================== SUB CATEGORY MANAGEMENT =====================
@@ -763,18 +689,13 @@ function loadManageSubCategories() {
         var all = subs || [];
         var html = '';
         all.forEach(function(s) {
-            var inactive = s.status !== 'ACTIVE';
             html += '<div class="manage-item">';
-            html += '<span class="item-name ' + (inactive ? 'inactive' : '') + '">';
+            html += '<span class="item-name">';
             html += '<small style="color:var(--text-muted);">[' + escHtml(s.cat_name || '') + ']</small> ' + escHtml(s.name);
             html += '</span>';
             html += '<div class="item-actions">';
-            html += '<button style="background:#3b82f6;" onclick="editSubCategory(' + s.id + ',' + s.category_id + ',\'' + escHtml(s.name).replace(/'/g, "\\'") + '\');"><i class="fas fa-pen"></i></button>';
-            if (inactive) {
-                html += '<button style="background:#16a34a;" onclick="activateSubCategory(' + s.id + ');"><i class="fas fa-check"></i></button>';
-            } else {
-                html += '<button style="background:#ef4444;" onclick="deleteSubCategory(' + s.id + ');"><i class="fas fa-ban"></i></button>';
-            }
+            html += '<button style="background:#3b82f6;" onclick="editSubCategory(' + s.id + ',\'' + escHtml(s.name).replace(/'/g, "\\'") + '\');"><i class="fas fa-pen"></i></button>';
+            html += '<button style="background:#ef4444;" onclick="deleteSubCategory(' + s.id + ');"><i class="fas fa-ban"></i></button>';
             html += '</div></div>';
         });
         if (all.length === 0) html = '<div style="padding:20px;text-align:center;color:var(--text-muted);">No sub categories yet</div>';
@@ -796,7 +717,7 @@ function createSubCategory() {
     }, 'json');
 }
 
-function editSubCategory(id, catId, oldName) {
+function editSubCategory(id, oldName) {
     Swal.fire({
         title: 'Edit Sub Category',
         input: 'text',
@@ -806,7 +727,7 @@ function editSubCategory(id, catId, oldName) {
         inputValidator: function(v) { if (!v || !v.trim()) return 'Name is required.'; }
     }).then(function(result) {
         if (result.isConfirmed) {
-            $.post('product_ajax.php', { action: 'subcat_update', id: id, category_id: catId, name: result.value.trim() }, function(r) {
+            $.post('product_ajax.php', { action: 'subcat_update', id: id, name: result.value.trim() }, function(r) {
                 if (r.success) { loadManageSubCategories(); }
                 else Swal.fire({ icon: 'error', text: r.error });
             }, 'json');
@@ -815,17 +736,17 @@ function editSubCategory(id, catId, oldName) {
 }
 
 function deleteSubCategory(id) {
-    $.post('product_ajax.php', { action: 'subcat_delete', id: id }, function(r) {
-        if (r.success) loadManageSubCategories();
-        else Swal.fire({ icon: 'error', text: r.error });
-    }, 'json');
-}
-
-function activateSubCategory(id) {
-    $.post('product_ajax.php', { action: 'subcat_activate', id: id }, function(r) {
-        if (r.success) loadManageSubCategories();
-        else Swal.fire({ icon: 'error', text: r.error });
-    }, 'json');
+    Swal.fire({
+        text: 'Delete this sub category?', icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#ef4444', confirmButtonText: 'Delete'
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.post('product_ajax.php', { action: 'subcat_delete', id: id }, function(r) {
+                if (r.success) { loadManageSubCategories(); }
+                else Swal.fire({ icon: 'error', text: r.error });
+            }, 'json');
+        }
+    });
 }
 
 // ===================== UOM MANAGEMENT =====================

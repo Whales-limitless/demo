@@ -863,28 +863,13 @@ if ($colCheck9 && $colCheck9->num_rows === 0) {
     $results[] = ['skip', 'Add approved_at to stock_take (already exists)'];
 }
 
-// --- Product Category ---
-runMigration($connect, 'Create product_category table', "
-CREATE TABLE IF NOT EXISTS `product_category` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR(50) NOT NULL UNIQUE,
-  `status` ENUM('ACTIVE','INACTIVE') DEFAULT 'ACTIVE',
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-");
-
-// --- Product Sub Category ---
-runMigration($connect, 'Create product_sub_category table', "
-CREATE TABLE IF NOT EXISTS `product_sub_category` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `category_id` INT NOT NULL,
-  `name` VARCHAR(50) NOT NULL,
-  `status` ENUM('ACTIVE','INACTIVE') DEFAULT 'ACTIVE',
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY `uq_cat_sub` (`category_id`, `name`),
-  FOREIGN KEY (`category_id`) REFERENCES `product_category`(`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-");
+// --- cat_group status column (add if not exists) ---
+$colCheckCatGroup = $connect->query("SHOW COLUMNS FROM `cat_group` LIKE 'status'");
+if ($colCheckCatGroup && $colCheckCatGroup->num_rows === 0) {
+    runMigration($connect, 'Add status column to cat_group', "ALTER TABLE `cat_group` ADD COLUMN `status` ENUM('ACTIVE','INACTIVE') NOT NULL DEFAULT 'ACTIVE'");
+} else {
+    $results[] = ['skip', 'Add status to cat_group (already exists)'];
+}
 
 // --- Product UOM ---
 runMigration($connect, 'Create product_uom table', "
