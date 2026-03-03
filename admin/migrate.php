@@ -943,7 +943,7 @@ CREATE TABLE IF NOT EXISTS `product_trend_config` (
 // errors on hosting with limited disk quota.
 
 // Drop unused legacy tables FIRST to free disk space
-$dropTables = ['cat_group', 'stockin', 'stockout'];
+$dropTables = ['stockin', 'stockout'];
 foreach ($dropTables as $dropTable) {
     $tableCheck = $connect->query("SHOW TABLES LIKE '$dropTable'");
     if ($tableCheck && $tableCheck->num_rows > 0) {

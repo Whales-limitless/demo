@@ -117,7 +117,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 100px; }
 
 .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; margin-bottom: 12px; transition: color var(--transition); }
-.back-link:hover { color: var(--primary); }
+@media (hover: hover) and (pointer: fine) { .back-link:hover { color: var(--primary); } }
 
 .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 
@@ -170,15 +170,20 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .oos-heading { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 14px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
 .oos-count { background: #fee2e2; color: var(--primary); font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 10px; }
 .oos-section .product-card { opacity: 0.7; }
-.oos-section .product-card:hover { opacity: 1; }
+@media (hover: hover) and (pointer: fine) { .oos-section .product-card:hover { opacity: 1; } }
 
 .product-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 
-.product-card { background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; transition: box-shadow var(--transition), transform var(--transition); }
-.product-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.product-card { background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 .product-img-wrap { position: relative; overflow: hidden; }
-.product-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; transition: transform 0.4s ease; background: var(--bg); }
-.product-card:hover .product-img { transform: scale(1.03); }
+.product-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--bg); }
+
+@media (hover: hover) and (pointer: fine) {
+  .product-card { transition: box-shadow var(--transition), transform var(--transition); }
+  .product-img { transition: transform 0.4s ease; }
+  .product-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .product-card:hover .product-img { transform: scale(1.03); }
+}
 
 .no-img-product { width: 100%; aspect-ratio: 1; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 11px; font-weight: 600; text-align: center; padding: 12px; font-family: 'DM Sans', sans-serif; }
 
@@ -228,8 +233,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 @media (min-width: 993px) { .product-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 1200px) { .product-grid { grid-template-columns: repeat(4, 1fr); } }
 
-@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-.product-card { animation: fadeUp 0.35s ease both; }
 </style>
 </head>
 <body>
@@ -237,7 +240,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <?php include('navbar.php'); ?>
 
 <main class="main">
-  <a href="index.php" class="back-link">
+  <a href="category.php" class="back-link">
     <svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><polyline points="15 18 9 12 15 6"/></svg>
     Back to Categories
   </a>
@@ -298,7 +301,7 @@ var trendLabels = { green: 'Hot', yellow: 'Moderate', red: 'Slow', black: 'Dead'
 function renderProductCard(p, index) {
   var imgHtml;
   if (p.image) {
-    imgHtml = '<img class="product-img" src="/img/' + p.image + '" alt="' + p.name + '" loading="lazy">';
+    imgHtml = '<img class="product-img" src="/img/' + p.image + '" alt="' + p.name + '">';
   } else {
     imgHtml = '<div class="no-img-product">' + (p.sku || 'NO IMAGE') + '</div>';
   }
@@ -327,7 +330,7 @@ function renderProductCard(p, index) {
   var bc = p.inStock ? 'active' : 'disabled';
   var bt = p.inStock ? 'Add to Cart' : 'Out of Stock';
 
-  return '<div class="product-card" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" data-barcode="' + (p.barcode || '').toLowerCase() + '" style="animation-delay:' + (index+1)*0.05 + 's">' +
+  return '<div class="product-card" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" data-barcode="' + (p.barcode || '').toLowerCase() + '">' +
     '<div class="product-img-wrap">' + imgHtml + badgeHtml + '</div>' +
     '<div class="product-info">' +
       '<div class="product-name">' + p.name + '</div>' +
