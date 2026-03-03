@@ -31,25 +31,11 @@ $connect->query("TRUNCATE TABLE `orderlist2`");
 $connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
 $connect->query("UPDATE orderlist2 AS b INNER JOIN MEMBER AS g ON b.ACCODE = g.ACCODE SET b.HP = g.HP");
 
-// Count new orders (sound not yet acknowledged)
+// Count new orders
 $newOrderCount = 0;
 $query56 = $connect->query("SELECT COUNT(DISTINCT SALNUM) as cnt FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND SOUND = '0'");
 if ($query56 && $row = $query56->fetch_assoc()) {
     $newOrderCount = (int)$row['cnt'];
-}
-
-// Handle notification acknowledge
-if (isset($_POST['noted'])) {
-    $connect->query("UPDATE `orderlist` SET SOUND = '1' WHERE SOUND = '0'");
-    header("Location: dashboard.php");
-    exit;
-}
-
-// Check if there are unacknowledged orders for sound
-$hasNewSound = false;
-$querySnd = $connect->query("SELECT 1 FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND SOUND = '0' LIMIT 1");
-if ($querySnd && $querySnd->num_rows > 0) {
-    $hasNewSound = true;
 }
 
 // Fetch all orders from orderlist2
@@ -129,6 +115,16 @@ body {
     background: #22c55e;
     border-radius: 50%;
     animation: pulse 2s infinite;
+    flex-shrink: 0;
+}
+
+.live-dot.error {
+    background: #ef4444;
+    animation: none;
+}
+
+.live-dot.polling {
+    background: #f59e0b;
 }
 
 @keyframes pulse {
@@ -139,6 +135,13 @@ body {
 .countdown-label {
     color: var(--text-muted);
     font-size: 13px;
+}
+
+.status-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .notification-btn {
@@ -173,6 +176,23 @@ body {
     justify-content: center;
     padding: 0 5px;
 }
+
+.sound-toggle {
+    background: #6b7280;
+    color: #fff;
+    border: none;
+    padding: 9px 14px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition);
+}
+
+.sound-toggle:hover { background: #4b5563; }
+.sound-toggle.enabled { background: #22c55e; }
+.sound-toggle.enabled:hover { background: #16a34a; }
 
 /* Table Card */
 .table-card {
@@ -269,6 +289,16 @@ body {
     color: var(--text-muted);
 }
 
+/* Highlight new row */
+.orders-table tbody tr.row-new {
+    animation: highlightNew 2s ease-out;
+}
+
+@keyframes highlightNew {
+    0% { background: #fef3c7; }
+    100% { background: transparent; }
+}
+
 /* Action Buttons */
 .btn-action {
     padding: 5px 12px;
@@ -300,9 +330,6 @@ body {
 .modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
 .modal-footer { border-top: 1px solid #e5e7eb; }
 
-/* Audio hidden */
-audio { display: none; }
-
 @media (max-width: 768px) {
     .dashboard-content { padding: 16px; }
     .status-bar { flex-direction: column; align-items: flex-start; }
@@ -323,19 +350,24 @@ audio { display: none; }
     <!-- Status Bar -->
     <div class="status-bar">
         <div class="live-indicator">
-            <span class="live-dot"></span>
+            <span class="live-dot" id="liveDot"></span>
             <span>Live View</span>
-            <span class="countdown-label">Refresh in <strong id="seconds">30</strong>s</span>
+            <span class="countdown-label">Refresh in <strong id="seconds">15</strong>s</span>
         </div>
 
-        <form method="POST" action="" style="margin:0;">
-            <button type="submit" name="noted" class="notification-btn">
+        <div class="status-right">
+            <button type="button" class="sound-toggle" id="soundToggle" onclick="toggleSound();">
+                <i class="fas fa-volume-mute" id="soundIcon"></i>
+            </button>
+            <button type="button" class="notification-btn" id="notifBtn" onclick="acknowledgeOrders();">
                 <i class="fas fa-bell"></i> Notification
                 <?php if ($newOrderCount > 0): ?>
-                <span class="notification-badge"><?php echo $newOrderCount; ?></span>
+                <span class="notification-badge" id="notifBadge"><?php echo $newOrderCount; ?></span>
+                <?php else: ?>
+                <span class="notification-badge" id="notifBadge" style="display:none;">0</span>
                 <?php endif; ?>
             </button>
-        </form>
+        </div>
     </div>
 
     <!-- Orders Table -->
@@ -372,13 +404,7 @@ audio { display: none; }
                     </tr>
                     <?php else: ?>
                     <?php foreach ($orders as $i => $order): ?>
-                    <tr data-search="<?php echo htmlspecialchars(strtolower(
-                        ($order['SDATE'] ?? '') . ' ' .
-                        ($order['SALNUM'] ?? '') . ' ' .
-                        ($order['NAME'] ?? '') . ' ' .
-                        ($order['TXTTO'] ?? '') . ' ' .
-                        ($order['ADMINRMK'] ?? '')
-                    )); ?>">
+                    <tr data-salnum="<?php echo htmlspecialchars($order['SALNUM'] ?? ''); ?>">
                         <td><?php echo $i + 1; ?></td>
                         <td><?php echo !empty($order['SDATE']) ? date('d/m/Y', strtotime($order['SDATE'])) : ''; ?></td>
                         <td><?php echo htmlspecialchars($order['TTIME'] ?? ''); ?></td>
@@ -431,43 +457,246 @@ audio { display: none; }
     </div>
 </div>
 
-<!-- Notification Sound -->
-<?php if ($hasNewSound): ?>
-<audio id="notifSound" autoplay>
-    <source src="sound/Melody-notification-sound.mp3" type="audio/mpeg">
-</audio>
-<?php endif; ?>
-
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-// Countdown timer
-var totalSeconds = 30;
-var secondsLabel = document.getElementById("seconds");
+// =====================================================================
+// PRODUCTION-READY LIVE VIEW
+// - AJAX polling (no full page reload)
+// - Preserves search, scroll, modal state
+// - Notification sound with user-gesture unlock (browser requirement)
+// - Exponential backoff on errors, recovers automatically
+// - Visibility API: pauses polling when tab is hidden
+// =====================================================================
 
-setInterval(function() {
-    totalSeconds--;
-    if (totalSeconds < 0) totalSeconds = 30;
-    secondsLabel.textContent = totalSeconds < 10 ? '0' + totalSeconds : totalSeconds;
-}, 1000);
+var POLL_INTERVAL = 15;       // seconds between polls
+var MAX_POLL_INTERVAL = 60;   // max backoff seconds
+var pollTimer = null;
+var countdown = POLL_INTERVAL;
+var currentInterval = POLL_INTERVAL;
+var consecutiveErrors = 0;
+var knownSalnums = {};        // track known orders to detect new ones
+var soundEnabled = false;     // must be enabled by user click (browser policy)
+var audioCtx = null;
+var notifBuffer = null;
+var modalOpen = false;
 
-// Auto-refresh page every 30 seconds
-setTimeout(function() {
-    location.reload();
-}, 30000);
+// Initialize known orders from server-rendered data
+<?php foreach ($orders as $order): ?>
+knownSalnums['<?php echo addslashes($order['SALNUM'] ?? ''); ?>'] = true;
+<?php endforeach; ?>
 
-// Search filter
+// ===================== AUDIO SETUP =====================
+
+function initAudio() {
+    if (audioCtx) return;
+    try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // Load notification sound
+        fetch('sound/notification.wav')
+            .then(function(r) { return r.arrayBuffer(); })
+            .then(function(buf) { return audioCtx.decodeAudioData(buf); })
+            .then(function(decoded) { notifBuffer = decoded; })
+            .catch(function() { notifBuffer = null; });
+    } catch(e) {
+        audioCtx = null;
+    }
+}
+
+function playNotifSound() {
+    if (!soundEnabled || !audioCtx || !notifBuffer) return;
+    // Resume context if suspended (browser policy)
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    var source = audioCtx.createBufferSource();
+    source.buffer = notifBuffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
+}
+
+function toggleSound() {
+    soundEnabled = !soundEnabled;
+    var icon = document.getElementById('soundIcon');
+    var btn = document.getElementById('soundToggle');
+    if (soundEnabled) {
+        initAudio();
+        icon.className = 'fas fa-volume-up';
+        btn.classList.add('enabled');
+        // Play once to confirm
+        setTimeout(playNotifSound, 300);
+    } else {
+        icon.className = 'fas fa-volume-mute';
+        btn.classList.remove('enabled');
+    }
+}
+
+// ===================== POLLING =====================
+
+function startPolling() {
+    countdown = currentInterval;
+    updateCountdown();
+    clearInterval(pollTimer);
+    pollTimer = setInterval(function() {
+        countdown--;
+        if (countdown <= 0) {
+            doPoll();
+            countdown = currentInterval;
+        }
+        updateCountdown();
+    }, 1000);
+}
+
+function updateCountdown() {
+    var el = document.getElementById('seconds');
+    if (el) el.textContent = countdown < 10 ? '0' + countdown : countdown;
+}
+
+function doPoll() {
+    // Don't poll if modal is open (user is working)
+    if (modalOpen) return;
+
+    var dot = document.getElementById('liveDot');
+    dot.className = 'live-dot polling';
+
+    $.ajax({
+        type: 'POST',
+        url: 'admin_ajax.php',
+        data: { action: 'poll' },
+        dataType: 'json',
+        timeout: 10000,
+        success: function(data) {
+            consecutiveErrors = 0;
+            currentInterval = POLL_INTERVAL;
+            dot.className = 'live-dot';
+
+            // Update table
+            renderOrders(data.orders || []);
+
+            // Update notification badge
+            updateBadge(data.new_count || 0);
+
+            // Detect new orders and play sound
+            var newOrders = [];
+            (data.orders || []).forEach(function(o) {
+                if (!knownSalnums[o.SALNUM]) {
+                    newOrders.push(o.SALNUM);
+                    knownSalnums[o.SALNUM] = true;
+                }
+            });
+
+            if (newOrders.length > 0 && data.new_count > 0) {
+                playNotifSound();
+            }
+        },
+        error: function() {
+            consecutiveErrors++;
+            // Exponential backoff: 15 -> 30 -> 60 (capped)
+            currentInterval = Math.min(MAX_POLL_INTERVAL, POLL_INTERVAL * Math.pow(2, consecutiveErrors - 1));
+            countdown = currentInterval;
+            dot.className = 'live-dot error';
+        }
+    });
+}
+
+function renderOrders(orders) {
+    var tbody = document.getElementById('ordersBody');
+    var searchQuery = (document.getElementById('searchInput').value || '').toLowerCase();
+
+    if (orders.length === 0) {
+        tbody.innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-inbox" style="font-size:24px;margin-bottom:8px;display:block;"></i>No orders found</td></tr>';
+        document.getElementById('orderCount').textContent = '0 order(s)';
+        return;
+    }
+
+    var html = '';
+    var visibleCount = 0;
+    for (var i = 0; i < orders.length; i++) {
+        var o = orders[i];
+        var salnum = escHtml(o.SALNUM || '');
+        var name = escHtml(o.NAME || '');
+        var txtto = escHtml(o.TXTTO || '');
+        var adminrmk = escHtml(o.ADMINRMK || '');
+        var sdate = o.SDATE ? formatDate(o.SDATE) : '';
+        var ttime = escHtml(o.TTIME || '');
+        var sumqty = escHtml((o.SUMQTY || '0') + '');
+
+        var searchData = ((o.SDATE || '') + ' ' + (o.SALNUM || '') + ' ' + (o.NAME || '') + ' ' + (o.TXTTO || '') + ' ' + (o.ADMINRMK || '')).toLowerCase();
+        var isVisible = !searchQuery || searchData.indexOf(searchQuery) > -1;
+        var isNew = !knownSalnums[o.SALNUM] ? ' row-new' : '';
+
+        if (isVisible) visibleCount++;
+
+        html += '<tr data-salnum="' + salnum + '" class="' + isNew + '"' + (isVisible ? '' : ' style="display:none;"') + '>';
+        html += '<td>' + (isVisible ? (visibleCount) : '') + '</td>';
+        html += '<td>' + sdate + '</td>';
+        html += '<td>' + ttime + '</td>';
+        html += '<td><strong>' + salnum + '</strong></td>';
+        html += '<td>' + name + '</td>';
+        html += '<td>' + sumqty + '</td>';
+        html += '<td>' + txtto + '</td>';
+        html += '<td>' + adminrmk + '</td>';
+        html += '<td style="white-space:nowrap">';
+        html += '<a href="order_detail.php?salnum=' + salnum + '" class="btn-action btn-view"><i class="fas fa-eye"></i> View</a>';
+        html += '<button type="button" onclick="donebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-done"><i class="fas fa-check"></i> Done</button>';
+        html += '<button type="button" onclick="editbtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-success-action"><i class="fas fa-dollar-sign"></i> Success</button>';
+        html += '<button type="button" onclick="deletebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-delete"><i class="fas fa-trash"></i> Delete</button>';
+        html += '</td></tr>';
+    }
+
+    tbody.innerHTML = html;
+    document.getElementById('orderCount').textContent = visibleCount + ' order(s)';
+}
+
+function updateBadge(count) {
+    var badge = document.getElementById('notifBadge');
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    var parts = dateStr.split('-');
+    if (parts.length === 3) return parts[2] + '/' + parts[1] + '/' + parts[0];
+    return escHtml(dateStr);
+}
+
+// ===================== VISIBILITY API =====================
+
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    } else {
+        // Tab visible again: poll immediately then restart
+        doPoll();
+        startPolling();
+    }
+});
+
+// ===================== MODAL TRACKING =====================
+
+$('#editModal').on('show.bs.modal', function() { modalOpen = true; });
+$('#editModal').on('hidden.bs.modal', function() { modalOpen = false; });
+
+// ===================== SEARCH FILTER =====================
+
 document.getElementById('searchInput').addEventListener('input', function() {
     var query = this.value.toLowerCase();
     var rows = document.querySelectorAll('#ordersBody tr:not(.no-results)');
     var visibleCount = 0;
 
     rows.forEach(function(row) {
-        var searchData = row.getAttribute('data-search') || '';
-        if (searchData.indexOf(query) > -1) {
+        var salnum = row.getAttribute('data-salnum') || '';
+        var text = row.textContent.toLowerCase();
+        if (!query || text.indexOf(query) > -1) {
             row.style.display = '';
             visibleCount++;
         } else {
@@ -485,6 +714,23 @@ document.getElementById('searchInput').addEventListener('input', function() {
         }
     });
 });
+
+// ===================== NOTIFICATION ACKNOWLEDGE =====================
+
+function acknowledgeOrders() {
+    $.ajax({
+        type: 'POST',
+        url: 'admin_ajax.php',
+        data: { action: 'noted' },
+        dataType: 'json',
+        success: function() {
+            updateBadge(0);
+            Swal.fire({ icon: 'success', text: 'All notifications acknowledged', timer: 1200, showConfirmButton: false });
+        }
+    });
+}
+
+// ===================== ORDER ACTIONS =====================
 
 // Edit/Success modal
 function editbtn(id) {
@@ -539,7 +785,8 @@ function donebtn(id) {
                 data: { id: id, action: "done" },
                 success: function(data) {
                     if (data.trim() === 'Saved.') {
-                        Swal.fire({ icon: 'success', text: 'Marked as Done', timer: 1500, showConfirmButton: false }).then(function() { location.reload(); });
+                        Swal.fire({ icon: 'success', text: 'Marked as Done', timer: 1500, showConfirmButton: false });
+                        doPoll(); // Refresh table without full reload
                     } else {
                         Swal.fire({ icon: 'error', title: 'Error', text: data });
                     }
@@ -567,7 +814,8 @@ function deletebtn(id) {
                 data: { id: id, action: "delete" },
                 success: function(data) {
                     if (data.trim() === 'Deleted.') {
-                        Swal.fire({ icon: 'success', text: 'Order Deleted', timer: 1500, showConfirmButton: false }).then(function() { location.reload(); });
+                        Swal.fire({ icon: 'success', text: 'Order Deleted', timer: 1500, showConfirmButton: false });
+                        doPoll(); // Refresh table without full reload
                     } else {
                         Swal.fire({ icon: 'error', title: 'Error', text: data });
                     }
@@ -589,13 +837,24 @@ function successbtn() {
         data: { remark: remark, rowtransno: rowtransno, pid: pid, action: "success" },
         success: function(value) {
             if (value.trim() === "Saved.") {
-                Swal.fire({ icon: 'success', text: 'Payment Saved', timer: 1500, showConfirmButton: false }).then(function() { location.reload(); });
+                $('#editModal').modal('hide');
+                Swal.fire({ icon: 'success', text: 'Payment Saved', timer: 1500, showConfirmButton: false });
+                doPoll(); // Refresh table without full reload
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: value });
             }
         }
     });
 }
+
+function escHtml(s) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s || ''));
+    return d.innerHTML;
+}
+
+// ===================== INIT =====================
+startPolling();
 </script>
 
 </body>
