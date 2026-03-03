@@ -4,6 +4,7 @@
 $sidebarSections = [
     'MAIN' => [
         ['page' => 'dashboard',      'href' => 'dashboard.php',        'icon' => 'fas fa-list-alt',             'label' => 'Orders'],
+        ['page' => 'cat_group',      'href' => 'cat_group.php',        'icon' => 'fas fa-layer-group',          'label' => 'Category Groups'],
         ['page' => 'product',        'href' => 'product.php',          'icon' => 'fas fa-boxes-stacked',        'label' => 'Products'],
         ['page' => 'product_trend',  'href' => 'product_trend.php',    'icon' => 'fas fa-chart-line',           'label' => 'Product Trends'],
     ],

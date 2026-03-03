@@ -101,6 +101,8 @@ if ($action === 'list') {
     $description = trim($_POST['description'] ?? '');
     $cat = trim($_POST['cat'] ?? '');
     $sub_cat = trim($_POST['sub_cat'] ?? '');
+    $cat_code = trim($_POST['cat_code'] ?? '');
+    $sub_code = trim($_POST['sub_code'] ?? '');
     $uom = trim($_POST['uom'] ?? '');
     $rack = trim($_POST['rack'] ?? '');
     $qoh = floatval($_POST['qoh'] ?? 0);
@@ -122,8 +124,8 @@ if ($action === 'list') {
     }
     $chk->close();
 
-    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`uom`,`rack`,`qoh`,`checked`) VALUES (?,?,?,?,?,?,?,?,?,?)");
-    $stmt->bind_param("ssssssssds", $barcode, $code, $name, $description, $cat, $sub_cat, $uom, $rack, $qoh, $checked);
+    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`cat_code`,`sub_code`,`uom`,`rack`,`qoh`,`checked`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+    $stmt->bind_param("ssssssssssds", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $qoh, $checked);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Product created successfully.']);
@@ -140,6 +142,8 @@ if ($action === 'list') {
     $description = trim($_POST['description'] ?? '');
     $cat = trim($_POST['cat'] ?? '');
     $sub_cat = trim($_POST['sub_cat'] ?? '');
+    $cat_code = trim($_POST['cat_code'] ?? '');
+    $sub_code = trim($_POST['sub_code'] ?? '');
     $uom = trim($_POST['uom'] ?? '');
     $rack = trim($_POST['rack'] ?? '');
     $qoh = floatval($_POST['qoh'] ?? 0);
@@ -150,8 +154,8 @@ if ($action === 'list') {
         exit;
     }
 
-    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`uom`=?,`rack`=?,`qoh`=?,`checked`=? WHERE `id`=?");
-    $stmt->bind_param("ssssssssdsi", $barcode, $code, $name, $description, $cat, $sub_cat, $uom, $rack, $qoh, $checked, $id);
+    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`cat_code`=?,`sub_code`=?,`uom`=?,`rack`=?,`qoh`=?,`checked`=? WHERE `id`=?");
+    $stmt->bind_param("ssssssssssdsi", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $qoh, $checked, $id);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Product updated successfully.']);
@@ -177,11 +181,12 @@ if ($action === 'list') {
     }
     $stmt->close();
 
-// ===================== CATEGORY ACTIONS =====================
+// ===================== CATEGORY ACTIONS (uses cat_group table) =====================
 
 } elseif ($action === 'cat_list') {
+    // Returns cat_group entries as the category list for product form
     $rows = [];
-    $result = $connect->query("SELECT `id`, `name`, `status` FROM `product_category` ORDER BY `name` ASC");
+    $result = $connect->query("SELECT `id`, `ccode`, `cat_name` AS `name`, COALESCE(`status`, 'ACTIVE') AS `status` FROM `cat_group` ORDER BY `sort_no` ASC, `cat_name` ASC");
     if ($result) {
         while ($r = $result->fetch_assoc()) {
             $rows[] = $r;
@@ -192,16 +197,19 @@ if ($action === 'list') {
 } elseif ($action === 'cat_create') {
     $name = trim($_POST['name'] ?? '');
     if ($name === '') { echo json_encode(['error' => 'Name is required.']); exit; }
-    $stmt = $connect->prepare("INSERT INTO `product_category` (`name`) VALUES (?)");
-    $stmt->bind_param("s", $name);
+    // Auto-assign next ccode
+    $maxRes = $connect->query("SELECT MAX(CAST(`ccode` AS UNSIGNED)) AS mx FROM `cat_group`");
+    $maxCode = 1;
+    if ($maxRes && $row = $maxRes->fetch_assoc()) {
+        $maxCode = intval($row['mx']) + 1;
+    }
+    $ccode = (string)$maxCode;
+    $stmt = $connect->prepare("INSERT INTO `cat_group` (`ccode`,`cat_name`,`cat_img`,`main_page`,`sort_no`) VALUES (?,?,'','',0)");
+    $stmt->bind_param("ss", $ccode, $name);
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Category created.', 'id' => $stmt->insert_id]);
     } else {
-        if (strpos($connect->error, 'Duplicate') !== false) {
-            echo json_encode(['error' => 'Category already exists.']);
-        } else {
-            echo json_encode(['error' => 'Failed: ' . $connect->error]);
-        }
+        echo json_encode(['error' => 'Failed: ' . $connect->error]);
     }
     $stmt->close();
 
@@ -209,23 +217,39 @@ if ($action === 'list') {
     $id = intval($_POST['id'] ?? 0);
     $name = trim($_POST['name'] ?? '');
     if ($id <= 0 || $name === '') { echo json_encode(['error' => 'Invalid data.']); exit; }
-    $stmt = $connect->prepare("UPDATE `product_category` SET `name`=? WHERE `id`=?");
+    // Get current ccode to update category table too
+    $cur = $connect->prepare("SELECT `ccode` FROM `cat_group` WHERE `id`=?");
+    $cur->bind_param("i", $id);
+    $cur->execute();
+    $curRow = $cur->get_result()->fetch_assoc();
+    $cur->close();
+    $ccode = $curRow ? $curRow['ccode'] : '';
+
+    $stmt = $connect->prepare("UPDATE `cat_group` SET `cat_name`=? WHERE `id`=?");
     $stmt->bind_param("si", $name, $id);
     if ($stmt->execute()) {
+        // Sync cat_name in category table
+        if ($ccode !== '') {
+            $upd = $connect->prepare("UPDATE `category` SET `cat_name`=? WHERE `cat_code`=?");
+            $upd->bind_param("ss", $name, $ccode);
+            $upd->execute();
+            $upd->close();
+        }
         echo json_encode(['success' => 'Category updated.']);
     } else {
-        if (strpos($connect->error, 'Duplicate') !== false) {
-            echo json_encode(['error' => 'Category name already exists.']);
-        } else {
-            echo json_encode(['error' => 'Failed: ' . $connect->error]);
-        }
+        echo json_encode(['error' => 'Failed: ' . $connect->error]);
     }
     $stmt->close();
 
 } elseif ($action === 'cat_delete') {
     $id = intval($_POST['id'] ?? 0);
     if ($id <= 0) { echo json_encode(['error' => 'Invalid ID.']); exit; }
-    $stmt = $connect->prepare("UPDATE `product_category` SET `status`='INACTIVE' WHERE `id`=?");
+    // Ensure status column exists
+    $chkCol = $connect->query("SHOW COLUMNS FROM `cat_group` LIKE 'status'");
+    if ($chkCol && $chkCol->num_rows === 0) {
+        $connect->query("ALTER TABLE `cat_group` ADD COLUMN `status` ENUM('ACTIVE','INACTIVE') NOT NULL DEFAULT 'ACTIVE'");
+    }
+    $stmt = $connect->prepare("UPDATE `cat_group` SET `status`='INACTIVE' WHERE `id`=?");
     $stmt->bind_param("i", $id);
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Category deactivated.']);
@@ -237,7 +261,11 @@ if ($action === 'list') {
 } elseif ($action === 'cat_activate') {
     $id = intval($_POST['id'] ?? 0);
     if ($id <= 0) { echo json_encode(['error' => 'Invalid ID.']); exit; }
-    $stmt = $connect->prepare("UPDATE `product_category` SET `status`='ACTIVE' WHERE `id`=?");
+    $chkCol = $connect->query("SHOW COLUMNS FROM `cat_group` LIKE 'status'");
+    if ($chkCol && $chkCol->num_rows === 0) {
+        $connect->query("ALTER TABLE `cat_group` ADD COLUMN `status` ENUM('ACTIVE','INACTIVE') NOT NULL DEFAULT 'ACTIVE'");
+    }
+    $stmt = $connect->prepare("UPDATE `cat_group` SET `status`='ACTIVE' WHERE `id`=?");
     $stmt->bind_param("i", $id);
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Category activated.']);
@@ -246,22 +274,31 @@ if ($action === 'list') {
     }
     $stmt->close();
 
-// ===================== SUB CATEGORY ACTIONS =====================
+// ===================== SUB CATEGORY ACTIONS (uses category table) =====================
 
 } elseif ($action === 'subcat_list') {
-    $catId = intval($_POST['category_id'] ?? 0);
+    $catGroupId = intval($_POST['category_id'] ?? 0);
     $rows = [];
-    if ($catId > 0) {
-        $stmt = $connect->prepare("SELECT `id`, `category_id`, `name`, `status` FROM `product_sub_category` WHERE `category_id`=? ORDER BY `name` ASC");
-        $stmt->bind_param("i", $catId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($r = $result->fetch_assoc()) {
-            $rows[] = $r;
+    if ($catGroupId > 0) {
+        // Get ccode from cat_group id
+        $cg = $connect->prepare("SELECT `ccode` FROM `cat_group` WHERE `id`=?");
+        $cg->bind_param("i", $catGroupId);
+        $cg->execute();
+        $cgRow = $cg->get_result()->fetch_assoc();
+        $cg->close();
+        if ($cgRow) {
+            $stmt = $connect->prepare("SELECT `id`, `cat_code` AS `category_id`, `sub_cat` AS `name`, `sub_code`, 'ACTIVE' AS `status` FROM `category` WHERE `cat_code`=? ORDER BY `sort_no` ASC, `sub_cat` ASC");
+            $stmt->bind_param("s", $cgRow['ccode']);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($r = $result->fetch_assoc()) {
+                $rows[] = $r;
+            }
+            $stmt->close();
         }
-        $stmt->close();
     } else {
-        $result = $connect->query("SELECT s.`id`, s.`category_id`, s.`name`, s.`status`, c.`name` AS `cat_name` FROM `product_sub_category` s LEFT JOIN `product_category` c ON s.`category_id`=c.`id` ORDER BY c.`name`, s.`name` ASC");
+        // List all sub categories with parent name
+        $result = $connect->query("SELECT c.`id`, c.`cat_code` AS `category_id`, c.`sub_cat` AS `name`, c.`sub_code`, c.`cat_name` AS `cat_name`, 'ACTIVE' AS `status` FROM `category` c ORDER BY c.`cat_name` ASC, c.`sort_no` ASC, c.`sub_cat` ASC");
         if ($result) {
             while ($r = $result->fetch_assoc()) {
                 $rows[] = $r;
@@ -271,63 +308,91 @@ if ($action === 'list') {
     echo json_encode($rows);
 
 } elseif ($action === 'subcat_create') {
-    $catId = intval($_POST['category_id'] ?? 0);
+    $catGroupId = intval($_POST['category_id'] ?? 0);
     $name = trim($_POST['name'] ?? '');
-    if ($catId <= 0 || $name === '') { echo json_encode(['error' => 'Category and name are required.']); exit; }
-    $stmt = $connect->prepare("INSERT INTO `product_sub_category` (`category_id`,`name`) VALUES (?,?)");
-    $stmt->bind_param("is", $catId, $name);
+    if ($catGroupId <= 0 || $name === '') { echo json_encode(['error' => 'Category and name are required.']); exit; }
+
+    // Get cat_group info
+    $cg = $connect->prepare("SELECT `ccode`, `cat_name` FROM `cat_group` WHERE `id`=?");
+    $cg->bind_param("i", $catGroupId);
+    $cg->execute();
+    $cgRow = $cg->get_result()->fetch_assoc();
+    $cg->close();
+    if (!$cgRow) { echo json_encode(['error' => 'Category group not found.']); exit; }
+
+    // Get next sub_code for this cat_code
+    $maxSub = $connect->prepare("SELECT MAX(CAST(`sub_code` AS UNSIGNED)) AS mx FROM `category` WHERE `cat_code`=?");
+    $maxSub->bind_param("s", $cgRow['ccode']);
+    $maxSub->execute();
+    $maxRow = $maxSub->get_result()->fetch_assoc();
+    $maxSub->close();
+    $nextSub = ($maxRow && $maxRow['mx']) ? intval($maxRow['mx']) + 1 : 1;
+    $sub_code = (string)$nextSub;
+    $ccode = $cgRow['ccode'] . $sub_code;
+
+    // Get next sort_no
+    $maxSort = $connect->prepare("SELECT MAX(`sort_no`) AS mx FROM `category` WHERE `cat_code`=?");
+    $maxSort->bind_param("s", $cgRow['ccode']);
+    $maxSort->execute();
+    $sortRow = $maxSort->get_result()->fetch_assoc();
+    $maxSort->close();
+    $nextSort = ($sortRow && $sortRow['mx']) ? intval($sortRow['mx']) + 1 : 1;
+
+    $stmt = $connect->prepare("INSERT INTO `category` (`cat_code`,`sub_code`,`ccode`,`cat_name`,`sub_cat`,`sort_no`) VALUES (?,?,?,?,?,?)");
+    $stmt->bind_param("sssssi", $cgRow['ccode'], $sub_code, $ccode, $cgRow['cat_name'], $name, $nextSort);
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Sub category created.', 'id' => $stmt->insert_id]);
     } else {
-        if (strpos($connect->error, 'Duplicate') !== false) {
-            echo json_encode(['error' => 'Sub category already exists under this category.']);
-        } else {
-            echo json_encode(['error' => 'Failed: ' . $connect->error]);
-        }
+        echo json_encode(['error' => 'Failed: ' . $connect->error]);
     }
     $stmt->close();
 
 } elseif ($action === 'subcat_update') {
     $id = intval($_POST['id'] ?? 0);
-    $catId = intval($_POST['category_id'] ?? 0);
     $name = trim($_POST['name'] ?? '');
-    if ($id <= 0 || $catId <= 0 || $name === '') { echo json_encode(['error' => 'Invalid data.']); exit; }
-    $stmt = $connect->prepare("UPDATE `product_sub_category` SET `category_id`=?,`name`=? WHERE `id`=?");
-    $stmt->bind_param("isi", $catId, $name, $id);
+    if ($id <= 0 || $name === '') { echo json_encode(['error' => 'Invalid data.']); exit; }
+    $stmt = $connect->prepare("UPDATE `category` SET `sub_cat`=? WHERE `id`=?");
+    $stmt->bind_param("si", $name, $id);
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Sub category updated.']);
     } else {
-        if (strpos($connect->error, 'Duplicate') !== false) {
-            echo json_encode(['error' => 'Sub category name already exists under this category.']);
-        } else {
-            echo json_encode(['error' => 'Failed: ' . $connect->error]);
-        }
+        echo json_encode(['error' => 'Failed: ' . $connect->error]);
     }
     $stmt->close();
 
 } elseif ($action === 'subcat_delete') {
     $id = intval($_POST['id'] ?? 0);
     if ($id <= 0) { echo json_encode(['error' => 'Invalid ID.']); exit; }
-    $stmt = $connect->prepare("UPDATE `product_sub_category` SET `status`='INACTIVE' WHERE `id`=?");
+    // Soft delete not available on category table - we delete the row
+    // But first check if products reference this sub_cat
+    $chk = $connect->prepare("SELECT c.`cat_code`, c.`sub_code` FROM `category` c WHERE c.`id`=?");
+    $chk->bind_param("i", $id);
+    $chk->execute();
+    $catRow = $chk->get_result()->fetch_assoc();
+    $chk->close();
+    if ($catRow) {
+        $pChk = $connect->prepare("SELECT COUNT(*) AS cnt FROM `PRODUCTS` WHERE `cat_code`=? AND `sub_code`=?");
+        $pChk->bind_param("ss", $catRow['cat_code'], $catRow['sub_code']);
+        $pChk->execute();
+        $pCount = $pChk->get_result()->fetch_assoc()['cnt'];
+        $pChk->close();
+        if ($pCount > 0) {
+            echo json_encode(['error' => 'Cannot delete: ' . $pCount . ' product(s) use this sub category.']);
+            exit;
+        }
+    }
+    $stmt = $connect->prepare("DELETE FROM `category` WHERE `id`=?");
     $stmt->bind_param("i", $id);
     if ($stmt->execute()) {
-        echo json_encode(['success' => 'Sub category deactivated.']);
+        echo json_encode(['success' => 'Sub category deleted.']);
     } else {
         echo json_encode(['error' => 'Failed: ' . $connect->error]);
     }
     $stmt->close();
 
 } elseif ($action === 'subcat_activate') {
-    $id = intval($_POST['id'] ?? 0);
-    if ($id <= 0) { echo json_encode(['error' => 'Invalid ID.']); exit; }
-    $stmt = $connect->prepare("UPDATE `product_sub_category` SET `status`='ACTIVE' WHERE `id`=?");
-    $stmt->bind_param("i", $id);
-    if ($stmt->execute()) {
-        echo json_encode(['success' => 'Sub category activated.']);
-    } else {
-        echo json_encode(['error' => 'Failed: ' . $connect->error]);
-    }
-    $stmt->close();
+    // category table has no status column, so this is a no-op kept for compatibility
+    echo json_encode(['success' => 'Sub category is active.']);
 
 // ===================== UOM ACTIONS =====================
 
