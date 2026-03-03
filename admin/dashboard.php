@@ -145,16 +145,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 }
 .order-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
 
-/* New-order highlight */
-.order-card.card-new {
-    animation: cardHighlight 2.5s ease-out;
-}
+.order-card.card-new { animation: cardHighlight 2.5s ease-out; }
 @keyframes cardHighlight {
     0% { box-shadow: 0 0 0 3px rgba(200,16,46,0.5), var(--shadow-md); }
     100% { box-shadow: var(--shadow-md); }
 }
 
-/* Card header strip */
 .card-header-strip {
     background: var(--text);
     color: #fff;
@@ -176,7 +172,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     white-space: nowrap;
 }
 
-/* Card body */
 .card-body-content {
     padding: 14px 16px;
     flex: 1;
@@ -226,7 +221,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     border-radius: 6px;
 }
 
-/* Card footer with actions */
 .card-footer-actions {
     padding: 10px 16px;
     border-top: 1px solid #f0f1f3;
@@ -260,7 +254,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-card.c-pay  { background: #22c55e; }
 .btn-card.c-del  { background: #ef4444; }
 
-/* Empty state */
 .empty-state {
     text-align: center;
     padding: 60px 20px;

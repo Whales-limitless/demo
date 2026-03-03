@@ -93,5 +93,43 @@ if ($action === "done") {
     } else {
         echo "Error: Order not found.";
     }
+
+// ===================== LIVE POLL (AJAX) =====================
+} elseif ($action === "poll") {
+    header('Content-Type: application/json; charset=utf-8');
+
+    // Rebuild orderlist2 summary
+    $connect->query("TRUNCATE TABLE `orderlist2`");
+    $connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
+    $connect->query("UPDATE orderlist2 AS b INNER JOIN MEMBER AS g ON b.ACCODE = g.ACCODE SET b.HP = g.HP");
+
+    // Fetch orders
+    $orders = [];
+    $orderResult = $connect->query("SELECT * FROM `orderlist2` ORDER BY SALNUM DESC");
+    if ($orderResult) {
+        while ($r = $orderResult->fetch_assoc()) {
+            $orders[] = $r;
+        }
+    }
+
+    // Count new (unacknowledged) orders
+    $newCount = 0;
+    $q = $connect->query("SELECT COUNT(DISTINCT SALNUM) as cnt FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND SOUND = '0'");
+    if ($q && $row = $q->fetch_assoc()) {
+        $newCount = (int)$row['cnt'];
+    }
+
+    echo json_encode([
+        'orders' => $orders,
+        'new_count' => $newCount,
+        'total' => count($orders),
+        'ts' => time()
+    ]);
+
+// ===================== ACKNOWLEDGE SOUND =====================
+} elseif ($action === "noted") {
+    header('Content-Type: application/json; charset=utf-8');
+    $connect->query("UPDATE `orderlist` SET SOUND = '1' WHERE SOUND = '0'");
+    echo json_encode(['success' => true]);
 }
 ?>
