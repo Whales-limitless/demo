@@ -10,7 +10,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 include('../staff/dbconnection.php');
 $connect->set_charset("utf8mb4");
 
-// Ensure orderlist2 summary table exists
 $connect->query("CREATE TABLE IF NOT EXISTS `orderlist2` (
   `ID` int(11) NOT NULL AUTO_INCREMENT,
   `SALNUM` varchar(100) NOT NULL DEFAULT '',
@@ -25,17 +24,14 @@ $connect->query("CREATE TABLE IF NOT EXISTS `orderlist2` (
   PRIMARY KEY (`ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-// Build initial orderlist2
 $connect->query("TRUNCATE TABLE `orderlist2`");
 $connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
 $connect->query("UPDATE orderlist2 AS b INNER JOIN MEMBER AS g ON b.ACCODE = g.ACCODE SET b.HP = g.HP");
 
-// Count new orders
 $newOrderCount = 0;
 $q = $connect->query("SELECT COUNT(DISTINCT SALNUM) as cnt FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND SOUND = '0'");
 if ($q && $row = $q->fetch_assoc()) $newOrderCount = (int)$row['cnt'];
 
-// Fetch orders
 $orders = [];
 $orderResult = $connect->query("SELECT * FROM `orderlist2` ORDER BY SALNUM DESC");
 if ($orderResult) { while ($r = $orderResult->fetch_assoc()) $orders[] = $r; }
@@ -61,20 +57,16 @@ $currentPage = 'dashboard';
     --bg: #f3f4f6;
     --text: #1a1a1a;
     --text-muted: #6b7280;
-    --radius: 14px;
-    --radius-sm: 10px;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+    --radius: 12px;
     --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
-    --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
     --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; margin: 0; }
 
-/* ── Layout ── */
 .dashboard-content { max-width: 1400px; margin: 0 auto; padding: 20px 24px 40px; }
 
-/* ── Status Bar ── */
+/* Status Bar */
 .status-bar {
     display: flex; align-items: center; justify-content: space-between;
     flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
@@ -88,11 +80,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     50% { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
 }
 .countdown-label { color: var(--text-muted); font-size: 13px; }
-
 .status-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .sound-toggle {
-    background: #6b7280; color: #fff; border: none; padding: 9px 14px; border-radius: var(--radius-sm);
+    background: #6b7280; color: #fff; border: none; padding: 9px 14px; border-radius: 10px;
     font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: background var(--transition);
 }
 .sound-toggle:hover { background: #4b5563; }
@@ -101,7 +92,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 .notification-btn {
     position: relative; background: var(--primary); color: #fff; border: none; padding: 9px 20px;
-    border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
     cursor: pointer; transition: background var(--transition);
 }
 .notification-btn:hover { background: var(--primary-dark); }
@@ -111,157 +102,62 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     display: flex; align-items: center; justify-content: center; padding: 0 5px;
 }
 
-/* ── Toolbar ── */
-.toolbar {
+/* Table Card */
+.table-card {
+    background: var(--surface); border-radius: var(--radius);
+    box-shadow: var(--shadow-md); padding: 20px; overflow: hidden;
+}
+.table-toolbar {
     display: flex; align-items: center; justify-content: space-between;
     gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
 }
-.search-box { position: relative; flex: 1; max-width: 360px; min-width: 180px; }
+.search-box { position: relative; flex: 1; max-width: 360px; }
 .search-box input {
-    width: 100%; padding: 10px 14px 10px 38px; border: 1px solid #d1d5db; border-radius: 10px;
+    width: 100%; padding: 9px 14px 9px 36px; border: 1px solid #d1d5db; border-radius: 8px;
     font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color var(--transition);
-    background: var(--surface);
 }
 .search-box input:focus { border-color: var(--primary); }
-.search-box i { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; }
-.order-count { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; }
+.order-count { font-size: 13px; color: var(--text-muted); }
 
-/* ── Order Cards Grid ── */
-.order-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 14px;
+/* Table */
+.orders-table {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    font-size: 13px; border-radius: var(--radius); overflow: hidden;
 }
+.orders-table thead th {
+    background: var(--text); color: #fff; font-weight: 600; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 12px 14px;
+    white-space: nowrap; text-align: left;
+}
+.orders-table thead th:first-child { border-top-left-radius: var(--radius); }
+.orders-table thead th:last-child { border-top-right-radius: var(--radius); }
+.orders-table tbody td {
+    padding: 11px 14px; vertical-align: middle; border-bottom: 1px solid #f0f1f3;
+}
+.orders-table tbody tr:hover { background: #f9fafb; }
+.orders-table tbody tr:last-child td { border-bottom: none; }
+.orders-table tbody tr.no-results td { text-align: center; padding: 40px; color: var(--text-muted); }
 
-/* ── Order Card ── */
-.order-card {
-    background: var(--surface);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-md);
-    overflow: hidden;
-    transition: transform var(--transition), box-shadow var(--transition);
-    display: flex;
-    flex-direction: column;
-}
-.order-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
-
-.order-card.card-new { animation: cardHighlight 2.5s ease-out; }
-@keyframes cardHighlight {
-    0% { box-shadow: 0 0 0 3px rgba(200,16,46,0.5), var(--shadow-md); }
-    100% { box-shadow: var(--shadow-md); }
-}
-
-.card-header-strip {
-    background: var(--text);
-    color: #fff;
-    padding: 10px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-.card-header-strip .order-num {
-    font-family: 'Outfit', sans-serif;
-    font-weight: 700;
-    font-size: 15px;
-    letter-spacing: 0.02em;
-}
-.card-header-strip .order-date {
-    font-size: 12px;
-    opacity: 0.8;
-    white-space: nowrap;
+/* New row highlight */
+.orders-table tbody tr.row-new { animation: highlightNew 2.5s ease-out; }
+@keyframes highlightNew {
+    0% { background: #fef3c7; }
+    100% { background: transparent; }
 }
 
-.card-body-content {
-    padding: 14px 16px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+/* Action Buttons */
+.btn-action {
+    padding: 5px 12px; border: none; border-radius: 6px;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all var(--transition); display: inline-block;
+    margin: 1px; text-decoration: none; color: #fff;
 }
-
-.card-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    font-size: 13px;
-    line-height: 1.4;
-}
-.card-row .row-icon {
-    color: var(--text-muted);
-    width: 16px;
-    text-align: center;
-    flex-shrink: 0;
-    margin-top: 2px;
-    font-size: 12px;
-}
-.card-row .row-label {
-    color: var(--text-muted);
-    min-width: 50px;
-    flex-shrink: 0;
-    font-weight: 500;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-.card-row .row-value {
-    flex: 1;
-    word-break: break-word;
-}
-
-.qty-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: #dbeafe;
-    color: #1d4ed8;
-    font-weight: 700;
-    font-size: 12px;
-    padding: 2px 10px;
-    border-radius: 6px;
-}
-
-.card-footer-actions {
-    padding: 10px 16px;
-    border-top: 1px solid #f0f1f3;
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.btn-card {
-    flex: 1;
-    min-width: 0;
-    padding: 8px 6px;
-    border: none;
-    border-radius: 8px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all var(--transition);
-    text-decoration: none;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    white-space: nowrap;
-}
-.btn-card:hover { opacity: 0.9; color: #fff; }
-.btn-card.c-view { background: #6b7280; }
-.btn-card.c-done { background: #3b82f6; }
-.btn-card.c-pay  { background: #22c55e; }
-.btn-card.c-del  { background: #ef4444; }
-
-.empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--text-muted);
-    grid-column: 1 / -1;
-}
-.empty-state i { font-size: 36px; margin-bottom: 12px; display: block; }
-.empty-state p { font-size: 15px; }
+.btn-action:hover { opacity: 0.85; color: #fff; }
+.btn-view { background: #6b7280; }
+.btn-done { background: #3b82f6; }
+.btn-success-action { background: #22c55e; }
+.btn-delete { background: #ef4444; }
 
 /* Modal */
 .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
@@ -269,17 +165,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
 .modal-footer { border-top: 1px solid #e5e7eb; }
 
-/* ── Responsive ── */
 @media (max-width: 768px) {
-    .dashboard-content { padding: 14px; }
+    .dashboard-content { padding: 16px; }
     .status-bar { flex-direction: column; align-items: flex-start; }
-    .order-grid { grid-template-columns: 1fr; gap: 10px; }
+    .table-card { padding: 12px; }
     .search-box { max-width: 100%; }
-    .btn-card { font-size: 11px; padding: 7px 4px; }
-}
-
-@media (min-width: 769px) and (max-width: 1024px) {
-    .order-grid { grid-template-columns: repeat(2, 1fr); }
+    .btn-action { padding: 4px 8px; font-size: 11px; }
 }
 </style>
 </head>
@@ -307,72 +198,59 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         </div>
     </div>
 
-    <!-- Toolbar -->
-    <div class="toolbar">
-        <div class="search-box">
-            <i class="fas fa-search"></i>
-            <input type="text" id="searchInput" placeholder="Search orders...">
+    <!-- Orders Table -->
+    <div class="table-card">
+        <div class="table-toolbar">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Search orders...">
+            </div>
+            <div class="order-count" id="orderCount"><?php echo count($orders); ?> order(s)</div>
         </div>
-        <div class="order-count" id="orderCount"><?php echo count($orders); ?> order(s)</div>
-    </div>
 
-    <!-- Order Cards -->
-    <div class="order-grid" id="orderGrid">
-        <?php if (count($orders) === 0): ?>
-        <div class="empty-state">
-            <i class="fas fa-inbox"></i>
-            <p>No pending orders</p>
+        <div style="overflow-x:auto;">
+            <table class="orders-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px">No</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Order No</th>
+                        <th>Name</th>
+                        <th>Qty</th>
+                        <th>To / Remark</th>
+                        <th>Admin Remark</th>
+                        <th style="width:1%">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="ordersBody">
+                    <?php if (count($orders) === 0): ?>
+                    <tr class="no-results"><td colspan="9"><i class="fas fa-inbox" style="font-size:24px;margin-bottom:8px;display:block;"></i>No orders found</td></tr>
+                    <?php else: ?>
+                    <?php foreach ($orders as $i => $order):
+                        $salnum = htmlspecialchars($order['SALNUM'] ?? '');
+                    ?>
+                    <tr data-salnum="<?php echo $salnum; ?>">
+                        <td><?php echo $i + 1; ?></td>
+                        <td><?php echo !empty($order['SDATE']) ? date('d/m/Y', strtotime($order['SDATE'])) : ''; ?></td>
+                        <td><?php echo htmlspecialchars($order['TTIME'] ?? ''); ?></td>
+                        <td><strong><?php echo $salnum; ?></strong></td>
+                        <td><?php echo htmlspecialchars($order['NAME'] ?? ''); ?></td>
+                        <td><?php echo htmlspecialchars($order['SUMQTY'] ?? '0'); ?></td>
+                        <td><?php echo htmlspecialchars($order['TXTTO'] ?? ''); ?></td>
+                        <td><?php echo htmlspecialchars($order['ADMINRMK'] ?? ''); ?></td>
+                        <td style="white-space:nowrap">
+                            <a href="order_detail.php?salnum=<?php echo $salnum; ?>" class="btn-action btn-view"><i class="fas fa-eye"></i></a>
+                            <button type="button" onclick="donebtn('<?php echo $salnum; ?>');" class="btn-action btn-done"><i class="fas fa-check"></i></button>
+                            <button type="button" onclick="editbtn('<?php echo $salnum; ?>');" class="btn-action btn-success-action"><i class="fas fa-dollar-sign"></i></button>
+                            <button type="button" onclick="deletebtn('<?php echo $salnum; ?>');" class="btn-action btn-delete"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
-        <?php else: ?>
-        <?php foreach ($orders as $order):
-            $salnum = htmlspecialchars($order['SALNUM'] ?? '');
-            $name   = htmlspecialchars($order['NAME'] ?? '');
-            $sdate  = !empty($order['SDATE']) ? date('d/m/Y', strtotime($order['SDATE'])) : '';
-            $ttime  = htmlspecialchars($order['TTIME'] ?? '');
-            $qty    = htmlspecialchars($order['SUMQTY'] ?? '0');
-            $txtto  = htmlspecialchars($order['TXTTO'] ?? '');
-            $rmk    = htmlspecialchars($order['ADMINRMK'] ?? '');
-        ?>
-        <div class="order-card" data-salnum="<?php echo $salnum; ?>">
-            <div class="card-header-strip">
-                <span class="order-num">#<?php echo $salnum; ?></span>
-                <span class="order-date"><i class="far fa-calendar-alt"></i> <?php echo $sdate; ?> <?php echo $ttime; ?></span>
-            </div>
-            <div class="card-body-content">
-                <div class="card-row">
-                    <span class="row-icon"><i class="fas fa-user"></i></span>
-                    <span class="row-label">Name</span>
-                    <span class="row-value"><strong><?php echo $name; ?></strong></span>
-                </div>
-                <div class="card-row">
-                    <span class="row-icon"><i class="fas fa-boxes-stacked"></i></span>
-                    <span class="row-label">Qty</span>
-                    <span class="row-value"><span class="qty-badge"><?php echo $qty; ?></span></span>
-                </div>
-                <?php if ($txtto !== ''): ?>
-                <div class="card-row">
-                    <span class="row-icon"><i class="fas fa-truck"></i></span>
-                    <span class="row-label">To</span>
-                    <span class="row-value"><?php echo $txtto; ?></span>
-                </div>
-                <?php endif; ?>
-                <?php if ($rmk !== ''): ?>
-                <div class="card-row">
-                    <span class="row-icon"><i class="fas fa-comment"></i></span>
-                    <span class="row-label">Remark</span>
-                    <span class="row-value"><?php echo $rmk; ?></span>
-                </div>
-                <?php endif; ?>
-            </div>
-            <div class="card-footer-actions">
-                <a href="order_detail.php?salnum=<?php echo $salnum; ?>" class="btn-card c-view"><i class="fas fa-eye"></i> View</a>
-                <button type="button" onclick="donebtn('<?php echo $salnum; ?>');" class="btn-card c-done"><i class="fas fa-check"></i> Done</button>
-                <button type="button" onclick="editbtn('<?php echo $salnum; ?>');" class="btn-card c-pay"><i class="fas fa-dollar-sign"></i> Pay</button>
-                <button type="button" onclick="deletebtn('<?php echo $salnum; ?>');" class="btn-card c-del"><i class="fas fa-trash"></i></button>
-            </div>
-        </div>
-        <?php endforeach; ?>
-        <?php endif; ?>
     </div>
 </div>
 
@@ -411,10 +289,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 <script>
 // =====================================================================
-// PRODUCTION-READY LIVE VIEW (Card UI)
+// PRODUCTION-READY LIVE VIEW (Table)
 // - AJAX polling every 15s (no page reload)
 // - Preserves search, scroll, modal state
-// - Web Audio API notification sound (browser-compliant)
+// - Web Audio API notification sound
 // - Exponential backoff on errors, auto-recovers
 // - Visibility API: pauses when tab hidden
 // =====================================================================
@@ -431,7 +309,6 @@ var audioCtx        = null;
 var notifBuffer     = null;
 var modalOpen       = false;
 
-// Seed known orders
 <?php foreach ($orders as $o): ?>
 knownSalnums['<?php echo addslashes($o['SALNUM'] ?? ''); ?>'] = true;
 <?php endforeach; ?>
@@ -505,13 +382,11 @@ function doPoll() {
             currentInterval = POLL_INTERVAL;
             dot.className = 'live-dot';
 
-            var orders = data.orders || [];
-            renderCards(orders);
+            renderTable(data.orders || []);
             updateBadge(data.new_count || 0);
 
-            // Detect new arrivals
             var hasNew = false;
-            orders.forEach(function(o) {
+            (data.orders || []).forEach(function(o) {
                 if (!knownSalnums[o.SALNUM]) { hasNew = true; knownSalnums[o.SALNUM] = true; }
             });
             if (hasNew && data.new_count > 0) playSound();
@@ -525,63 +400,56 @@ function doPoll() {
     });
 }
 
-// ── Render Cards ───────────────────────────────────────
+// ── Render Table ───────────────────────────────────────
 
-function renderCards(orders) {
-    var grid = document.getElementById('orderGrid');
+function renderTable(orders) {
+    var tbody = document.getElementById('ordersBody');
     var query = (document.getElementById('searchInput').value || '').toLowerCase();
 
     if (orders.length === 0) {
-        grid.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>No pending orders</p></div>';
+        tbody.innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-inbox" style="font-size:24px;margin-bottom:8px;display:block;"></i>No orders found</td></tr>';
         document.getElementById('orderCount').textContent = '0 order(s)';
         return;
     }
 
     var html = '';
-    var visible = 0;
+    var num = 0;
 
     for (var i = 0; i < orders.length; i++) {
         var o = orders[i];
-        var salnum = esc(o.SALNUM || '');
-        var name   = esc(o.NAME || '');
-        var sdate  = formatDate(o.SDATE);
-        var ttime  = esc(o.TTIME || '');
-        var qty    = esc((o.SUMQTY || '0') + '');
-        var txtto  = esc(o.TXTTO || '');
-        var rmk    = esc(o.ADMINRMK || '');
-        var isNew  = !knownSalnums[o.SALNUM];
+        var salnum  = esc(o.SALNUM || '');
+        var name    = esc(o.NAME || '');
+        var sdate   = formatDate(o.SDATE);
+        var ttime   = esc(o.TTIME || '');
+        var qty     = esc((o.SUMQTY || '0') + '');
+        var txtto   = esc(o.TXTTO || '');
+        var rmk     = esc(o.ADMINRMK || '');
+        var isNew   = !knownSalnums[o.SALNUM];
 
-        var search = ((o.SALNUM||'') + ' ' + (o.NAME||'') + ' ' + (o.TXTTO||'') + ' ' + (o.ADMINRMK||'') + ' ' + (o.SDATE||'')).toLowerCase();
-        var show = !query || search.indexOf(query) > -1;
-        if (show) visible++;
+        var searchStr = ((o.SALNUM||'') + ' ' + (o.NAME||'') + ' ' + (o.TXTTO||'') + ' ' + (o.ADMINRMK||'') + ' ' + (o.SDATE||'')).toLowerCase();
+        var show = !query || searchStr.indexOf(query) > -1;
 
-        html += '<div class="order-card' + (isNew ? ' card-new' : '') + '" data-salnum="' + salnum + '"' + (show ? '' : ' style="display:none;"') + '>';
+        if (show) num++;
 
-        // Header
-        html += '<div class="card-header-strip">';
-        html += '<span class="order-num">#' + salnum + '</span>';
-        html += '<span class="order-date"><i class="far fa-calendar-alt"></i> ' + sdate + ' ' + ttime + '</span>';
-        html += '</div>';
-
-        // Body
-        html += '<div class="card-body-content">';
-        html += '<div class="card-row"><span class="row-icon"><i class="fas fa-user"></i></span><span class="row-label">Name</span><span class="row-value"><strong>' + name + '</strong></span></div>';
-        html += '<div class="card-row"><span class="row-icon"><i class="fas fa-boxes-stacked"></i></span><span class="row-label">Qty</span><span class="row-value"><span class="qty-badge">' + qty + '</span></span></div>';
-        if (txtto) html += '<div class="card-row"><span class="row-icon"><i class="fas fa-truck"></i></span><span class="row-label">To</span><span class="row-value">' + txtto + '</span></div>';
-        if (rmk) html += '<div class="card-row"><span class="row-icon"><i class="fas fa-comment"></i></span><span class="row-label">Remark</span><span class="row-value">' + rmk + '</span></div>';
-        html += '</div>';
-
-        // Footer actions
-        html += '<div class="card-footer-actions">';
-        html += '<a href="order_detail.php?salnum=' + salnum + '" class="btn-card c-view"><i class="fas fa-eye"></i> View</a>';
-        html += '<button type="button" onclick="donebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-card c-done"><i class="fas fa-check"></i> Done</button>';
-        html += '<button type="button" onclick="editbtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-card c-pay"><i class="fas fa-dollar-sign"></i> Pay</button>';
-        html += '<button type="button" onclick="deletebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-card c-del"><i class="fas fa-trash"></i></button>';
-        html += '</div></div>';
+        html += '<tr data-salnum="' + salnum + '"' + (isNew ? ' class="row-new"' : '') + (show ? '' : ' style="display:none;"') + '>';
+        html += '<td>' + (show ? num : '') + '</td>';
+        html += '<td>' + sdate + '</td>';
+        html += '<td>' + ttime + '</td>';
+        html += '<td><strong>' + salnum + '</strong></td>';
+        html += '<td>' + name + '</td>';
+        html += '<td>' + qty + '</td>';
+        html += '<td>' + txtto + '</td>';
+        html += '<td>' + rmk + '</td>';
+        html += '<td style="white-space:nowrap">';
+        html += '<a href="order_detail.php?salnum=' + salnum + '" class="btn-action btn-view"><i class="fas fa-eye"></i></a>';
+        html += '<button type="button" onclick="donebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-done"><i class="fas fa-check"></i></button>';
+        html += '<button type="button" onclick="editbtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-success-action"><i class="fas fa-dollar-sign"></i></button>';
+        html += '<button type="button" onclick="deletebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-delete"><i class="fas fa-trash"></i></button>';
+        html += '</td></tr>';
     }
 
-    grid.innerHTML = html;
-    document.getElementById('orderCount').textContent = visible + ' order(s)';
+    tbody.innerHTML = html;
+    document.getElementById('orderCount').textContent = num + ' order(s)';
 }
 
 function updateBadge(count) {
@@ -618,14 +486,19 @@ $('#editModal').on('hidden.bs.modal', function() { modalOpen = false; });
 
 document.getElementById('searchInput').addEventListener('input', function() {
     var query = this.value.toLowerCase();
-    var cards = document.querySelectorAll('.order-card');
-    var visible = 0;
-    cards.forEach(function(card) {
-        var text = card.textContent.toLowerCase();
-        if (!query || text.indexOf(query) > -1) { card.style.display = ''; visible++; }
-        else { card.style.display = 'none'; }
+    var rows = document.querySelectorAll('#ordersBody tr:not(.no-results)');
+    var num = 0;
+    rows.forEach(function(row) {
+        var text = row.textContent.toLowerCase();
+        if (!query || text.indexOf(query) > -1) {
+            row.style.display = '';
+            num++;
+            row.cells[0].textContent = num;
+        } else {
+            row.style.display = 'none';
+        }
     });
-    document.getElementById('orderCount').textContent = visible + ' order(s)';
+    document.getElementById('orderCount').textContent = num + ' order(s)';
 });
 
 // ── Acknowledge ────────────────────────────────────────
