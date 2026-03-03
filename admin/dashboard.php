@@ -156,14 +156,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-action:hover { opacity: 0.85; color: #fff; }
 .btn-view { background: #6b7280; }
 .btn-done { background: #3b82f6; }
-.btn-success-action { background: #22c55e; }
 .btn-delete { background: #ef4444; }
-
-/* Modal */
-.modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
-.modal-header { border-bottom: 1px solid #e5e7eb; }
-.modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
-.modal-footer { border-top: 1px solid #e5e7eb; }
 
 @media (max-width: 768px) {
     .dashboard-content { padding: 16px; }
@@ -242,7 +235,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <td style="white-space:nowrap">
                             <a href="order_detail.php?salnum=<?php echo $salnum; ?>" class="btn-action btn-view"><i class="fas fa-eye"></i></a>
                             <button type="button" onclick="donebtn('<?php echo $salnum; ?>');" class="btn-action btn-done"><i class="fas fa-check"></i></button>
-                            <button type="button" onclick="editbtn('<?php echo $salnum; ?>');" class="btn-action btn-success-action"><i class="fas fa-dollar-sign"></i></button>
                             <button type="button" onclick="deletebtn('<?php echo $salnum; ?>');" class="btn-action btn-delete"><i class="fas fa-trash"></i></button>
                         </td>
                     </tr>
@@ -250,35 +242,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     <?php endif; ?>
                 </tbody>
             </table>
-        </div>
-    </div>
-</div>
-
-<!-- Edit/Success Modal -->
-<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-edit"></i> Update Order</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold" for="remark">Remark</label>
-                    <input type="text" id="remark" class="form-control" placeholder="Enter remark">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold" for="rowtransno">Transaction No</label>
-                    <input type="text" id="rowtransno" class="form-control" placeholder="Enter transaction number">
-                </div>
-                <input type="hidden" id="pid">
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success w-50" onclick="successbtn();">
-                    <i class="fas fa-check"></i> Save & Mark Payment
-                </button>
-            </div>
         </div>
     </div>
 </div>
@@ -307,7 +270,6 @@ var knownSalnums    = {};
 var soundEnabled    = false;
 var audioCtx        = null;
 var notifBuffer     = null;
-var modalOpen       = false;
 
 <?php foreach ($orders as $o): ?>
 knownSalnums['<?php echo addslashes($o['SALNUM'] ?? ''); ?>'] = true;
@@ -370,7 +332,6 @@ function updateCountdown() {
 }
 
 function doPoll() {
-    if (modalOpen) return;
     var dot = document.getElementById('liveDot');
     dot.className = 'live-dot polling';
 
@@ -443,7 +404,6 @@ function renderTable(orders) {
         html += '<td style="white-space:nowrap">';
         html += '<a href="order_detail.php?salnum=' + salnum + '" class="btn-action btn-view"><i class="fas fa-eye"></i></a>';
         html += '<button type="button" onclick="donebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-done"><i class="fas fa-check"></i></button>';
-        html += '<button type="button" onclick="editbtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-success-action"><i class="fas fa-dollar-sign"></i></button>';
         html += '<button type="button" onclick="deletebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-delete"><i class="fas fa-trash"></i></button>';
         html += '</td></tr>';
     }
@@ -477,11 +437,6 @@ document.addEventListener('visibilitychange', function() {
     else { doPoll(); startPolling(); }
 });
 
-// ── Modal tracking ─────────────────────────────────────
-
-$('#editModal').on('show.bs.modal', function() { modalOpen = true; });
-$('#editModal').on('hidden.bs.modal', function() { modalOpen = false; });
-
 // ── Search filter ──────────────────────────────────────
 
 document.getElementById('searchInput').addEventListener('input', function() {
@@ -512,20 +467,6 @@ function acknowledgeOrders() {
 
 // ── Order Actions ──────────────────────────────────────
 
-function editbtn(id) {
-    $('#editModal').modal('show');
-    $.post('admin_ajax.php', { id: id, action: 'detail' }, function(data) {
-        var parts = data.split('|');
-        $('#remark').val(parts[0]);
-        $('#rowtransno').val(parts[1]);
-        $('#pid').val(id);
-    });
-}
-
-$('#editModal').on('shown.bs.modal', function() { $('#remark').trigger('focus'); });
-$('#remark').on('keydown', function(e) { if (e.which === 13) { e.preventDefault(); $('#rowtransno').focus(); } });
-$('#rowtransno').on('keydown', function(e) { if (e.which === 13) { e.preventDefault(); successbtn(); } });
-
 function donebtn(id) {
     Swal.fire({
         title: 'Mark as Done?', text: 'This order will be marked as completed.', icon: 'question',
@@ -555,19 +496,6 @@ function deletebtn(id) {
                 } else Swal.fire({ icon: 'error', title: 'Error', text: data });
             });
         }
-    });
-}
-
-function successbtn() {
-    var remark = document.getElementById('remark').value;
-    var rowtransno = document.getElementById('rowtransno').value;
-    var pid = document.getElementById('pid').value;
-    $.post('admin_ajax.php', { remark: remark, rowtransno: rowtransno, pid: pid, action: 'success' }, function(v) {
-        if (v.trim() === 'Saved.') {
-            $('#editModal').modal('hide');
-            Swal.fire({ icon: 'success', text: 'Payment Saved', timer: 1500, showConfirmButton: false });
-            doPoll();
-        } else Swal.fire({ icon: 'error', title: 'Error', text: v });
     });
 }
 
