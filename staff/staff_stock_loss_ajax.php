@@ -16,7 +16,25 @@ $action = $_POST['action'] ?? '';
 $staffName = $_SESSION['user_name'] ?? 'Staff';
 $staffOutlet = $_SESSION['user_outlet'] ?? 'WEB';
 
-if ($action === 'lookup') {
+if ($action === 'search') {
+    $q = trim($_POST['q'] ?? '');
+    if ($q === '') {
+        echo json_encode([]);
+        exit;
+    }
+    $like = '%' . $q . '%';
+    $stmt = $connect->prepare("SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE (`barcode` LIKE ? OR `name` LIKE ?) AND (`checked` != 'N' OR `checked` IS NULL) ORDER BY CASE WHEN `barcode` = ? THEN 0 ELSE 1 END, `name` ASC LIMIT 20");
+    $stmt->bind_param("sss", $like, $like, $q);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $products = [];
+    while ($r = $result->fetch_assoc()) {
+        $products[] = $r;
+    }
+    $stmt->close();
+    echo json_encode($products);
+
+} elseif ($action === 'lookup') {
     $barcode = trim($_POST['barcode'] ?? '');
     if ($barcode === '') {
         echo json_encode(['name' => '']);

@@ -301,6 +301,45 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             font-size: 14px;
         }
 
+        /* Product search dropdown */
+        .search-wrap { position: relative; }
+        .search-wrap .search-icon {
+            position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+            color: #9ca3af; pointer-events: none; width: 16px; height: 16px;
+        }
+        .search-wrap .form-control { padding-left: 38px; }
+        .search-dropdown {
+            display: none; position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px;
+            background: var(--surface); border: 1.5px solid #e5e7eb; border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12); z-index: 50; max-height: 280px;
+            overflow-y: auto; -webkit-overflow-scrolling: touch;
+        }
+        .search-dropdown.active { display: block; }
+        .dd-item {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            padding: 10px 14px; cursor: pointer; transition: background 0.15s;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .dd-item:last-child { border-bottom: none; }
+        .dd-item:hover, .dd-item:focus { background: #f9fafb; }
+        .dd-item-info { flex: 1; min-width: 0; }
+        .dd-item-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dd-item-barcode { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+        .dd-item-qoh { font-size: 11px; font-weight: 700; color: var(--primary); white-space: nowrap; }
+        .dd-msg { text-align: center; padding: 16px; color: var(--text-muted); font-size: 13px; }
+        .selected-product {
+            display: flex; align-items: center; gap: 10px; background: #f0fdf4;
+            border: 1.5px solid #bbf7d0; border-radius: 10px; padding: 10px 14px;
+        }
+        .selected-product .sp-info { flex: 1; min-width: 0; }
+        .selected-product .sp-name { font-size: 14px; font-weight: 600; }
+        .selected-product .sp-meta { font-size: 11px; color: var(--text-muted); }
+        .selected-product .sp-clear {
+            background: none; border: none; color: var(--text-muted); cursor: pointer;
+            padding: 4px; border-radius: 6px; transition: color 0.15s;
+        }
+        .selected-product .sp-clear:hover { color: var(--primary); }
+
         @media (min-width: 768px) {
             .main-content {
                 padding: 24px 24px 100px;
@@ -330,13 +369,26 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         <div class="card-title">Record Loss</div>
 
         <div class="form-group">
-            <label for="barcode">Barcode</label>
-            <input type="text" id="barcode" class="form-control" placeholder="Scan or enter barcode" onchange="lookupProduct()" onblur="lookupProduct()">
-        </div>
-
-        <div class="form-group">
-            <label for="product_display">Product</label>
-            <input type="text" id="product_display" class="form-control" placeholder="Product name will appear here" disabled>
+            <label>Product</label>
+            <div id="searchArea">
+                <div class="search-wrap">
+                    <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="productSearch" class="form-control" placeholder="Search by barcode or product name..." autocomplete="off">
+                    <div class="search-dropdown" id="searchDropdown"></div>
+                </div>
+            </div>
+            <div id="selectedArea" style="display:none;">
+                <div class="selected-product">
+                    <div class="sp-info">
+                        <div class="sp-name" id="spName"></div>
+                        <div class="sp-meta"><span id="spBarcode"></span> &middot; QOH: <span id="spQoh"></span></div>
+                    </div>
+                    <button type="button" class="sp-clear" onclick="clearSelection()" title="Change product">
+                        <svg style="width:18px;height:18px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            </div>
+            <input type="hidden" id="barcode" value="">
         </div>
 
         <div class="form-group">
@@ -374,39 +426,83 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 <?php include 'mobile-bottombar.php'; ?>
 
 <script>
-    let currentProductId = null;
+    let selectedBarcode = '';
+    let searchTimer = null;
 
-    function lookupProduct() {
-        const barcode = document.getElementById('barcode').value.trim();
-        const productDisplay = document.getElementById('product_display');
+    // ===================== PRODUCT SEARCH =====================
 
-        if (!barcode) {
-            productDisplay.value = '';
-            currentProductId = null;
+    const searchInput = document.getElementById('productSearch');
+    const dropdown = document.getElementById('searchDropdown');
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimer);
+        const q = this.value.trim();
+        if (q.length === 0) {
+            dropdown.classList.remove('active');
             return;
         }
+        dropdown.innerHTML = '<div class="dd-msg">Searching...</div>';
+        dropdown.classList.add('active');
 
-        fetch('staff_stock_loss_ajax.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=lookup&barcode=' + encodeURIComponent(barcode)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                productDisplay.value = data.name + ' (QOH: ' + data.qoh + ')';
-                currentProductId = data.product_id;
-            } else {
-                productDisplay.value = data.message || 'Product not found';
-                currentProductId = null;
-            }
-        })
-        .catch(err => {
-            productDisplay.value = 'Error looking up product';
-            currentProductId = null;
-            console.error('Lookup error:', err);
-        });
+        searchTimer = setTimeout(function() {
+            fetch('staff_stock_loss_ajax.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'action=search&q=' + encodeURIComponent(q)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (!data || data.length === 0) {
+                    dropdown.innerHTML = '<div class="dd-msg">No products found</div>';
+                    return;
+                }
+                let html = '';
+                data.forEach(function(p) {
+                    html += '<div class="dd-item" onclick="selectProduct(\'' + escapeHtml(p.barcode).replace(/'/g, "&#39;") + '\', \'' + escapeHtml(p.name).replace(/'/g, "&#39;") + '\', ' + parseInt(p.qoh) + ')">';
+                    html += '<div class="dd-item-info">';
+                    html += '<div class="dd-item-name">' + escapeHtml(p.name) + '</div>';
+                    html += '<div class="dd-item-barcode">' + escapeHtml(p.barcode) + '</div>';
+                    html += '</div>';
+                    html += '<div class="dd-item-qoh">QOH: ' + parseInt(p.qoh) + '</div>';
+                    html += '</div>';
+                });
+                dropdown.innerHTML = html;
+            })
+            .catch(function() {
+                dropdown.innerHTML = '<div class="dd-msg">Search failed</div>';
+            });
+        }, 300);
+    });
+
+    // Close dropdown on outside click
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.search-wrap')) {
+            dropdown.classList.remove('active');
+        }
+    });
+
+    function selectProduct(barcode, name, qoh) {
+        selectedBarcode = barcode;
+        document.getElementById('barcode').value = barcode;
+        document.getElementById('spName').textContent = name;
+        document.getElementById('spBarcode').textContent = barcode;
+        document.getElementById('spQoh').textContent = qoh;
+
+        document.getElementById('searchArea').style.display = 'none';
+        document.getElementById('selectedArea').style.display = 'block';
+        dropdown.classList.remove('active');
+        searchInput.value = '';
     }
+
+    function clearSelection() {
+        selectedBarcode = '';
+        document.getElementById('barcode').value = '';
+        document.getElementById('selectedArea').style.display = 'none';
+        document.getElementById('searchArea').style.display = 'block';
+        setTimeout(function() { searchInput.focus(); }, 50);
+    }
+
+    // ===================== RECORD LOSS =====================
 
     function recordLoss() {
         const barcode = document.getElementById('barcode').value.trim();
@@ -415,12 +511,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         const remark = document.getElementById('remark').value.trim();
 
         if (!barcode) {
-            Swal.fire({ icon: 'warning', title: 'Missing Barcode', text: 'Please enter or scan a barcode.', confirmButtonColor: '#C8102E' });
-            return;
-        }
-
-        if (!currentProductId) {
-            Swal.fire({ icon: 'warning', title: 'Invalid Product', text: 'Please look up a valid product first.', confirmButtonColor: '#C8102E' });
+            Swal.fire({ icon: 'warning', title: 'No Product', text: 'Please search and select a product first.', confirmButtonColor: '#C8102E' });
             return;
         }
 
@@ -452,9 +543,8 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                 const params = new URLSearchParams();
                 params.append('action', 'record');
                 params.append('barcode', barcode);
-                params.append('product_id', currentProductId);
-                params.append('quantity', quantity);
-                params.append('reason', reason);
+                params.append('qty', quantity);
+                params.append('reason', reason.toUpperCase());
                 params.append('remark', remark);
 
                 fetch('staff_stock_loss_ajax.php', {
@@ -471,25 +561,22 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                         Swal.fire({
                             icon: 'success',
                             title: 'Recorded',
-                            text: data.message || 'Stock loss has been recorded successfully.',
+                            text: data.success,
                             confirmButtonColor: '#C8102E'
                         });
 
                         // Reset form
-                        document.getElementById('barcode').value = '';
-                        document.getElementById('product_display').value = '';
+                        clearSelection();
                         document.getElementById('quantity').value = 1;
                         document.getElementById('reason').value = '';
                         document.getElementById('remark').value = '';
-                        currentProductId = null;
 
-                        // Reload recent records
                         loadRecent();
                     } else {
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
-                            text: data.message || 'Failed to record stock loss.',
+                            text: data.error || 'Failed to record stock loss.',
                             confirmButtonColor: '#C8102E'
                         });
                     }
@@ -530,21 +617,24 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success && data.records && data.records.length > 0) {
+            if (Array.isArray(data) && data.length > 0) {
                 let html = '';
-                data.records.forEach(function(rec) {
-                    const badgeClass = getReasonBadgeClass(rec.reason);
-                    const remarkHtml = rec.remark ? '<span class="recent-card-remark">' + escapeHtml(rec.remark) + '</span>' : '';
+                data.forEach(function(rec) {
+                    const reason = rec.LOSS_REASON || 'Other';
+                    const badgeClass = getReasonBadgeClass(reason);
+                    const remarkText = rec.REMARK || '';
+                    const remarkHtml = remarkText ? '<span class="recent-card-remark">' + escapeHtml(remarkText) + '</span>' : '';
+                    const qty = Math.abs(parseFloat(rec.QTYADJ || 0));
 
                     html += '<div class="recent-card">';
                     html += '  <div class="recent-card-top">';
-                    html += '    <span class="recent-card-date">' + escapeHtml(rec.date) + '</span>';
-                    html += '    <span class="reason-badge ' + badgeClass + '">' + escapeHtml(rec.reason) + '</span>';
+                    html += '    <span class="recent-card-date">' + escapeHtml(rec.SDATE || '') + '</span>';
+                    html += '    <span class="reason-badge ' + badgeClass + '">' + escapeHtml(reason) + '</span>';
                     html += '  </div>';
-                    html += '  <div class="recent-card-desc">' + escapeHtml(rec.description) + '</div>';
-                    html += '  <div class="recent-card-barcode">Barcode: ' + escapeHtml(rec.barcode) + '</div>';
+                    html += '  <div class="recent-card-desc">' + escapeHtml(rec.PDESC || '') + '</div>';
+                    html += '  <div class="recent-card-barcode">Barcode: ' + escapeHtml(rec.BARCODE || '') + '</div>';
                     html += '  <div class="recent-card-bottom">';
-                    html += '    <span class="recent-card-qty">-' + escapeHtml(String(rec.qty)) + ' unit(s)</span>';
+                    html += '    <span class="recent-card-qty">-' + qty + ' unit(s)</span>';
                     html += '    ' + remarkHtml;
                     html += '  </div>';
                     html += '</div>';
