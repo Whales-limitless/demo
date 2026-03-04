@@ -201,7 +201,7 @@ if($type == '1'){
 								$ttxt2 = "AND LOCATION = '".$lname."'";
 							}
 
-							$sql = $connect->query("SELECT DRIVER, COUNT(ORDNO) AS CORDNO, SUM(DISTANT) AS SDISTANT, SUM(RETAIL) AS SRETAIL FROM `del_orderlist` WHERE DRIVERCODE = '".$_COOKIE["parkwaydelivery_driver"]."' AND STATUS = 'C' AND DELDATE BETWEEN '".$sdate."' AND '".$edate."' $ttxt1 $ttxt2 GROUP BY DRIVERCODE");
+							$sql = $connect->query("SELECT DRIVER, COUNT(ORDNO) AS CORDNO, SUM(DISTANT) AS SDISTANT, SUM(RETAIL) AS SRETAIL FROM `del_orderlist` WHERE DRIVERCODE = '".$_COOKIE["parkwaydelivery_driver"]."' AND (STATUS = 'D' OR STATUS = 'C') AND DELDATE BETWEEN '".$sdate."' AND '".$edate."' $ttxt1 $ttxt2 GROUP BY DRIVERCODE");
 							while($row = $sql->fetch_assoc()){
 								?>
 								<tr>
@@ -237,7 +237,7 @@ if($type == '1'){
 						</tbody>
 						<tfoot>
 							<?php
-							$sql12 = $connect->query("SELECT COUNT(ORDNO) AS CORDNO, SUM(DISTANT) AS SUMDISTANT, SUM(RETAIL) AS SUMRETAIL FROM `del_orderlist` WHERE DRIVERCODE = '".$_COOKIE["parkwaydelivery_driver"]."' AND STATUS = 'C' AND DELDATE BETWEEN '".$sdate."' AND '".$edate."' $ttxt1 $ttxt2 ");
+							$sql12 = $connect->query("SELECT COUNT(ORDNO) AS CORDNO, SUM(DISTANT) AS SUMDISTANT, SUM(RETAIL) AS SUMRETAIL FROM `del_orderlist` WHERE DRIVERCODE = '".$_COOKIE["parkwaydelivery_driver"]."' AND (STATUS = 'D' OR STATUS = 'C') AND DELDATE BETWEEN '".$sdate."' AND '".$edate."' $ttxt1 $ttxt2 ");
 							if($sql12->num_rows > 0){
 								while($row = $sql12->fetch_assoc()){
                                     $countordno = number_format($row['CORDNO'],2);

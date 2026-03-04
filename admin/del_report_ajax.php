@@ -18,7 +18,7 @@ $driver = trim($_POST['driver'] ?? '');
 $location = trim($_POST['location'] ?? '');
 
 if ($action === 'summary') {
-    $where = "WHERE STATUS = 'C' AND DELDATE >= ? AND DELDATE <= ?";
+    $where = "WHERE (STATUS = 'D' OR STATUS = 'C') AND DELDATE >= ? AND DELDATE <= ?";
     $params = [$startDate, $endDate];
     $types = "ss";
 
@@ -36,7 +36,7 @@ if ($action === 'summary') {
     echo json_encode(['rows' => $rows]);
 
 } elseif ($action === 'detailed') {
-    $where = "WHERE STATUS = 'C' AND DELDATE >= ? AND DELDATE <= ?";
+    $where = "WHERE (STATUS = 'D' OR STATUS = 'C') AND DELDATE >= ? AND DELDATE <= ?";
     $params = [$startDate, $endDate];
     $types = "ss";
 

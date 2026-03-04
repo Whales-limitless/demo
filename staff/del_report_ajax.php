@@ -23,7 +23,7 @@ if ($driver === '') {
 }
 
 if ($action === 'summary') {
-    $where = "WHERE STATUS = 'C' AND DRIVERCODE = ? AND DELDATE >= ? AND DELDATE <= ?";
+    $where = "WHERE (STATUS = 'D' OR STATUS = 'C') AND DRIVERCODE = ? AND DELDATE >= ? AND DELDATE <= ?";
     $params = [$driver, $startDate, $endDate];
     $types = "sss";
 
@@ -40,7 +40,7 @@ if ($action === 'summary') {
     echo json_encode(['rows' => $rows]);
 
 } elseif ($action === 'detailed') {
-    $where = "WHERE STATUS = 'C' AND DRIVERCODE = ? AND DELDATE >= ? AND DELDATE <= ?";
+    $where = "WHERE (STATUS = 'D' OR STATUS = 'C') AND DRIVERCODE = ? AND DELDATE >= ? AND DELDATE <= ?";
     $params = [$driver, $startDate, $endDate];
     $types = "sss";
 
