@@ -52,7 +52,25 @@ if ($action === 'upload') {
             }
 
             if ($src) {
-                imagejpeg($src, $filePath, 75);
+                // Resize if too large (max 1200px on longest side)
+                $maxDim = 1200;
+                $origW = imagesx($src);
+                $origH = imagesy($src);
+                if ($origW > $maxDim || $origH > $maxDim) {
+                    if ($origW >= $origH) {
+                        $newW = $maxDim;
+                        $newH = intval($origH * $maxDim / $origW);
+                    } else {
+                        $newH = $maxDim;
+                        $newW = intval($origW * $maxDim / $origH);
+                    }
+                    $resized = imagecreatetruecolor($newW, $newH);
+                    imagecopyresampled($resized, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+                    imagedestroy($src);
+                    $src = $resized;
+                }
+
+                imagejpeg($src, $filePath, 40);
                 imagedestroy($src);
 
                 $imgCol = 'IMG' . $i;

@@ -3,7 +3,7 @@ include "../../staff/dbconnection.php";
 include "validation.php";
 
 $drivercode = $_COOKIE["parkwaydelivery_driver"];
-$getfilter = $_GET["filter"] ?? "today";
+$getfilter = $_GET["filter"] ?? "all";
 
 $todaydate = date("Y-m-d");
 $showdate = $todaydate;
