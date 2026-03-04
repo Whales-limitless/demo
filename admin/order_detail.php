@@ -70,7 +70,7 @@ if ($item_query) {
         $qty = (float)($irow['QTY'] ?? 0);
         $barcode = $connect->real_escape_string($irow['BARCODE'] ?? '');
 
-        // Get rack from rack_product table first
+        // Get rack from rack_product table (rack management only)
         $rack_code = '';
         $rack_q = $connect->query("
             SELECT r.`code`
@@ -84,19 +84,19 @@ if ($item_query) {
             $rack_code = $rr['code'];
         }
 
-        // Fallback to PRODUCTS.rack field
-        if (empty($rack_code)) {
-            $rack_q2 = $connect->query("SELECT `rack` FROM `PRODUCTS` WHERE `barcode` = '$barcode' LIMIT 1");
-            if ($rack_q2 && $rr2 = $rack_q2->fetch_assoc()) {
-                if (!empty($rr2['rack'])) $rack_code = $rr2['rack'];
-            }
+        // Get rack remark from PRODUCTS.rack field
+        $rack_remark = '';
+        $remark_q = $connect->query("SELECT `rack` FROM `PRODUCTS` WHERE `barcode` = '$barcode' LIMIT 1");
+        if ($remark_q && $rr2 = $remark_q->fetch_assoc()) {
+            $rack_remark = $rr2['rack'] ?? '';
         }
 
         $order_items[] = [
             'barcode' => $irow['BARCODE'] ?? '',
             'pdesc'   => $irow['PDESC'] ?? '',
             'qty'     => $qty,
-            'rack'    => $rack_code
+            'rack'    => $rack_code,
+            'rack_remark' => $rack_remark
         ];
     }
 }
@@ -229,7 +229,7 @@ body {
 }
 .items-table tbody td { padding: 6px; border-bottom: 1px solid #f3f4f6; }
 .items-table .text-right { text-align: right; }
-.items-table .rack-info { font-size: 11px; color: var(--text-muted); font-style: italic; }
+.items-table .rack-remark { font-size: 11px; color: var(--text-muted); font-style: italic; }
 .items-table tfoot td { padding: 6px; }
 .items-table tfoot .total-row td { font-weight: 700; border-top: 2px solid var(--text); }
 
@@ -288,21 +288,11 @@ body {
 
         <!-- Header -->
         <div class="order-header">
+            <div style="text-align:center;font-weight:700;font-size:16px;margin-bottom:8px;">Purchase Order</div>
             <img src="../logo/logo.png" alt="Logo" onerror="this.style.display='none'">
             <div class="merchant-name"><?php echo htmlspecialchars($mer_name); ?></div>
             <div class="merchant-info"><?php echo htmlspecialchars($mer_addr); ?></div>
-            <div class="merchant-info">Contact: <?php echo htmlspecialchars($mer_cont); ?></div>
-            <div style="text-align:right;margin-top:-40px;font-weight:600;font-size:14px;">Sales Order</div>
         </div>
-
-        <!-- To -->
-        <table class="info-table">
-            <tr>
-                <td class="label highlight">To</td>
-                <td class="sep">:</td>
-                <td class="highlight" colspan="4"><?php echo htmlspecialchars($rowto); ?></td>
-            </tr>
-        </table>
 
         <!-- Order Info -->
         <table class="info-table">
@@ -341,9 +331,10 @@ body {
             <thead>
                 <tr>
                     <td style="width:5%">S/N</td>
-                    <td style="width:20%">Barcode</td>
-                    <td style="width:55%">Item</td>
-                    <td style="width:20%" class="text-right">Qty</td>
+                    <td style="width:18%">Barcode</td>
+                    <td style="width:37%">Item</td>
+                    <td style="width:10%" class="text-right">Qty</td>
+                    <td style="width:30%" class="text-right">Rack Remark</td>
                 </tr>
             </thead>
             <?php endif; ?>
@@ -354,6 +345,7 @@ body {
                     <td><?php echo htmlspecialchars($item['barcode']); ?></td>
                     <td><?php echo htmlspecialchars($item['pdesc']); ?></td>
                     <td class="text-right"><?php echo $item['qty']; ?></td>
+                    <td class="text-right rack-remark"><?php echo htmlspecialchars($item['rack_remark']); ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -377,20 +369,11 @@ body {
         <!-- Office Copy (print only) -->
         <div class="office-copy" style="page-break-before:always;">
             <div class="order-header">
+                <div style="text-align:center;font-weight:700;font-size:16px;margin-bottom:8px;">Purchase Order</div>
                 <img src="../logo/logo.png" alt="Logo" style="width:70px;height:70px;" onerror="this.style.display='none'">
                 <div class="merchant-name"><?php echo htmlspecialchars($mer_name); ?></div>
                 <div class="merchant-info"><?php echo htmlspecialchars($mer_addr); ?></div>
-                <div class="merchant-info">Contact: <?php echo htmlspecialchars($mer_cont); ?></div>
-                <div style="text-align:right;margin-top:-40px;font-weight:600;font-size:14px;">Sales Order</div>
             </div>
-
-            <table class="info-table">
-                <tr>
-                    <td class="label highlight">To</td>
-                    <td class="sep">:</td>
-                    <td class="highlight" colspan="4"><?php echo htmlspecialchars($rowto); ?></td>
-                </tr>
-            </table>
 
             <table class="info-table">
                 <tr>
@@ -427,9 +410,10 @@ body {
                 <thead>
                     <tr>
                         <td style="width:5%">S/N</td>
-                        <td style="width:20%">Barcode</td>
-                        <td style="width:55%">Item</td>
-                        <td style="width:20%" class="text-right">Qty</td>
+                        <td style="width:18%">Barcode</td>
+                        <td style="width:37%">Item</td>
+                        <td style="width:10%" class="text-right">Qty</td>
+                        <td style="width:30%" class="text-right">Rack Remark</td>
                     </tr>
                 </thead>
                 <?php endif; ?>
@@ -440,6 +424,7 @@ body {
                         <td><?php echo htmlspecialchars($item['barcode']); ?></td>
                         <td><?php echo htmlspecialchars($item['pdesc']); ?></td>
                         <td class="text-right"><?php echo $item['qty']; ?></td>
+                        <td class="text-right rack-remark"><?php echo htmlspecialchars($item['rack_remark']); ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
