@@ -85,6 +85,19 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 .empty-msg { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 15px; grid-column: 1/-1; }
 
+/* Manage sub-cat list inside modals */
+.manage-list { max-height: 350px; overflow-y: auto; }
+.manage-list .manage-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #f3f4f6; gap: 8px; }
+.manage-list .manage-item:last-child { border-bottom: none; }
+.manage-list .manage-item .item-name { flex: 1; font-size: 13px; }
+.manage-list .manage-item .item-actions { display: flex; gap: 4px; }
+.manage-list .manage-item .item-actions button { padding: 3px 8px; border: none; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; color: #fff; }
+.manage-add-row { display: flex; gap: 8px; padding: 12px 0; }
+.manage-add-row input, .manage-add-row select { flex: 1; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 13px; }
+.manage-add-row button { padding: 7px 14px; }
+.filter-select { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; background: #fff; transition: border-color var(--transition); min-width: 140px; }
+.filter-select:focus { border-color: var(--primary); }
+
 @media (max-width: 768px) {
     .page-content { padding: 16px; }
     .cat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -99,7 +112,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="page-content">
     <div class="page-header">
         <h1><i class="fas fa-layer-group" style="color:var(--primary);margin-right:8px;"></i>Category Groups</h1>
-        <button class="btn-add" onclick="openCreateModal();"><i class="fas fa-plus"></i> Add Category Group</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-add" style="background:#8b5cf6;" onclick="openManageSubCatModal();"><i class="fas fa-tags"></i> Manage Sub-Categories</button>
+            <button class="btn-add" onclick="openCreateModal();"><i class="fas fa-plus"></i> Add Category Group</button>
+        </div>
     </div>
 
     <div class="toolbar">
@@ -158,16 +174,45 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
+<!-- Manage Sub Categories Modal -->
+<div class="modal fade" id="manageSubCatModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-tags"></i> Manage Sub Categories</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="manage-add-row">
+                    <select id="subCatParentFilter" class="filter-select" style="max-width:200px;" onchange="loadManageSubCategories();">
+                        <option value="">All Groups</option>
+                    </select>
+                    <input type="text" id="newSubCatName" placeholder="New sub category name">
+                    <button class="btn btn-sm btn-success" onclick="createSubCategory();"><i class="fas fa-plus"></i> Add</button>
+                </div>
+                <div class="manage-list" id="subCatListManage"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 var modal = null;
+var subCatModal = null;
 var allCards = [];
+var categoriesCache = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     modal = new bootstrap.Modal(document.getElementById('catGroupModal'));
+    subCatModal = new bootstrap.Modal(document.getElementById('manageSubCatModal'));
     loadCatGroups();
+    loadCategoriesCache();
 });
 
 function loadCatGroups() {
@@ -210,6 +255,7 @@ function renderCards(items) {
         html += '<span>' + (c.sub_count || 0) + ' sub-cats</span>';
         html += '</div>';
         html += '<div class="card-actions">';
+        html += '<button style="background:#8b5cf6;" onclick="openManageSubCatModal(' + c.id + ');"><i class="fas fa-tags"></i> Sub-Cats</button>';
         html += '<button style="background:#3b82f6;" onclick="openEditModal(' + c.id + ');"><i class="fas fa-pen"></i> Edit</button>';
         if (isInactive) {
             html += '<button style="background:#16a34a;" onclick="toggleStatus(' + c.id + ',\'activate\');"><i class="fas fa-check"></i> Activate</button>';
@@ -344,6 +390,118 @@ function escHtml(s) {
 document.getElementById('catGroupModal').addEventListener('shown.bs.modal', function() {
     document.getElementById('fName').focus();
 });
+
+// ===================== SUB CATEGORY MANAGEMENT =====================
+
+function loadCategoriesCache() {
+    $.post('product_ajax.php', { action: 'cat_list' }, function(cats) {
+        categoriesCache = (cats || []).filter(function(c) { return c.status === 'ACTIVE'; });
+        refreshParentDropdown();
+    }, 'json');
+}
+
+function refreshParentDropdown() {
+    var sel = document.getElementById('subCatParentFilter');
+    var val = sel.value;
+    // Keep the first option (All Groups)
+    sel.innerHTML = '<option value="">All Groups</option>';
+    categoriesCache.forEach(function(c) {
+        sel.innerHTML += '<option value="' + c.id + '" data-ccode="' + escHtml(c.ccode) + '">' + escHtml(c.name) + '</option>';
+    });
+    sel.value = val;
+}
+
+function openManageSubCatModal(catGroupId) {
+    if (catGroupId) {
+        // Find the matching cat_group in categoriesCache
+        var match = categoriesCache.find(function(c) { return parseInt(c.id) === catGroupId; });
+        if (match) {
+            document.getElementById('subCatParentFilter').value = match.id;
+        }
+    } else {
+        document.getElementById('subCatParentFilter').value = '';
+    }
+    loadManageSubCategories();
+    subCatModal.show();
+}
+
+function loadManageSubCategories() {
+    var catGroupId = document.getElementById('subCatParentFilter').value;
+    var postData = { action: 'subcat_list' };
+    if (catGroupId) postData.category_id = catGroupId;
+
+    $.post('product_ajax.php', postData, function(subs) {
+        var all = subs || [];
+        var html = '';
+        all.forEach(function(s) {
+            html += '<div class="manage-item">';
+            html += '<span class="item-name">';
+            if (!catGroupId) {
+                html += '<small style="color:var(--text-muted);">[' + escHtml(s.cat_name || '') + ']</small> ';
+            }
+            html += escHtml(s.name);
+            html += '</span>';
+            html += '<div class="item-actions">';
+            html += '<button style="background:#3b82f6;" onclick="editSubCategory(' + s.id + ',\'' + escHtml(s.name).replace(/'/g, "\\'") + '\');"><i class="fas fa-pen"></i></button>';
+            html += '<button style="background:#ef4444;" onclick="deleteSubCategory(' + s.id + ');"><i class="fas fa-ban"></i></button>';
+            html += '</div></div>';
+        });
+        if (all.length === 0) html = '<div style="padding:20px;text-align:center;color:var(--text-muted);">No sub categories yet</div>';
+        document.getElementById('subCatListManage').innerHTML = html;
+    }, 'json');
+}
+
+function createSubCategory() {
+    var catGroupId = document.getElementById('subCatParentFilter').value;
+    var name = document.getElementById('newSubCatName').value.trim();
+    if (!catGroupId) { Swal.fire({ icon: 'warning', text: 'Select a category group first.' }); return; }
+    if (!name) { Swal.fire({ icon: 'warning', text: 'Enter a sub category name.' }); return; }
+    $.post('product_ajax.php', { action: 'subcat_create', category_id: catGroupId, name: name }, function(r) {
+        if (r.success) {
+            document.getElementById('newSubCatName').value = '';
+            loadManageSubCategories();
+            loadCatGroups(); // Refresh sub_count on cards
+        } else {
+            Swal.fire({ icon: 'error', text: r.error });
+        }
+    }, 'json');
+}
+
+function editSubCategory(id, oldName) {
+    Swal.fire({
+        title: 'Edit Sub Category',
+        input: 'text',
+        inputValue: oldName,
+        showCancelButton: true,
+        confirmButtonText: 'Save',
+        inputValidator: function(v) { if (!v || !v.trim()) return 'Name is required.'; }
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.post('product_ajax.php', { action: 'subcat_update', id: id, name: result.value.trim() }, function(r) {
+                if (r.success) { loadManageSubCategories(); }
+                else Swal.fire({ icon: 'error', text: r.error });
+            }, 'json');
+        }
+    });
+}
+
+function deleteSubCategory(id) {
+    Swal.fire({
+        text: 'Delete this sub category?', icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#ef4444', confirmButtonText: 'Delete'
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.post('product_ajax.php', { action: 'subcat_delete', id: id }, function(r) {
+                if (r.success) {
+                    loadManageSubCategories();
+                    loadCatGroups(); // Refresh sub_count on cards
+                } else {
+                    Swal.fire({ icon: 'error', text: r.error });
+                }
+            }, 'json');
+        }
+    });
+}
 </script>
 </body>
 </html>

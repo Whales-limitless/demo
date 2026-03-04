@@ -19,12 +19,12 @@ if ($result) {
     }
 }
 
-// Fetch categories for filter
-$categories = [];
-$catResult = $connect->query("SELECT DISTINCT `cat` FROM `PRODUCTS` WHERE `cat` != '' ORDER BY `cat` ASC");
+// Fetch category groups for filter
+$catGroups = [];
+$catResult = $connect->query("SELECT `id`, `ccode`, `cat_name` FROM `cat_group` WHERE COALESCE(`status`,'ACTIVE')='ACTIVE' ORDER BY `sort_no` ASC, `cat_name` ASC");
 if ($catResult) {
     while ($r = $catResult->fetch_assoc()) {
-        $categories[] = $r['cat'];
+        $catGroups[] = $r;
     }
 }
 
@@ -112,7 +112,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>Session Code</th>
                         <th>Description</th>
                         <th>Type</th>
-                        <th>Category Filter</th>
+                        <th>Sub-Category Filter</th>
                         <th>Status</th>
                         <th>Created By</th>
                         <th>Created</th>
@@ -131,7 +131,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <td><strong><?php echo htmlspecialchars($s['session_code'] ?? ''); ?></strong></td>
                         <td><?php echo htmlspecialchars($s['description'] ?? ''); ?></td>
                         <td><?php echo htmlspecialchars($s['type'] ?? ''); ?></td>
-                        <td><?php echo htmlspecialchars($s['filter_cat'] ?? 'All'); ?></td>
+                        <td><?php echo htmlspecialchars($s['filter_sub_cat'] ?? ($s['filter_cat'] ?? 'All')); ?></td>
                         <td><span class="badge-st badge-<?php echo htmlspecialchars($s['status'] ?? 'OPEN'); ?>"><?php echo str_replace('_', ' ', htmlspecialchars($s['status'] ?? '')); ?></span></td>
                         <td><?php echo htmlspecialchars($s['created_by'] ?? ''); ?></td>
                         <td><?php echo !empty($s['created_at']) ? date('d/m/Y H:i', strtotime($s['created_at'])) : ''; ?></td>
@@ -164,16 +164,22 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     <label class="form-label fw-semibold">Type</label>
                     <select id="fType" class="form-select">
                         <option value="FULL">Full Inventory</option>
-                        <option value="PARTIAL">Partial (by Category)</option>
+                        <option value="PARTIAL">Partial (by Sub-Category)</option>
                     </select>
                 </div>
-                <div class="mb-3" id="catGroup" style="display:none;">
-                    <label class="form-label fw-semibold">Category Filter</label>
-                    <select id="fCat" class="form-select">
-                        <option value="">-- All Categories --</option>
-                        <?php foreach ($categories as $cat): ?>
-                        <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
+                <div class="mb-3" id="catGroupRow" style="display:none;">
+                    <label class="form-label fw-semibold">Category Group</label>
+                    <select id="fCatGroup" class="form-select" onchange="loadSubCatFilter();">
+                        <option value="">-- Select Category Group --</option>
+                        <?php foreach ($catGroups as $cg): ?>
+                        <option value="<?php echo (int)$cg['id']; ?>" data-ccode="<?php echo htmlspecialchars($cg['ccode']); ?>"><?php echo htmlspecialchars($cg['cat_name']); ?></option>
                         <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="mb-3" id="subCatRow" style="display:none;">
+                    <label class="form-label fw-semibold">Sub-Category Filter</label>
+                    <select id="fSubCat" class="form-select">
+                        <option value="">-- Select Sub-Category --</option>
                     </select>
                 </div>
             </div>
@@ -195,8 +201,33 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 document.getElementById('fType').addEventListener('change', function() {
-    document.getElementById('catGroup').style.display = this.value === 'PARTIAL' ? 'block' : 'none';
+    var isPartial = this.value === 'PARTIAL';
+    document.getElementById('catGroupRow').style.display = isPartial ? 'block' : 'none';
+    document.getElementById('subCatRow').style.display = isPartial ? 'block' : 'none';
+    if (!isPartial) {
+        document.getElementById('fCatGroup').value = '';
+        document.getElementById('fSubCat').innerHTML = '<option value="">-- Select Sub-Category --</option>';
+    }
 });
+
+function loadSubCatFilter() {
+    var catGroupId = document.getElementById('fCatGroup').value;
+    var sel = document.getElementById('fSubCat');
+    sel.innerHTML = '<option value="">-- Select Sub-Category --</option>';
+    if (!catGroupId) return;
+
+    $.post('product_ajax.php', { action: 'subcat_list', category_id: catGroupId }, function(subs) {
+        (subs || []).forEach(function(s) {
+            sel.innerHTML += '<option value="' + escHtml(s.name) + '">' + escHtml(s.name) + '</option>';
+        });
+    }, 'json');
+}
+
+function escHtml(s) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s || ''));
+    return d.innerHTML;
+}
 
 document.getElementById('searchInput').addEventListener('input', function() {
     var q = this.value.toLowerCase();
@@ -215,19 +246,24 @@ document.getElementById('searchInput').addEventListener('input', function() {
 function openCreateModal() {
     document.getElementById('fDesc').value = '';
     document.getElementById('fType').value = 'FULL';
-    document.getElementById('fCat').value = '';
-    document.getElementById('catGroup').style.display = 'none';
+    document.getElementById('fCatGroup').value = '';
+    document.getElementById('fSubCat').innerHTML = '<option value="">-- Select Sub-Category --</option>';
+    document.getElementById('catGroupRow').style.display = 'none';
+    document.getElementById('subCatRow').style.display = 'none';
     createModalObj.show();
 }
 
 function createSession() {
     var desc = document.getElementById('fDesc').value.trim();
     var type = document.getElementById('fType').value;
-    var cat = document.getElementById('fCat').value;
+    var subCat = document.getElementById('fSubCat').value;
+    var catGroupSel = document.getElementById('fCatGroup');
+    var catGroupName = catGroupSel.selectedOptions[0] ? catGroupSel.selectedOptions[0].textContent.trim() : '';
+    if (catGroupSel.value === '') catGroupName = '';
 
     $.ajax({
         type: 'POST', url: 'stock_take_ajax.php',
-        data: { action: 'create', description: desc, type: type, filter_cat: cat },
+        data: { action: 'create', description: desc, type: type, filter_cat: catGroupName, filter_sub_cat: subCat },
         dataType: 'json',
         success: function(data) {
             if (data.success) {
