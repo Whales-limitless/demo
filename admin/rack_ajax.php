@@ -27,10 +27,16 @@ if ($action === 'list') {
     $types = "";
 
     if ($search !== '') {
-        $where .= " AND (LOWER(r.`code`) LIKE ? OR LOWER(r.`description`) LIKE ?)";
+        $where .= " AND (LOWER(r.`code`) LIKE ? OR LOWER(r.`description`) LIKE ?
+                    OR EXISTS (
+                        SELECT 1 FROM `rack_product` rp
+                        JOIN `PRODUCTS` p ON rp.`barcode` = p.`barcode`
+                        WHERE rp.`rack_id` = r.`id`
+                        AND (p.`barcode` LIKE ? OR LOWER(p.`name`) LIKE ?)
+                    ))";
         $like = '%' . strtolower($search) . '%';
-        $params = array_merge($params, [$like, $like]);
-        $types .= "ss";
+        $params = array_merge($params, [$like, $like, $like, $like]);
+        $types .= "ssss";
     }
     if ($statusFilter === 'active') {
         $where .= " AND r.`status` = 'ACTIVE'";
@@ -54,11 +60,9 @@ if ($action === 'list') {
 
     // Fetch page with product counts
     $sql = "SELECT r.`id`, r.`code`, r.`description`, r.`status`, r.`created_at`,
-                   COUNT(rp.`id`) AS product_count
+                   (SELECT COUNT(*) FROM `rack_product` WHERE `rack_id` = r.`id`) AS product_count
             FROM `rack` r
-            LEFT JOIN `rack_product` rp ON r.`id` = rp.`rack_id`
             WHERE $where
-            GROUP BY r.`id`
             ORDER BY r.`status` DESC, r.`code` ASC
             LIMIT ?, ?";
     $stmt = $connect->prepare($sql);
@@ -72,6 +76,41 @@ if ($action === 'list') {
         $racks[] = $r;
     }
     $stmt->close();
+
+    // If searching, find which products matched for each rack
+    if ($search !== '' && !empty($racks)) {
+        $rackIds = array_column($racks, 'id');
+        $placeholders = implode(',', array_fill(0, count($rackIds), '?'));
+        $matchTypes = str_repeat('i', count($rackIds)) . 'ss';
+        $searchLike = '%' . strtolower($search) . '%';
+        $matchParams = array_merge($rackIds, [$searchLike, $searchLike]);
+
+        $matchSql = "SELECT rp.`rack_id`, p.`barcode`, p.`name`
+                     FROM `rack_product` rp
+                     JOIN `PRODUCTS` p ON rp.`barcode` = p.`barcode`
+                     WHERE rp.`rack_id` IN ($placeholders)
+                     AND (p.`barcode` LIKE ? OR LOWER(p.`name`) LIKE ?)
+                     ORDER BY p.`name` ASC";
+        $matchStmt = $connect->prepare($matchSql);
+        $matchStmt->bind_param($matchTypes, ...$matchParams);
+        $matchStmt->execute();
+        $matchResult = $matchStmt->get_result();
+
+        $matchMap = [];
+        while ($m = $matchResult->fetch_assoc()) {
+            $rid = $m['rack_id'];
+            if (!isset($matchMap[$rid])) $matchMap[$rid] = [];
+            if (count($matchMap[$rid]) < 3) {
+                $matchMap[$rid][] = ['barcode' => $m['barcode'], 'name' => $m['name']];
+            }
+        }
+        $matchStmt->close();
+
+        for ($i = 0; $i < count($racks); $i++) {
+            $rid = $racks[$i]['id'];
+            $racks[$i]['matched_products'] = $matchMap[$rid] ?? [];
+        }
+    }
 
     echo json_encode([
         'racks' => $racks,

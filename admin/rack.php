@@ -92,6 +92,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .assign-item .btn-assign-item:hover { background: var(--primary-dark); }
 .no-results-msg { text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px; }
 
+/* Matched products */
+.matched-products { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+.matched-tag { display: inline-flex; align-items: center; gap: 4px; background: #fef3c7; color: #92400e; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+.matched-tag i { font-size: 9px; }
+
 /* Loading spinner */
 .table-loading { text-align: center; padding: 40px; color: var(--text-muted); }
 .table-loading i { font-size: 24px; margin-bottom: 8px; display: block; }
@@ -122,7 +127,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             <div class="toolbar-filters">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Search racks..." oninput="debouncedFetch();">
+                    <input type="text" id="searchInput" placeholder="Search racks or products..." oninput="debouncedFetch();">
                 </div>
                 <select id="filterStatus" class="filter-select" onchange="fetchRacks(1);">
                     <option value="">All Status</option>
@@ -303,7 +308,16 @@ function renderTable(data) {
 
         html += '<tr style="' + (isSelected ? 'background:#fef2f2;' : '') + '">';
         html += '<td>' + (offset + i + 1) + '</td>';
-        html += '<td><strong>' + escHtml(r.code) + '</strong></td>';
+        html += '<td><strong>' + escHtml(r.code) + '</strong>';
+        if (r.matched_products && r.matched_products.length > 0) {
+            html += '<div class="matched-products">';
+            for (var j = 0; j < r.matched_products.length; j++) {
+                var mp = r.matched_products[j];
+                html += '<span class="matched-tag"><i class="fas fa-box"></i>' + escHtml(mp.name || mp.barcode) + '</span>';
+            }
+            html += '</div>';
+        }
+        html += '</td>';
         html += '<td>' + escHtml(r.description || '-') + '</td>';
         html += '<td><span class="badge-count">' + pCount + '</span></td>';
         html += '<td><span class="badge-status ' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? 'Active' : 'Inactive') + '</span></td>';
