@@ -194,7 +194,7 @@ if($type == '1'){
 								$ttxt2 = "AND LOCATION = '".$lname."'";
 							}
 
-							$sql = $connect->query("SELECT *,CAST(DONEDATETIME as time) AS DONEAT FROM `del_orderlist` WHERE DRIVERCODE = '".$_COOKIE["parkwaydelivery_driver"]."' AND STATUS = 'C' AND DELDATE BETWEEN '".$sdate."' AND '".$edate."' $ttxt1 $ttxt2 ");
+							$sql = $connect->query("SELECT *,CAST(DONEDATETIME as time) AS DONEAT FROM `del_orderlist` WHERE DRIVERCODE = '".$_COOKIE["parkwaydelivery_driver"]."' AND (STATUS = 'D' OR STATUS = 'C') AND DELDATE BETWEEN '".$sdate."' AND '".$edate."' $ttxt1 $ttxt2 ");
 							
 							while($row = $sql->fetch_assoc()){
 								?>
@@ -236,7 +236,7 @@ if($type == '1'){
 						</tbody>
 						<tfoot>
 							<?php
-							$sql12 = $connect->query("SELECT SUM(DISTANT) AS SUMDISTANT,SUM(RETAIL) AS SUMRETAIL FROM `del_orderlist` WHERE DRIVERCODE = '".$_COOKIE["parkwaydelivery_driver"]."' AND STATUS = 'C' AND DELDATE BETWEEN '".$sdate."' AND '".$edate."' $ttxt1 $ttxt2 ");
+							$sql12 = $connect->query("SELECT SUM(DISTANT) AS SUMDISTANT,SUM(RETAIL) AS SUMRETAIL FROM `del_orderlist` WHERE DRIVERCODE = '".$_COOKIE["parkwaydelivery_driver"]."' AND (STATUS = 'D' OR STATUS = 'C') AND DELDATE BETWEEN '".$sdate."' AND '".$edate."' $ttxt1 $ttxt2 ");
 							if($sql12->num_rows > 0){
 								while($row = $sql12->fetch_assoc()){
 									$sumdistant = number_format($row['SUMDISTANT'],2);
