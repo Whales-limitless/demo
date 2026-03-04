@@ -128,6 +128,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             <div class="col-md-4 mb-2"><strong>Description:</strong> <?php echo htmlspecialchars($session['description'] ?? '-'); ?></div>
             <div class="col-md-2 mb-2"><strong>Type:</strong> <?php echo htmlspecialchars($session['type']); ?></div>
             <div class="col-md-3 mb-2"><strong>Category:</strong> <?php echo htmlspecialchars($session['filter_cat'] ?: 'All'); ?></div>
+            <?php if (!empty($session['filter_sub_cat'])): ?>
+            <div class="col-md-3 mb-2"><strong>Sub-Category:</strong> <?php echo htmlspecialchars($session['filter_sub_cat']); ?></div>
+            <?php endif; ?>
             <div class="col-md-3 mb-2"><strong>Created:</strong> <?php echo date('d/m/Y H:i', strtotime($session['created_at'])); ?> by <?php echo htmlspecialchars($session['created_by']); ?></div>
             <?php if (!empty($session['submitted_by'])): ?>
             <div class="col-md-3 mb-2"><strong>Submitted:</strong> <?php echo !empty($session['submitted_at']) ? date('d/m/Y H:i', strtotime($session['submitted_at'])) : ''; ?> by <?php echo htmlspecialchars($session['submitted_by']); ?></div>

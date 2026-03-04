@@ -25,22 +25,35 @@ function generateSessionCode($connect) {
     return $prefix . str_pad($next, 3, '0', STR_PAD_LEFT);
 }
 
+// Ensure filter_sub_cat column exists in stock_take table
+function ensureFilterSubCatColumn($connect) {
+    $result = $connect->query("SHOW COLUMNS FROM `stock_take` LIKE 'filter_sub_cat'");
+    if ($result && $result->num_rows === 0) {
+        $connect->query("ALTER TABLE `stock_take` ADD COLUMN `filter_sub_cat` VARCHAR(50) DEFAULT NULL AFTER `filter_cat`");
+    }
+}
+
 if ($action === 'create') {
     $desc = trim($_POST['description'] ?? '');
     $type = trim($_POST['type'] ?? 'FULL');
     $filterCat = trim($_POST['filter_cat'] ?? '');
+    $filterSubCat = trim($_POST['filter_sub_cat'] ?? '');
     $createdBy = $_SESSION['admin_name'] ?? 'Admin';
 
     if (!in_array($type, ['FULL', 'PARTIAL'])) $type = 'FULL';
 
+    // Ensure filter_sub_cat column exists
+    ensureFilterSubCatColumn($connect);
+
     $sessionCode = generateSessionCode($connect);
     $filterCatVal = ($type === 'PARTIAL' && $filterCat !== '') ? $filterCat : null;
+    $filterSubCatVal = ($type === 'PARTIAL' && $filterSubCat !== '') ? $filterSubCat : null;
 
     $connect->begin_transaction();
 
     try {
-        $stmt = $connect->prepare("INSERT INTO `stock_take` (`session_code`,`description`,`type`,`filter_cat`,`status`,`created_by`) VALUES (?,?,?,?,'DRAFT',?)");
-        $stmt->bind_param("sssss", $sessionCode, $desc, $type, $filterCatVal, $createdBy);
+        $stmt = $connect->prepare("INSERT INTO `stock_take` (`session_code`,`description`,`type`,`filter_cat`,`filter_sub_cat`,`status`,`created_by`) VALUES (?,?,?,?,?,'DRAFT',?)");
+        $stmt->bind_param("ssssss", $sessionCode, $desc, $type, $filterCatVal, $filterSubCatVal, $createdBy);
         if (!$stmt->execute()) {
             throw new Exception('Failed to create session: ' . $connect->error);
         }
@@ -49,7 +62,9 @@ if ($action === 'create') {
 
         // Populate stock_take_item with current products
         $where = "WHERE `checked` = 'Y'";
-        if ($filterCatVal) {
+        if ($filterSubCatVal) {
+            $where .= " AND `sub_cat` = '" . $connect->real_escape_string($filterSubCatVal) . "'";
+        } elseif ($filterCatVal) {
             $where .= " AND `cat` = '" . $connect->real_escape_string($filterCatVal) . "'";
         }
 
