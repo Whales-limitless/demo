@@ -84,11 +84,19 @@ if ($item_query) {
             $rack_code = $rr['code'];
         }
 
+        // Get rack remark from PRODUCTS.rack field
+        $rack_remark = '';
+        $remark_q = $connect->query("SELECT `rack` FROM `PRODUCTS` WHERE `barcode` = '$barcode' LIMIT 1");
+        if ($remark_q && $rr2 = $remark_q->fetch_assoc()) {
+            $rack_remark = $rr2['rack'] ?? '';
+        }
+
         $order_items[] = [
             'barcode' => $irow['BARCODE'] ?? '',
             'pdesc'   => $irow['PDESC'] ?? '',
             'qty'     => $qty,
-            'rack'    => $rack_code
+            'rack'    => $rack_code,
+            'rack_remark' => $rack_remark
         ];
     }
 }
@@ -221,7 +229,7 @@ body {
 }
 .items-table tbody td { padding: 6px; border-bottom: 1px solid #f3f4f6; }
 .items-table .text-right { text-align: right; }
-.items-table .rack-info { font-size: 11px; color: var(--text-muted); font-style: italic; }
+.items-table .rack-remark { font-size: 11px; color: var(--text-muted); font-style: italic; }
 .items-table tfoot td { padding: 6px; }
 .items-table tfoot .total-row td { font-weight: 700; border-top: 2px solid var(--text); }
 
@@ -323,9 +331,10 @@ body {
             <thead>
                 <tr>
                     <td style="width:5%">S/N</td>
-                    <td style="width:20%">Barcode</td>
-                    <td style="width:55%">Item</td>
-                    <td style="width:20%" class="text-right">Qty</td>
+                    <td style="width:18%">Barcode</td>
+                    <td style="width:37%">Item</td>
+                    <td style="width:10%" class="text-right">Qty</td>
+                    <td style="width:30%" class="text-right">Rack Remark</td>
                 </tr>
             </thead>
             <?php endif; ?>
@@ -336,6 +345,7 @@ body {
                     <td><?php echo htmlspecialchars($item['barcode']); ?></td>
                     <td><?php echo htmlspecialchars($item['pdesc']); ?></td>
                     <td class="text-right"><?php echo $item['qty']; ?></td>
+                    <td class="text-right rack-remark"><?php echo htmlspecialchars($item['rack_remark']); ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -400,9 +410,10 @@ body {
                 <thead>
                     <tr>
                         <td style="width:5%">S/N</td>
-                        <td style="width:20%">Barcode</td>
-                        <td style="width:55%">Item</td>
-                        <td style="width:20%" class="text-right">Qty</td>
+                        <td style="width:18%">Barcode</td>
+                        <td style="width:37%">Item</td>
+                        <td style="width:10%" class="text-right">Qty</td>
+                        <td style="width:30%" class="text-right">Rack Remark</td>
                     </tr>
                 </thead>
                 <?php endif; ?>
@@ -413,6 +424,7 @@ body {
                         <td><?php echo htmlspecialchars($item['barcode']); ?></td>
                         <td><?php echo htmlspecialchars($item['pdesc']); ?></td>
                         <td class="text-right"><?php echo $item['qty']; ?></td>
+                        <td class="text-right rack-remark"><?php echo htmlspecialchars($item['rack_remark']); ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
