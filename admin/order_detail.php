@@ -62,29 +62,60 @@ if ($getdata && $getdata->num_rows > 0) {
     exit;
 }
 
-// Get order items
+// Get order items with rack info from rack_product table (multi-rack support)
 $order_items = [];
 $item_query = $connect->query("SELECT * FROM `orderlist` WHERE SALNUM = '$roworderid' AND PDESC <> 'USE POINTS'");
 if ($item_query) {
     while ($irow = $item_query->fetch_assoc()) {
         $qty = (float)($irow['QTY'] ?? 0);
-
-        // Get rack info
-        $rack_info = '';
         $barcode = $connect->real_escape_string($irow['BARCODE'] ?? '');
-        $rack_q = $connect->query("SELECT rack FROM PRODUCTS WHERE barcode = '$barcode' LIMIT 1");
+
+        // Get rack from rack_product table first
+        $rack_code = '';
+        $rack_q = $connect->query("
+            SELECT r.`code`
+            FROM `rack_product` rp
+            JOIN `rack` r ON rp.`rack_id` = r.`id`
+            WHERE rp.`barcode` = '$barcode' AND r.`status` = 'ACTIVE'
+            ORDER BY r.`code` ASC
+            LIMIT 1
+        ");
         if ($rack_q && $rr = $rack_q->fetch_assoc()) {
-            if (!empty($rr['rack'])) $rack_info = 'Rack: ' . $rr['rack'];
+            $rack_code = $rr['code'];
+        }
+
+        // Fallback to PRODUCTS.rack field
+        if (empty($rack_code)) {
+            $rack_q2 = $connect->query("SELECT `rack` FROM `PRODUCTS` WHERE `barcode` = '$barcode' LIMIT 1");
+            if ($rack_q2 && $rr2 = $rack_q2->fetch_assoc()) {
+                if (!empty($rr2['rack'])) $rack_code = $rr2['rack'];
+            }
         }
 
         $order_items[] = [
             'barcode' => $irow['BARCODE'] ?? '',
             'pdesc'   => $irow['PDESC'] ?? '',
             'qty'     => $qty,
-            'rack'    => $rack_info
+            'rack'    => $rack_code
         ];
     }
 }
+
+// Group items by rack
+$grouped_items = [];
+foreach ($order_items as $item) {
+    $rackKey = !empty($item['rack']) ? $item['rack'] : 'Unassigned';
+    if (!isset($grouped_items[$rackKey])) {
+        $grouped_items[$rackKey] = [];
+    }
+    $grouped_items[$rackKey][] = $item;
+}
+// Sort rack groups alphabetically, Unassigned last
+uksort($grouped_items, function($a, $b) {
+    if ($a === 'Unassigned') return 1;
+    if ($b === 'Unassigned') return -1;
+    return strcmp($a, $b);
+});
 
 // Status label
 $statusLabel = ($rowstatus === 'DONE') ? 'Done' : (($rowstatus === 'DELETED') ? 'Deleted' : 'Pending');
@@ -168,9 +199,6 @@ body {
 .btn-back:hover { background: #d1d5db; color: var(--text); }
 .btn-print-a4 { background: #3b82f6; color: #fff; }
 .btn-print-a4:hover { background: #2563eb; color: #fff; }
-.btn-print-receipt { background: #8b5cf6; color: #fff; }
-.btn-print-receipt:hover { background: #7c3aed; color: #fff; }
-
 /* Header section */
 .order-header {
     text-align: center;
@@ -224,24 +252,24 @@ body {
 .status-paid { background: #dcfce7; color: #16a34a; }
 .status-unpaid { background: #fef2f2; color: #dc2626; }
 
-/* Receipt-specific styles */
-.receipt-view {
-    display: none;
-    max-width: 300px;
-    margin: 0 auto;
-    font-size: 12px;
+/* Rack group styles */
+.rack-group-header {
+    background: #f0f4ff;
+    border-left: 4px solid #3b82f6;
+    padding: 8px 12px;
+    margin-top: 16px;
+    margin-bottom: 0;
+    border-radius: 4px 4px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
-
-.receipt-view .items-table { font-size: 11px; }
-.receipt-view .order-header { margin-bottom: 10px; padding-bottom: 10px; }
-.receipt-view .info-table { font-size: 12px; }
-
-@media print {
-    body.print-receipt .detail-card { max-width: 300px; margin: 0 auto; font-size: 11px; }
-    body.print-receipt .items-table { font-size: 10px; }
-    body.print-receipt .info-table { font-size: 11px; }
-    body.print-receipt .info-table .highlight { font-size: 14px; }
-}
+.rack-group-header i { color: #3b82f6; font-size: 14px; }
+.rack-group-header .rack-label { font-weight: 700; font-size: 14px; color: #1e40af; }
+.rack-group-header .rack-count { font-size: 12px; color: var(--text-muted); }
+.rack-group-header.unassigned { background: #fef3c7; border-left-color: #f59e0b; }
+.rack-group-header.unassigned i { color: #f59e0b; }
+.rack-group-header.unassigned .rack-label { color: #92400e; }
 </style>
 </head>
 <body>
@@ -250,7 +278,6 @@ body {
     <!-- Toolbar -->
     <div class="detail-toolbar no-print">
         <a href="dashboard.php" class="btn-toolbar btn-back"><i class="fas fa-arrow-left"></i> Back</a>
-        <a href="order_detail.php?salnum=<?php echo htmlspecialchars($get_id); ?>&print=receipt" class="btn-toolbar btn-print-receipt"><i class="fas fa-receipt"></i> Print Receipt</a>
         <form method="POST" style="margin:0;display:inline">
             <button type="submit" name="submit_print" class="btn-toolbar btn-print-a4" onclick="window.print();"><i class="fas fa-print"></i> Print A4</button>
         </form>
@@ -298,21 +325,19 @@ body {
             <tr>
                 <td class="label">Customer</td>
                 <td class="sep">:</td>
-                <td><?php echo htmlspecialchars($rowname); ?></td>
-                <td class="label">Email</td>
-                <td class="sep">:</td>
-                <td><?php echo htmlspecialchars($rowemail); ?></td>
-            </tr>
-            <tr>
-                <td class="label">Phone</td>
-                <td class="sep">:</td>
-                <td><?php echo htmlspecialchars($rowphone); ?></td>
-                <td></td><td></td><td></td>
+                <td colspan="4"><?php echo htmlspecialchars($rowname); ?></td>
             </tr>
         </table>
 
-        <!-- Items Table -->
-        <table class="items-table">
+        <!-- Items Grouped by Rack -->
+        <?php $sn = 1; foreach ($grouped_items as $rackName => $items): ?>
+        <div class="rack-group-header<?php echo $rackName === 'Unassigned' ? ' unassigned' : ''; ?>">
+            <i class="fas fa-<?php echo $rackName === 'Unassigned' ? 'question-circle' : 'warehouse'; ?>"></i>
+            <span class="rack-label"><?php echo htmlspecialchars($rackName); ?></span>
+            <span class="rack-count">(<?php echo count($items); ?> item<?php echo count($items) > 1 ? 's' : ''; ?>)</span>
+        </div>
+        <table class="items-table" style="margin-top:0;">
+            <?php if ($sn === 1): ?>
             <thead>
                 <tr>
                     <td style="width:5%">S/N</td>
@@ -321,22 +346,19 @@ body {
                     <td style="width:20%" class="text-right">Qty</td>
                 </tr>
             </thead>
+            <?php endif; ?>
             <tbody>
-                <?php foreach ($order_items as $i => $item): ?>
+                <?php foreach ($items as $item): ?>
                 <tr>
-                    <td><?php echo $i + 1; ?></td>
+                    <td><?php echo $sn++; ?></td>
                     <td><?php echo htmlspecialchars($item['barcode']); ?></td>
-                    <td>
-                        <?php echo htmlspecialchars($item['pdesc']); ?>
-                        <?php if (!empty($item['rack'])): ?>
-                        <div class="rack-info"><?php echo htmlspecialchars($item['rack']); ?></div>
-                        <?php endif; ?>
-                    </td>
+                    <td><?php echo htmlspecialchars($item['pdesc']); ?></td>
                     <td class="text-right"><?php echo $item['qty']; ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
+        <?php endforeach; ?>
 
         <!-- Footer Info -->
         <div class="order-footer">
@@ -390,20 +412,18 @@ body {
                 <tr>
                     <td class="label">Customer</td>
                     <td class="sep">:</td>
-                    <td><?php echo htmlspecialchars($rowname); ?></td>
-                    <td class="label">Email</td>
-                    <td class="sep">:</td>
-                    <td><?php echo htmlspecialchars($rowemail); ?></td>
-                </tr>
-                <tr>
-                    <td class="label">Phone</td>
-                    <td class="sep">:</td>
-                    <td><?php echo htmlspecialchars($rowphone); ?></td>
-                    <td></td><td></td><td></td>
+                    <td colspan="4"><?php echo htmlspecialchars($rowname); ?></td>
                 </tr>
             </table>
 
-            <table class="items-table">
+            <?php $sn2 = 1; foreach ($grouped_items as $rackName => $items): ?>
+            <div class="rack-group-header<?php echo $rackName === 'Unassigned' ? ' unassigned' : ''; ?>">
+                <i class="fas fa-<?php echo $rackName === 'Unassigned' ? 'question-circle' : 'warehouse'; ?>"></i>
+                <span class="rack-label"><?php echo htmlspecialchars($rackName); ?></span>
+                <span class="rack-count">(<?php echo count($items); ?> item<?php echo count($items) > 1 ? 's' : ''; ?>)</span>
+            </div>
+            <table class="items-table" style="margin-top:0;">
+                <?php if ($sn2 === 1): ?>
                 <thead>
                     <tr>
                         <td style="width:5%">S/N</td>
@@ -412,22 +432,19 @@ body {
                         <td style="width:20%" class="text-right">Qty</td>
                     </tr>
                 </thead>
+                <?php endif; ?>
                 <tbody>
-                    <?php foreach ($order_items as $i => $item): ?>
+                    <?php foreach ($items as $item): ?>
                     <tr>
-                        <td><?php echo $i + 1; ?></td>
+                        <td><?php echo $sn2++; ?></td>
                         <td><?php echo htmlspecialchars($item['barcode']); ?></td>
-                        <td>
-                            <?php echo htmlspecialchars($item['pdesc']); ?>
-                            <?php if (!empty($item['rack'])): ?>
-                            <div class="rack-info"><?php echo htmlspecialchars($item['rack']); ?></div>
-                            <?php endif; ?>
-                        </td>
+                        <td><?php echo htmlspecialchars($item['pdesc']); ?></td>
                         <td class="text-right"><?php echo $item['qty']; ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            <?php endforeach; ?>
 
             <table style="width:100%;margin-top:20px;">
                 <tr>
