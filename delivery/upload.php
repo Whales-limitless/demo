@@ -23,11 +23,30 @@ if(isset($_POST["submit"])){
 				$image = imagecreatefromjpeg($source); 
 		} 
 
-		// Save image 
-		imagejpeg($image, $destination, $quality); 
+		// Resize if too large (max 1200px on longest side)
+		$maxDim = 1200;
+		$origW = imagesx($image);
+		$origH = imagesy($image);
+		if ($origW > $maxDim || $origH > $maxDim) {
+			if ($origW >= $origH) {
+				$newW = $maxDim;
+				$newH = intval($origH * $maxDim / $origW);
+			} else {
+				$newH = $maxDim;
+				$newW = intval($origW * $maxDim / $origH);
+			}
+			$resized = imagecreatetruecolor($newW, $newH);
+			imagecopyresampled($resized, $image, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+			imagedestroy($image);
+			$image = $resized;
+		}
 
-		// Return compressed image 
-		return $destination; 
+		// Save image
+		imagejpeg($image, $destination, $quality);
+		imagedestroy($image);
+
+		// Return compressed image
+		return $destination;
 	}
 
 	function convert_filesize($bytes, $decimals = 2) { 
@@ -58,7 +77,7 @@ if(isset($_POST["submit"])){
 				$imageSize = convert_filesize($_FILES["image"]["size"]); 
 
 				// Compress size and upload image 
-				$compressedImage = compressImage($imageTemp, $imageUploadPath, 75); 
+				$compressedImage = compressImage($imageTemp, $imageUploadPath, 40); 
 				
 				if($compressedImage){ 
 					$compressedImageSize = filesize($compressedImage); 
