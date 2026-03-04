@@ -18,7 +18,7 @@ if ($userType === 'D' || $userType === 'A') {
 }
 
 // Get filter
-$filter = $_GET['filter'] ?? 'today';
+$filter = $_GET['filter'] ?? 'all';
 $today = date('Y-m-d');
 $yesterday = date('Y-m-d', strtotime('-1 day'));
 
