@@ -70,7 +70,7 @@ if ($item_query) {
         $qty = (float)($irow['QTY'] ?? 0);
         $barcode = $connect->real_escape_string($irow['BARCODE'] ?? '');
 
-        // Get rack from rack_product table first
+        // Get rack from rack_product table (rack management only)
         $rack_code = '';
         $rack_q = $connect->query("
             SELECT r.`code`
@@ -82,14 +82,6 @@ if ($item_query) {
         ");
         if ($rack_q && $rr = $rack_q->fetch_assoc()) {
             $rack_code = $rr['code'];
-        }
-
-        // Fallback to PRODUCTS.rack field
-        if (empty($rack_code)) {
-            $rack_q2 = $connect->query("SELECT `rack` FROM `PRODUCTS` WHERE `barcode` = '$barcode' LIMIT 1");
-            if ($rack_q2 && $rr2 = $rack_q2->fetch_assoc()) {
-                if (!empty($rr2['rack'])) $rack_code = $rr2['rack'];
-            }
         }
 
         $order_items[] = [
@@ -288,21 +280,11 @@ body {
 
         <!-- Header -->
         <div class="order-header">
+            <div style="text-align:center;font-weight:700;font-size:16px;margin-bottom:8px;">Purchase Order</div>
             <img src="../logo/logo.png" alt="Logo" onerror="this.style.display='none'">
             <div class="merchant-name"><?php echo htmlspecialchars($mer_name); ?></div>
             <div class="merchant-info"><?php echo htmlspecialchars($mer_addr); ?></div>
-            <div class="merchant-info">Contact: <?php echo htmlspecialchars($mer_cont); ?></div>
-            <div style="text-align:right;margin-top:-40px;font-weight:600;font-size:14px;">Sales Order</div>
         </div>
-
-        <!-- To -->
-        <table class="info-table">
-            <tr>
-                <td class="label highlight">To</td>
-                <td class="sep">:</td>
-                <td class="highlight" colspan="4"><?php echo htmlspecialchars($rowto); ?></td>
-            </tr>
-        </table>
 
         <!-- Order Info -->
         <table class="info-table">
@@ -377,20 +359,11 @@ body {
         <!-- Office Copy (print only) -->
         <div class="office-copy" style="page-break-before:always;">
             <div class="order-header">
+                <div style="text-align:center;font-weight:700;font-size:16px;margin-bottom:8px;">Purchase Order</div>
                 <img src="../logo/logo.png" alt="Logo" style="width:70px;height:70px;" onerror="this.style.display='none'">
                 <div class="merchant-name"><?php echo htmlspecialchars($mer_name); ?></div>
                 <div class="merchant-info"><?php echo htmlspecialchars($mer_addr); ?></div>
-                <div class="merchant-info">Contact: <?php echo htmlspecialchars($mer_cont); ?></div>
-                <div style="text-align:right;margin-top:-40px;font-weight:600;font-size:14px;">Sales Order</div>
             </div>
-
-            <table class="info-table">
-                <tr>
-                    <td class="label highlight">To</td>
-                    <td class="sep">:</td>
-                    <td class="highlight" colspan="4"><?php echo htmlspecialchars($rowto); ?></td>
-                </tr>
-            </table>
 
             <table class="info-table">
                 <tr>
