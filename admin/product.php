@@ -87,6 +87,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .table-loading { text-align: center; padding: 40px; color: var(--text-muted); }
 .table-loading i { font-size: 24px; margin-bottom: 8px; display: block; }
 
+/* Product image upload */
+.img-upload-area { border: 2px dashed #d1d5db; border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all var(--transition); background: #fafbfc; position: relative; }
+.img-upload-area:hover { border-color: var(--primary); background: #fff5f5; }
+.img-upload-area.has-image { border-style: solid; border-color: #d1d5db; padding: 8px; }
+.img-upload-area .upload-placeholder { color: var(--text-muted); font-size: 13px; }
+.img-upload-area .upload-placeholder i { font-size: 28px; display: block; margin-bottom: 8px; color: #9ca3af; }
+.img-upload-area img { max-width: 100%; max-height: 200px; border-radius: 6px; object-fit: contain; }
+.img-upload-area .btn-remove-img { position: absolute; top: 4px; right: 4px; background: #ef4444; color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+.product-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 1px solid #e5e7eb; }
+.product-thumb-placeholder { width: 40px; height: 40px; border-radius: 6px; background: #f3f4f6; display: inline-flex; align-items: center; justify-content: center; color: #d1d5db; font-size: 16px; }
+
 @media (max-width: 768px) {
     .page-content { padding: 16px; }
     .table-card { padding: 12px; }
@@ -144,6 +155,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 <thead>
                     <tr>
                         <th style="width:40px">No</th>
+                        <th style="width:50px">Img</th>
                         <th>Barcode</th>
                         <th>Name</th>
                         <th>Category</th>
@@ -154,7 +166,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     </tr>
                 </thead>
                 <tbody id="dataBody">
-                    <tr class="no-results"><td colspan="8" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
+                    <tr class="no-results"><td colspan="9" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -193,6 +205,20 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Description</label>
                     <textarea id="fDescription" class="form-control" rows="2" placeholder="Product description"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Product Image</label>
+                    <input type="file" id="fImage" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none;" onchange="previewImage(this);">
+                    <div class="img-upload-area" id="imgUploadArea" onclick="document.getElementById('fImage').click();">
+                        <div class="upload-placeholder" id="imgPlaceholder">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            Click to upload image<br><small>JPG, PNG, GIF, WebP (max 10MB). Will be auto-compressed.</small>
+                        </div>
+                        <img id="imgPreview" src="" alt="" style="display:none;">
+                        <button type="button" class="btn-remove-img" id="btnRemoveImg" style="display:none;" onclick="removeImage(event);"><i class="fas fa-times"></i></button>
+                    </div>
+                    <input type="hidden" id="fExistingImage" value="">
+                    <input type="hidden" id="fRemoveImage" value="0">
                 </div>
                 <div class="row">
                     <div class="col-md-4 mb-3">
@@ -369,6 +395,11 @@ function renderTable(data) {
 
         html += '<tr>';
         html += '<td>' + (offset + i + 1) + '</td>';
+        if (p.image) {
+            html += '<td><img src="../product_img/' + escHtml(p.image) + '" class="product-thumb" loading="lazy"></td>';
+        } else {
+            html += '<td><div class="product-thumb-placeholder"><i class="fas fa-image"></i></div></td>';
+        }
         html += '<td><strong>' + escHtml(p.barcode || '') + '</strong></td>';
         html += '<td>' + escHtml(p.name || '') + '</td>';
         html += '<td>' + escHtml(p.cat || '') + '</td>';
@@ -540,6 +571,15 @@ function clearForm() {
     document.getElementById('fRack').value = '';
     document.getElementById('fChecked').value = 'Y';
     document.getElementById('fBarcode').disabled = false;
+    // Reset image
+    document.getElementById('fImage').value = '';
+    document.getElementById('fExistingImage').value = '';
+    document.getElementById('fRemoveImage').value = '0';
+    document.getElementById('imgPreview').style.display = 'none';
+    document.getElementById('imgPreview').src = '';
+    document.getElementById('imgPlaceholder').style.display = '';
+    document.getElementById('btnRemoveImg').style.display = 'none';
+    document.getElementById('imgUploadArea').classList.remove('has-image');
 }
 
 function openCreateModal() {
@@ -585,6 +625,9 @@ function openEditModal(id) {
                 }
             }
 
+            // Show existing image
+            showExistingImage(data.image || '');
+
             productModal.show();
         }
     });
@@ -615,25 +658,33 @@ function saveProduct() {
     if (catSel.value === '') { catName = ''; catCode = ''; }
     if (subSel.value === '') { subName = ''; subCode = ''; }
 
-    var postData = {
-        action: editId ? 'update' : 'create',
-        barcode: barcode,
-        code: document.getElementById('fCode').value.trim(),
-        name: name,
-        description: document.getElementById('fDescription').value.trim(),
-        cat: catName,
-        sub_cat: subName,
-        cat_code: catCode,
-        sub_code: subCode,
-        uom: document.getElementById('fUom').value.trim(),
-        qoh: document.getElementById('fQoh').value,
-        rack: rackValue,
-        checked: document.getElementById('fChecked').value
-    };
-    if (editId) postData.id = editId;
+    var formData = new FormData();
+    formData.append('action', editId ? 'update' : 'create');
+    formData.append('barcode', barcode);
+    formData.append('code', document.getElementById('fCode').value.trim());
+    formData.append('name', name);
+    formData.append('description', document.getElementById('fDescription').value.trim());
+    formData.append('cat', catName);
+    formData.append('sub_cat', subName);
+    formData.append('cat_code', catCode);
+    formData.append('sub_code', subCode);
+    formData.append('uom', document.getElementById('fUom').value.trim());
+    formData.append('qoh', document.getElementById('fQoh').value);
+    formData.append('rack', rackValue);
+    formData.append('checked', document.getElementById('fChecked').value);
+    if (editId) formData.append('id', editId);
+
+    // Image upload
+    var imageFile = document.getElementById('fImage').files[0];
+    if (imageFile) {
+        formData.append('product_image', imageFile);
+    }
+    formData.append('existing_image', document.getElementById('fExistingImage').value);
+    formData.append('remove_image', document.getElementById('fRemoveImage').value);
 
     $.ajax({
-        type: 'POST', url: 'product_ajax.php', data: postData, dataType: 'json',
+        type: 'POST', url: 'product_ajax.php', data: formData, dataType: 'json',
+        processData: false, contentType: false,
         success: function(data) {
             if (data.success) {
                 productModal.hide();
@@ -824,6 +875,52 @@ function activateUom(id) {
         if (r.success) loadManageUoms();
         else Swal.fire({ icon: 'error', text: r.error });
     }, 'json');
+}
+
+// ===================== IMAGE UPLOAD =====================
+
+function previewImage(input) {
+    if (input.files && input.files[0]) {
+        var file = input.files[0];
+        // Validate size (10MB max)
+        if (file.size > 10 * 1024 * 1024) {
+            Swal.fire({ icon: 'warning', text: 'Image must be smaller than 10MB.' });
+            input.value = '';
+            return;
+        }
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('imgPreview').src = e.target.result;
+            document.getElementById('imgPreview').style.display = '';
+            document.getElementById('imgPlaceholder').style.display = 'none';
+            document.getElementById('btnRemoveImg').style.display = 'flex';
+            document.getElementById('imgUploadArea').classList.add('has-image');
+            document.getElementById('fRemoveImage').value = '0';
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function removeImage(e) {
+    e.stopPropagation();
+    document.getElementById('fImage').value = '';
+    document.getElementById('imgPreview').style.display = 'none';
+    document.getElementById('imgPreview').src = '';
+    document.getElementById('imgPlaceholder').style.display = '';
+    document.getElementById('btnRemoveImg').style.display = 'none';
+    document.getElementById('imgUploadArea').classList.remove('has-image');
+    document.getElementById('fRemoveImage').value = '1';
+}
+
+function showExistingImage(imageName) {
+    if (imageName) {
+        document.getElementById('fExistingImage').value = imageName;
+        document.getElementById('imgPreview').src = '../product_img/' + imageName;
+        document.getElementById('imgPreview').style.display = '';
+        document.getElementById('imgPlaceholder').style.display = 'none';
+        document.getElementById('btnRemoveImg').style.display = 'flex';
+        document.getElementById('imgUploadArea').classList.add('has-image');
+    }
 }
 
 // Modal autofocus
