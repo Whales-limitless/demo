@@ -14,12 +14,6 @@ $connect->set_charset("utf8mb4");
 
 $action = $_POST['action'] ?? '';
 
-// ===================== AUTO-MIGRATION: ensure image column exists =====================
-$colCheck = $connect->query("SHOW COLUMNS FROM `PRODUCTS` LIKE 'image'");
-if ($colCheck && $colCheck->num_rows === 0) {
-    $connect->query("ALTER TABLE `PRODUCTS` ADD COLUMN `image` VARCHAR(255) DEFAULT NULL");
-}
-
 // ===================== IMAGE UPLOAD HELPER =====================
 
 function handleProductImage($existingImage = '', $removeImage = false) {
@@ -172,7 +166,7 @@ if ($action === 'list') {
     $offset = ($page - 1) * $perPage;
 
     // Fetch page
-    $sql = "SELECT `id`, `barcode`, `code`, `name`, `cat`, `sub_cat`, COALESCE(`qoh`, 0) AS `qoh`, `uom`, `rack`, `checked`, `image`
+    $sql = "SELECT `id`, `barcode`, `code`, `name`, `cat`, `sub_cat`, COALESCE(`qoh`, 0) AS `qoh`, `uom`, `rack`, `checked`, `img1` AS `image`
             FROM `PRODUCTS` WHERE $where ORDER BY `checked` DESC, `name` ASC LIMIT ?, ?";
     $stmt = $connect->prepare($sql);
     $fetchTypes = $types . "ii";
@@ -196,7 +190,7 @@ if ($action === 'list') {
 
 } elseif ($action === 'get') {
     $id = intval($_POST['id'] ?? 0);
-    $stmt = $connect->prepare("SELECT * FROM `PRODUCTS` WHERE `id` = ? LIMIT 1");
+    $stmt = $connect->prepare("SELECT *, `img1` AS `image` FROM `PRODUCTS` WHERE `id` = ? LIMIT 1");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -246,7 +240,7 @@ if ($action === 'list') {
     }
     $image = is_string($imageResult) ? $imageResult : '';
 
-    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`cat_code`,`sub_code`,`uom`,`rack`,`qoh`,`checked`,`image`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`cat_code`,`sub_code`,`uom`,`rack`,`qoh`,`checked`,`img1`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
     $stmt->bind_param("ssssssssssdss", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $qoh, $checked, $image);
 
     if ($stmt->execute()) {
@@ -286,7 +280,7 @@ if ($action === 'list') {
     }
     $image = is_string($imageResult) ? $imageResult : $existingImage;
 
-    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`cat_code`=?,`sub_code`=?,`uom`=?,`rack`=?,`qoh`=?,`checked`=?,`image`=? WHERE `id`=?");
+    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`cat_code`=?,`sub_code`=?,`uom`=?,`rack`=?,`qoh`=?,`checked`=?,`img1`=? WHERE `id`=?");
     $stmt->bind_param("ssssssssssdssi", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $qoh, $checked, $image, $id);
 
     if ($stmt->execute()) {
