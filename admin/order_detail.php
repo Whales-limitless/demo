@@ -146,17 +146,17 @@ body {
 }
 
 .detail-container {
-    max-width: 900px;
+    max-width: 302px;
     margin: 0 auto;
-    padding: 24px 16px;
+    padding: 8px 4px;
 }
 
 .detail-card {
     background: #fff;
     border-radius: var(--radius);
     box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-    padding: 32px;
-    margin-bottom: 24px;
+    padding: 8px;
+    margin-bottom: 8px;
 }
 
 /* Print-only styles */
@@ -165,9 +165,10 @@ body {
 @media print {
     .no-print { display: none !important; }
     .office-copy { display: block; }
-    body { background: #fff; }
+    body { background: #fff; margin: 0; padding: 0; }
     .detail-card { box-shadow: none; padding: 0; border-radius: 0; }
-    .detail-container { padding: 0; max-width: 100%; }
+    .detail-container { padding: 0; max-width: 80mm; margin: 0; }
+    @page { size: 80mm auto; margin: 2mm; }
 }
 
 /* Toolbar */
@@ -175,9 +176,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 6px;
     flex-wrap: wrap;
-    margin-bottom: 24px;
+    margin-bottom: 8px;
 }
 
 .btn-toolbar {
@@ -197,76 +198,65 @@ body {
 
 .btn-back { background: #e5e7eb; color: var(--text); }
 .btn-back:hover { background: #d1d5db; color: var(--text); }
-.btn-print-a4 { background: #3b82f6; color: #fff; }
-.btn-print-a4:hover { background: #2563eb; color: #fff; }
+.btn-print { background: #3b82f6; color: #fff; }
+.btn-print:hover { background: #2563eb; color: #fff; }
 /* Header section */
 .order-header {
     text-align: center;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
-    border-bottom: 2px solid var(--text);
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--text);
 }
 
-.order-header img { width: 70px; height: 70px; margin-bottom: 8px; }
-.order-header .merchant-name { font-weight: 700; font-size: 16px; }
-.order-header .merchant-info { font-size: 13px; color: var(--text-muted); }
+.order-header img { width: 50px; height: 50px; margin-bottom: 4px; }
+.order-header .merchant-name { font-weight: 700; font-size: 13px; }
+.order-header .merchant-info { font-size: 10px; color: var(--text-muted); }
 
 /* Info grid */
-.info-table { width: 100%; margin-bottom: 24px; font-size: 14px; }
-.info-table td { padding: 4px 8px; vertical-align: top; }
-.info-table .label { color: var(--text-muted); width: 13%; }
-.info-table .sep { width: 2%; }
-.info-table .highlight { font-size: 20px; font-weight: 700; }
+.info-table { width: 100%; margin-bottom: 8px; font-size: 11px; }
+.info-table td { padding: 1px 2px; vertical-align: top; }
+.info-table .label { color: var(--text-muted); white-space: nowrap; }
+.info-table .sep { width: 8px; }
+.info-table .highlight { font-size: 14px; font-weight: 700; }
 
 /* Items table */
-.items-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+.items-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 4px; }
 .items-table thead td {
-    border-top: 2px solid var(--text);
-    border-bottom: 2px solid var(--text);
-    padding: 8px 6px;
+    border-top: 1px dashed var(--text);
+    border-bottom: 1px dashed var(--text);
+    padding: 4px 2px;
     font-weight: 600;
-    background: #f9fafb;
+    font-size: 10px;
 }
-.items-table tbody td { padding: 6px; border-bottom: 1px solid #f3f4f6; }
+.items-table tbody td { padding: 3px 2px; border-bottom: 1px dotted #ddd; font-size: 10px; }
 .items-table .text-right { text-align: right; }
-.items-table .rack-remark { font-size: 11px; color: var(--text-muted); font-style: italic; }
-.items-table tfoot td { padding: 6px; }
-.items-table tfoot .total-row td { font-weight: 700; border-top: 2px solid var(--text); }
+.items-table .rack-remark { font-size: 9px; color: var(--text-muted); font-style: italic; }
+.items-table tfoot td { padding: 3px 2px; }
+.items-table tfoot .total-row td { font-weight: 700; border-top: 1px dashed var(--text); }
 
 /* Order footer info */
 .order-footer {
-    border-top: 2px solid var(--text);
-    padding-top: 12px;
-    font-size: 13px;
+    border-top: 1px dashed var(--text);
+    padding-top: 6px;
+    font-size: 10px;
     color: var(--text-muted);
 }
-
-.order-footer .status-badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.status-paid { background: #dcfce7; color: #16a34a; }
-.status-unpaid { background: #fef2f2; color: #dc2626; }
 
 /* Rack group styles */
 .rack-group-header {
     background: #f0f4ff;
-    border-left: 4px solid #3b82f6;
-    padding: 8px 12px;
-    margin-top: 16px;
+    border-left: 3px solid #3b82f6;
+    padding: 4px 6px;
+    margin-top: 6px;
     margin-bottom: 0;
-    border-radius: 4px 4px 0 0;
+    border-radius: 2px 2px 0 0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
 }
-.rack-group-header i { color: #3b82f6; font-size: 14px; }
-.rack-group-header .rack-label { font-weight: 700; font-size: 14px; color: #1e40af; }
-.rack-group-header .rack-count { font-size: 12px; color: var(--text-muted); }
+.rack-group-header i { color: #3b82f6; font-size: 10px; }
+.rack-group-header .rack-label { font-weight: 700; font-size: 11px; color: #1e40af; }
+.rack-group-header .rack-count { font-size: 9px; color: var(--text-muted); }
 .rack-group-header.unassigned { background: #fef3c7; border-left-color: #f59e0b; }
 .rack-group-header.unassigned i { color: #f59e0b; }
 .rack-group-header.unassigned .rack-label { color: #92400e; }
@@ -279,7 +269,7 @@ body {
     <div class="detail-toolbar no-print">
         <a href="dashboard.php" class="btn-toolbar btn-back"><i class="fas fa-arrow-left"></i> Back</a>
         <form method="POST" style="margin:0;display:inline">
-            <button type="submit" name="submit_print" class="btn-toolbar btn-print-a4" onclick="window.print();"><i class="fas fa-print"></i> Print A4</button>
+            <button type="submit" name="submit_print" class="btn-toolbar btn-print" onclick="window.print();"><i class="fas fa-print"></i> Print</button>
         </form>
     </div>
 
@@ -288,7 +278,7 @@ body {
 
         <!-- Header -->
         <div class="order-header">
-            <div style="text-align:center;font-weight:700;font-size:16px;margin-bottom:8px;">Purchase Order</div>
+            <div style="text-align:center;font-weight:700;font-size:13px;margin-bottom:4px;">Purchase Order</div>
             <img src="../logo/logo.png" alt="Logo" onerror="this.style.display='none'">
             <div class="merchant-name"><?php echo htmlspecialchars($mer_name); ?></div>
             <div class="merchant-info"><?php echo htmlspecialchars($mer_addr); ?></div>
@@ -300,22 +290,16 @@ body {
                 <td class="label">Order ID</td>
                 <td class="sep">:</td>
                 <td><strong><?php echo htmlspecialchars($roworderid); ?></strong></td>
-                <td class="label">Address</td>
-                <td class="sep">:</td>
-                <td><?php echo htmlspecialchars($rowaddress ?: 'N/A'); ?></td>
             </tr>
             <tr>
                 <td class="label">Date</td>
                 <td class="sep">:</td>
-                <td><?php echo !empty($rowdate) ? date('d/m/Y', strtotime($rowdate)) : ''; ?></td>
-                <td class="label">Time</td>
-                <td class="sep">:</td>
-                <td><?php echo htmlspecialchars($rowttime); ?></td>
+                <td><?php echo !empty($rowdate) ? date('d/m/Y', strtotime($rowdate)) : ''; ?> <?php echo htmlspecialchars($rowttime); ?></td>
             </tr>
             <tr>
-                <td class="label">Customer</td>
+                <td class="label">Staff</td>
                 <td class="sep">:</td>
-                <td colspan="4"><?php echo htmlspecialchars($rowname); ?></td>
+                <td><?php echo htmlspecialchars($rowname); ?></td>
             </tr>
         </table>
 
@@ -352,25 +336,16 @@ body {
         </table>
         <?php endforeach; ?>
 
-        <!-- Footer Info -->
+        <!-- Footer -->
         <div class="order-footer">
-            <p>
-                <strong>Order date:</strong>
-                <?php echo (!empty($rowdate) ? date('d/m/Y', strtotime($rowdate)) : '') . ' ' . htmlspecialchars($rowttime); ?>
-            </p>
-            <p>
-                <strong>Status:</strong>
-                <span class="status-badge <?php echo $statusLabel === 'Done' ? 'status-paid' : 'status-unpaid'; ?>">
-                    <?php echo $statusLabel; ?>
-                </span>
-            </p>
+            <p style="text-align:center;margin:4px 0;">--- End ---</p>
         </div>
 
         <!-- Office Copy (print only) -->
         <div class="office-copy" style="page-break-before:always;">
             <div class="order-header">
-                <div style="text-align:center;font-weight:700;font-size:16px;margin-bottom:8px;">Purchase Order</div>
-                <img src="../logo/logo.png" alt="Logo" style="width:70px;height:70px;" onerror="this.style.display='none'">
+                <div style="text-align:center;font-weight:700;font-size:13px;margin-bottom:4px;">Purchase Order</div>
+                <img src="../logo/logo.png" alt="Logo" style="width:50px;height:50px;" onerror="this.style.display='none'">
                 <div class="merchant-name"><?php echo htmlspecialchars($mer_name); ?></div>
                 <div class="merchant-info"><?php echo htmlspecialchars($mer_addr); ?></div>
             </div>
@@ -380,22 +355,16 @@ body {
                     <td class="label">Order ID</td>
                     <td class="sep">:</td>
                     <td><strong><?php echo htmlspecialchars($roworderid); ?></strong></td>
-                    <td class="label">Address</td>
-                    <td class="sep">:</td>
-                    <td><?php echo htmlspecialchars($rowaddress ?: 'N/A'); ?></td>
                 </tr>
                 <tr>
                     <td class="label">Date</td>
                     <td class="sep">:</td>
-                    <td><?php echo !empty($rowdate) ? date('d/m/Y', strtotime($rowdate)) : ''; ?></td>
-                    <td class="label">Time</td>
-                    <td class="sep">:</td>
-                    <td><?php echo htmlspecialchars($rowttime); ?></td>
+                    <td><?php echo !empty($rowdate) ? date('d/m/Y', strtotime($rowdate)) : ''; ?> <?php echo htmlspecialchars($rowttime); ?></td>
                 </tr>
                 <tr>
-                    <td class="label">Customer</td>
+                    <td class="label">Staff</td>
                     <td class="sep">:</td>
-                    <td colspan="4"><?php echo htmlspecialchars($rowname); ?></td>
+                    <td><?php echo htmlspecialchars($rowname); ?></td>
                 </tr>
             </table>
 
@@ -431,19 +400,12 @@ body {
             </table>
             <?php endforeach; ?>
 
-            <table style="width:100%;margin-top:20px;">
-                <tr>
-                    <td style="width:70%">OFFICE COPY</td>
-                    <td style="width:30%;text-align:center;">
-                        <br><br>
-                        <hr style="border-top:1px solid #000;">
-                        Customer Signature
-                    </td>
-                </tr>
-            </table>
+            <div style="margin-top:10px;font-size:10px;">
+                <p style="margin:0;">OFFICE COPY</p>
+            </div>
 
-            <div class="order-footer" style="margin-top:12px;">
-                <p>Order date: <?php echo (!empty($rowdate) ? date('d/m/Y', strtotime($rowdate)) : '') . ' ' . htmlspecialchars($rowttime); ?></p>
+            <div class="order-footer" style="margin-top:6px;">
+                <p style="text-align:center;margin:4px 0;">--- End ---</p>
             </div>
         </div>
 
