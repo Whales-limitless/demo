@@ -171,13 +171,28 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 .product-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 .tag { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
-.tag-sku { background: #ede9fe; color: #6d28d9; }
-.tag-barcode { background: #e0f2fe; color: #0369a1; }
 .tag-rack { background: #fef3c7; color: #92400e; }
 .tag-rack.unset { background: var(--bg); color: var(--text-muted); }
+.tag-rack-remark { background: #e0f2fe; color: #0369a1; }
+.tag-btn { cursor: pointer; transition: all var(--transition); }
+.tag-btn:hover { opacity: 0.8; transform: translateY(-1px); }
 
-.qty-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
-.qty-label span { font-weight: 700; color: var(--text); }
+.rack-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; justify-content: center; align-items: center; padding: 16px; }
+.rack-modal-overlay.active { display: flex; }
+.rack-modal { background: var(--surface); border-radius: var(--radius); padding: 24px; max-width: 400px; width: 100%; box-shadow: var(--shadow-lg); animation: fadeUp 0.25s ease; }
+.rack-modal h3 { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+.rack-modal label { font-size: 13px; font-weight: 600; color: var(--text); display: block; margin-bottom: 6px; }
+.rack-modal input, .rack-modal select { width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; transition: border-color var(--transition); margin-bottom: 12px; }
+.rack-modal input:focus, .rack-modal select:focus { border-color: var(--primary); }
+.rack-modal-actions { display: flex; gap: 8px; margin-top: 8px; }
+.rack-modal-actions button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; transition: all var(--transition); }
+.rack-modal-actions .btn-save { background: var(--primary); color: #fff; }
+.rack-modal-actions .btn-save:hover { background: var(--primary-dark); }
+.rack-modal-actions .btn-cancel { background: var(--bg); color: var(--text); }
+.rack-modal-actions .btn-cancel:hover { background: #e5e7eb; }
+
+.qty-label { font-size: 16px; color: #1a1a1a; margin-bottom: 8px; font-weight: 800; }
+.qty-label span { font-weight: 800; color: #1a1a1a; }
 
 .product-actions { margin-top: auto; padding-top: 8px; }
 .qty-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
@@ -273,18 +288,15 @@ function renderProductCard(p, index) {
   }
 
   var tags = '';
-  if (p.sku) tags += '<span class="tag tag-sku">SKU: ' + p.sku + '</span>';
-  if (p.barcode) tags += '<span class="tag tag-barcode">BC: ' + p.barcode + '</span>';
-  if (p.rack_location) {
-    tags += '<span class="tag tag-rack">Rack: ' + p.rack_location + '</span>';
-  } else {
-    tags += '<span class="tag tag-rack unset">No Rack</span>';
-  }
+  var rackLabel = p.rack_location ? 'Rack: ' + p.rack_location : 'No Rack';
+  var rackClass = p.rack_location ? 'tag tag-rack tag-btn' : 'tag tag-rack unset tag-btn';
+  tags += '<span class="' + rackClass + '" onclick="openRackModal(' + p.id + ', \'' + (p.rack_location || '').replace(/'/g, "\\'") + '\')">&#9881; ' + rackLabel + '</span>';
+  tags += '<span class="tag tag-rack-remark tag-btn" onclick="openRackRemarkModal(' + p.id + ', \'' + (p.rack_location || '').replace(/'/g, "\\'") + '\')">&#9998; Rack Remark</span>';
 
   var bc = p.inStock ? 'active' : 'disabled';
   var bt = p.inStock ? 'Add to Cart' : 'Out of Stock';
 
-  return '<div class="product-card" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" data-barcode="' + (p.barcode || '').toLowerCase() + '" style="animation-delay:' + (index+1)*0.03 + 's">' +
+  return '<div class="product-card" data-id="' + p.id + '" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" data-barcode="' + (p.barcode || '').toLowerCase() + '" style="animation-delay:' + (index+1)*0.03 + 's">' +
     '<div class="product-img-wrap">' + imgHtml + badgeHtml + '</div>' +
     '<div class="product-info">' +
       '<div class="product-name">' + p.name + '</div>' +
@@ -517,6 +529,166 @@ function addToCart(productId) {
     document.getElementById('cartBadge').textContent = cart.length;
   } catch(e) {}
 })();
+
+// ==================== RACK MODALS ====================
+var rackEditProductId = null;
+var rackListCache = null;
+
+function openRackModal(productId, currentRack) {
+  rackEditProductId = productId;
+  document.getElementById('rackModalSelect').value = currentRack || '';
+  document.getElementById('rackModalOverlay').classList.add('active');
+
+  // Load rack list if not cached
+  if (rackListCache === null) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'product_rack_ajax.php', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === 4 && xhr.status === 200) {
+        try {
+          rackListCache = JSON.parse(xhr.responseText);
+          populateRackSelect(currentRack);
+        } catch(e) { rackListCache = []; }
+      }
+    };
+    xhr.send('action=rack_list');
+  } else {
+    populateRackSelect(currentRack);
+  }
+}
+
+function populateRackSelect(currentVal) {
+  var sel = document.getElementById('rackModalSelect');
+  sel.innerHTML = '<option value="">-- No Rack --</option>';
+  (rackListCache || []).forEach(function(r) {
+    var opt = document.createElement('option');
+    opt.value = r.code;
+    opt.textContent = r.code + (r.description ? ' - ' + r.description : '');
+    if (r.code === currentVal) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function closeRackModal() {
+  document.getElementById('rackModalOverlay').classList.remove('active');
+  rackEditProductId = null;
+}
+
+function saveRack() {
+  if (!rackEditProductId) return;
+  var val = document.getElementById('rackModalSelect').value.trim();
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', 'product_rack_ajax.php', true);
+  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4 && xhr.status === 200) {
+      try {
+        var resp = JSON.parse(xhr.responseText);
+        if (resp.success) {
+          updateProductRackInData(rackEditProductId, resp.rack);
+          closeRackModal();
+        } else {
+          alert('Failed: ' + (resp.error || 'Unknown error'));
+        }
+      } catch(e) { alert('Failed to update rack'); }
+    }
+  };
+  xhr.send('action=update_rack&id=' + rackEditProductId + '&rack=' + encodeURIComponent(val));
+}
+
+function openRackRemarkModal(productId, currentRack) {
+  rackEditProductId = productId;
+  document.getElementById('rackRemarkInput').value = currentRack || '';
+  document.getElementById('rackRemarkModalOverlay').classList.add('active');
+  document.getElementById('rackRemarkInput').focus();
+}
+
+function closeRackRemarkModal() {
+  document.getElementById('rackRemarkModalOverlay').classList.remove('active');
+  rackEditProductId = null;
+}
+
+function saveRackRemark() {
+  if (!rackEditProductId) return;
+  var val = document.getElementById('rackRemarkInput').value.trim();
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', 'product_rack_ajax.php', true);
+  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4 && xhr.status === 200) {
+      try {
+        var resp = JSON.parse(xhr.responseText);
+        if (resp.success) {
+          updateProductRackInData(rackEditProductId, resp.rack);
+          closeRackRemarkModal();
+        } else {
+          alert('Failed: ' + (resp.error || 'Unknown error'));
+        }
+      } catch(e) { alert('Failed to update rack remark'); }
+    }
+  };
+  xhr.send('action=update_rack&id=' + rackEditProductId + '&rack=' + encodeURIComponent(val));
+}
+
+function updateProductRackInData(productId, newRack) {
+  // Update the data model
+  allCategories.forEach(function(cat) {
+    cat.subcategories.forEach(function(sc) {
+      sc.products.forEach(function(p) {
+        if (p.id === productId) {
+          p.rack_location = newRack || null;
+        }
+      });
+    });
+  });
+  // Re-render the specific product card's tags
+  var card = document.querySelector('.product-card[data-id="' + productId + '"]');
+  if (card) {
+    var tagsEl = card.querySelector('.product-tags');
+    if (tagsEl) {
+      var rackLabel = newRack ? 'Rack: ' + newRack : 'No Rack';
+      var rackClass = newRack ? 'tag tag-rack tag-btn' : 'tag tag-rack unset tag-btn';
+      tagsEl.innerHTML = '<span class="' + rackClass + '" onclick="openRackModal(' + productId + ', \'' + (newRack || '').replace(/'/g, "\\'") + '\')">&#9881; ' + rackLabel + '</span>' +
+        '<span class="tag tag-rack-remark tag-btn" onclick="openRackRemarkModal(' + productId + ', \'' + (newRack || '').replace(/'/g, "\\'") + '\')">&#9998; Rack Remark</span>';
+    }
+  }
+}
+
+// Close modals on overlay click
+document.getElementById('rackModalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeRackModal();
+});
+document.getElementById('rackRemarkModalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeRackRemarkModal();
+});
 </script>
+
+<!-- Rack Edit Modal -->
+<div class="rack-modal-overlay" id="rackModalOverlay">
+  <div class="rack-modal">
+    <h3>Rack Management</h3>
+    <label>Select Rack</label>
+    <select id="rackModalSelect"><option value="">-- No Rack --</option></select>
+    <div class="rack-modal-actions">
+      <button class="btn-cancel" onclick="closeRackModal()">Cancel</button>
+      <button class="btn-save" onclick="saveRack()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rack Remark Edit Modal -->
+<div class="rack-modal-overlay" id="rackRemarkModalOverlay">
+  <div class="rack-modal">
+    <h3>Edit Rack Remark</h3>
+    <label>Rack Remark</label>
+    <input type="text" id="rackRemarkInput" placeholder="Enter rack remark...">
+    <div class="rack-modal-actions">
+      <button class="btn-cancel" onclick="closeRackRemarkModal()">Cancel</button>
+      <button class="btn-save" onclick="saveRackRemark()">Save</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
