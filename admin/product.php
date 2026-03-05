@@ -396,7 +396,7 @@ function renderTable(data) {
         html += '<tr>';
         html += '<td>' + (offset + i + 1) + '</td>';
         if (p.image) {
-            html += '<td><img src="../product_img/' + escHtml(p.image) + '" class="product-thumb" loading="lazy"></td>';
+            html += '<td><img src="../img/' + escHtml(p.image) + '" class="product-thumb" loading="lazy"></td>';
         } else {
             html += '<td><div class="product-thumb-placeholder"><i class="fas fa-image"></i></div></td>';
         }
@@ -915,7 +915,7 @@ function removeImage(e) {
 function showExistingImage(imageName) {
     if (imageName) {
         document.getElementById('fExistingImage').value = imageName;
-        document.getElementById('imgPreview').src = '../product_img/' + imageName;
+        document.getElementById('imgPreview').src = '../img/' + imageName;
         document.getElementById('imgPreview').style.display = '';
         document.getElementById('imgPlaceholder').style.display = 'none';
         document.getElementById('btnRemoveImg').style.display = 'flex';
