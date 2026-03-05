@@ -284,6 +284,11 @@ body {
             <div class="merchant-info"><?php echo htmlspecialchars($mer_addr); ?></div>
         </div>
 
+        <!-- TO -->
+        <?php if (!empty($rowto)): ?>
+        <div style="font-size:14px;font-weight:700;margin-bottom:6px;">TO: <?php echo htmlspecialchars($rowto); ?></div>
+        <?php endif; ?>
+
         <!-- Order Info -->
         <table class="info-table">
             <tr>
@@ -304,31 +309,25 @@ body {
         </table>
 
         <!-- Items Grouped by Rack -->
-        <?php $sn = 1; foreach ($grouped_items as $rackName => $items): ?>
+        <?php foreach ($grouped_items as $rackName => $items): ?>
         <div class="rack-group-header<?php echo $rackName === 'Unassigned' ? ' unassigned' : ''; ?>">
             <i class="fas fa-<?php echo $rackName === 'Unassigned' ? 'question-circle' : 'warehouse'; ?>"></i>
             <span class="rack-label"><?php echo htmlspecialchars($rackName); ?></span>
             <span class="rack-count">(<?php echo count($items); ?> item<?php echo count($items) > 1 ? 's' : ''; ?>)</span>
         </div>
         <table class="items-table" style="margin-top:0;">
-            <?php if ($sn === 1): ?>
             <thead>
                 <tr>
-                    <td style="width:5%">S/N</td>
-                    <td style="width:18%">Barcode</td>
-                    <td style="width:37%">Item</td>
-                    <td style="width:10%" class="text-right">Qty</td>
-                    <td style="width:30%" class="text-right">Rack Remark</td>
+                    <td style="width:15%">Qty</td>
+                    <td style="width:50%">Item</td>
+                    <td style="width:35%" class="text-right">Rack Remark</td>
                 </tr>
             </thead>
-            <?php endif; ?>
             <tbody>
                 <?php foreach ($items as $item): ?>
                 <tr>
-                    <td><?php echo $sn++; ?></td>
-                    <td><?php echo htmlspecialchars($item['barcode']); ?></td>
+                    <td><?php echo $item['qty']; ?></td>
                     <td><?php echo htmlspecialchars($item['pdesc']); ?></td>
-                    <td class="text-right"><?php echo $item['qty']; ?></td>
                     <td class="text-right rack-remark"><?php echo htmlspecialchars($item['rack_remark']); ?></td>
                 </tr>
                 <?php endforeach; ?>
@@ -350,6 +349,10 @@ body {
                 <div class="merchant-info"><?php echo htmlspecialchars($mer_addr); ?></div>
             </div>
 
+            <?php if (!empty($rowto)): ?>
+            <div style="font-size:14px;font-weight:700;margin-bottom:6px;">TO: <?php echo htmlspecialchars($rowto); ?></div>
+            <?php endif; ?>
+
             <table class="info-table">
                 <tr>
                     <td class="label">Order ID</td>
@@ -368,31 +371,25 @@ body {
                 </tr>
             </table>
 
-            <?php $sn2 = 1; foreach ($grouped_items as $rackName => $items): ?>
+            <?php foreach ($grouped_items as $rackName => $items): ?>
             <div class="rack-group-header<?php echo $rackName === 'Unassigned' ? ' unassigned' : ''; ?>">
                 <i class="fas fa-<?php echo $rackName === 'Unassigned' ? 'question-circle' : 'warehouse'; ?>"></i>
                 <span class="rack-label"><?php echo htmlspecialchars($rackName); ?></span>
                 <span class="rack-count">(<?php echo count($items); ?> item<?php echo count($items) > 1 ? 's' : ''; ?>)</span>
             </div>
             <table class="items-table" style="margin-top:0;">
-                <?php if ($sn2 === 1): ?>
                 <thead>
                     <tr>
-                        <td style="width:5%">S/N</td>
-                        <td style="width:18%">Barcode</td>
-                        <td style="width:37%">Item</td>
-                        <td style="width:10%" class="text-right">Qty</td>
-                        <td style="width:30%" class="text-right">Rack Remark</td>
+                        <td style="width:15%">Qty</td>
+                        <td style="width:50%">Item</td>
+                        <td style="width:35%" class="text-right">Rack Remark</td>
                     </tr>
                 </thead>
-                <?php endif; ?>
                 <tbody>
                     <?php foreach ($items as $item): ?>
                     <tr>
-                        <td><?php echo $sn2++; ?></td>
-                        <td><?php echo htmlspecialchars($item['barcode']); ?></td>
+                        <td><?php echo $item['qty']; ?></td>
                         <td><?php echo htmlspecialchars($item['pdesc']); ?></td>
-                        <td class="text-right"><?php echo $item['qty']; ?></td>
                         <td class="text-right rack-remark"><?php echo htmlspecialchars($item['rack_remark']); ?></td>
                     </tr>
                     <?php endforeach; ?>
