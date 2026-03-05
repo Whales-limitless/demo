@@ -122,6 +122,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .product-search { flex: 1; min-width: 180px; display: flex; align-items: center; background: var(--surface); border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; transition: border-color var(--transition); }
 .product-search:focus-within { border-color: var(--primary); }
 .product-search input { border: none; outline: none; padding: 10px 14px; font-family: 'DM Sans', sans-serif; font-size: 14px; width: 100%; color: var(--text); background: transparent; }
+.search-btn { background: var(--primary); border: none; padding: 0; width: 42px; height: 42px; cursor: pointer; color: #fff; display: grid; place-items: center; flex-shrink: 0; border-radius: 0 10px 10px 0; transition: background var(--transition); }
+.search-btn:hover { background: var(--primary-dark); }
+
+.search-results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding: 12px 16px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+.search-results-header h2 { font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700; }
+.search-results-header .clear-search { font-size: 13px; color: var(--primary); text-decoration: none; font-weight: 600; cursor: pointer; background: none; border: none; font-family: 'DM Sans', sans-serif; }
+.search-results-header .clear-search:hover { opacity: 0.7; }
 .product-search .search-icon { padding: 0 12px; color: var(--text-muted); flex-shrink: 0; }
 
 /* Category sections */
@@ -234,6 +241,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="product-search">
       <svg class="search-icon" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" placeholder="Search all products…" id="productSearchInput">
+      <button class="search-btn" id="searchBtn" title="Search">
+        <svg style="width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
     </div>
   </div>
 
@@ -256,15 +266,114 @@ var isLoading = false;
 var isSearchMode = false;
 var totalProducts = 0;
 
-// Pre-compute total and OOS list
+// Flatten all products for search
+var allProductsFlat = [];
 (function() {
   allCategories.forEach(function(cat) {
     cat.subcategories.forEach(function(sc) {
       totalProducts += sc.products.length;
+      sc.products.forEach(function(p) {
+        allProductsFlat.push(p);
+      });
     });
   });
   document.getElementById('productTotal').textContent = totalProducts + ' products';
 })();
+
+// Get URL query parameter
+function getUrlParam(name) {
+  var params = new URLSearchParams(window.location.search);
+  return params.get(name) || '';
+}
+
+// Relevance scoring: higher = better match
+function scoreProduct(p, q) {
+  var ql = q.toLowerCase();
+  var name = (p.name || '').toLowerCase();
+  var sku = (p.sku || '').toLowerCase();
+  var barcode = (p.barcode || '').toLowerCase();
+
+  var score = 0;
+
+  // Exact matches (highest priority)
+  if (barcode === ql) score += 1000;
+  if (sku === ql) score += 900;
+  if (name === ql) score += 800;
+
+  // Starts with (high priority)
+  if (barcode.indexOf(ql) === 0) score += 500;
+  if (sku.indexOf(ql) === 0) score += 400;
+  if (name.indexOf(ql) === 0) score += 300;
+
+  // Contains (lower priority)
+  if (barcode.indexOf(ql) !== -1) score += 100;
+  if (sku.indexOf(ql) !== -1) score += 80;
+  if (name.indexOf(ql) !== -1) score += 60;
+
+  // Partial/progressive matching (e.g. "1170" also matches "117", "11")
+  // Check if the query progressively matches from the start
+  for (var len = ql.length - 1; len >= 2; len--) {
+    var partial = ql.substring(0, len);
+    if (barcode.indexOf(partial) === 0) score += 10 + len;
+    if (sku.indexOf(partial) === 0) score += 8 + len;
+  }
+
+  return score;
+}
+
+function doRelevanceSearch(query) {
+  var q = query.trim();
+  if (!q) {
+    clearSearch();
+    return;
+  }
+
+  isSearchMode = true;
+
+  // Score and filter products
+  var scored = [];
+  allProductsFlat.forEach(function(p) {
+    var s = scoreProduct(p, q);
+    if (s > 0) scored.push({ product: p, score: s });
+  });
+
+  // Sort by score descending
+  scored.sort(function(a, b) { return b.score - a.score; });
+
+  // Render results
+  var sections = document.getElementById('productSections');
+  var matchCount = scored.length;
+
+  var headerHtml = '<div class="search-results-header">' +
+    '<h2>Search: "' + q.replace(/</g, '&lt;') + '" (' + matchCount + ' found)</h2>' +
+    '<button class="clear-search" onclick="clearSearch()">Clear Search</button>' +
+  '</div>';
+
+  if (matchCount === 0) {
+    sections.innerHTML = headerHtml + '<div style="text-align:center;padding:40px 0;color:var(--text-muted);font-size:14px;">No products found.</div>';
+  } else {
+    var cardsHtml = scored.map(function(item, i) {
+      return renderProductCard(item.product, i);
+    }).join('');
+    sections.innerHTML = headerHtml + '<div class="product-grid">' + cardsHtml + '</div>';
+  }
+
+  document.getElementById('loadSentinel').style.display = 'none';
+  document.getElementById('productTotal').textContent = matchCount + ' results';
+}
+
+function clearSearch() {
+  isSearchMode = false;
+  loadedIndex = 0;
+  document.getElementById('productSearchInput').value = '';
+  document.getElementById('productSections').innerHTML = '';
+  document.getElementById('productTotal').textContent = totalProducts + ' products';
+  // Remove query from URL without reload
+  if (window.history.replaceState) {
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+  loadNextBatch();
+}
 
 function renderProductCard(p, index) {
   var imgHtml;
@@ -369,11 +478,17 @@ var observer = new IntersectionObserver(function(entries) {
 
 observer.observe(sentinel);
 
-// Initial render - first batch
-loadNextBatch();
-
-// ==================== SEARCH ====================
-var searchDebounce = null;
+// Initial render - check for URL search query first
+var initialQuery = getUrlParam('q');
+if (initialQuery) {
+  document.getElementById('productSearchInput').value = initialQuery;
+  // Also set the navbar search input to match
+  var navInput = document.getElementById('searchInput');
+  if (navInput) navInput.value = initialQuery;
+  doRelevanceSearch(initialQuery);
+} else {
+  loadNextBatch();
+}
 
 function renderAllForSearch() {
   // Render remaining categories that haven't been loaded yet
@@ -386,42 +501,19 @@ function renderAllForSearch() {
   document.getElementById('loadSentinel').style.display = 'none';
 }
 
-function filterProducts(query) {
-  var q = query.toLowerCase();
+// Search button click
+document.getElementById('searchBtn').addEventListener('click', function() {
+  var q = document.getElementById('productSearchInput').value.trim();
+  if (q) doRelevanceSearch(q);
+});
 
-  if (q.length > 0) {
-    isSearchMode = true;
-    // Make sure everything is rendered before filtering
-    if (loadedIndex < allCategories.length) {
-      renderAllForSearch();
-    }
-  } else {
-    isSearchMode = false;
+// Enter key in search input
+document.getElementById('productSearchInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    var q = this.value.trim();
+    if (q) doRelevanceSearch(q);
   }
-
-  document.querySelectorAll('.product-card').forEach(function(card) {
-    if (!q) { card.style.display = ''; return; }
-    var nameMatch = card.getAttribute('data-name').indexOf(q) !== -1;
-    var skuMatch = card.getAttribute('data-sku').indexOf(q) !== -1;
-    var barcodeMatch = card.getAttribute('data-barcode').indexOf(q) !== -1;
-    card.style.display = (nameMatch || skuMatch || barcodeMatch) ? '' : 'none';
-  });
-
-  // Show/hide empty sections
-  document.querySelectorAll('.subcat-section').forEach(function(sec) {
-    var any = Array.from(sec.querySelectorAll('.product-card')).some(function(c) { return c.style.display !== 'none'; });
-    sec.style.display = any ? '' : 'none';
-  });
-  document.querySelectorAll('.category-section').forEach(function(sec) {
-    var any = Array.from(sec.querySelectorAll('.product-card')).some(function(c) { return c.style.display !== 'none'; });
-    sec.style.display = any ? '' : 'none';
-  });
-}
-
-document.getElementById('productSearchInput').addEventListener('input', function() {
-  var val = this.value;
-  clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(function() { filterProducts(val); }, 200);
 });
 
 // ==================== CART ====================
