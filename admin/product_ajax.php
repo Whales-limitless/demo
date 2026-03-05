@@ -17,7 +17,7 @@ $action = $_POST['action'] ?? '';
 // ===================== IMAGE UPLOAD HELPER =====================
 
 function handleProductImage($existingImage = '', $removeImage = false) {
-    $uploadDir = __DIR__ . '/../product_img/';
+    $uploadDir = __DIR__ . '/../img/';
 
     // If removing image, delete old file and return empty
     if ($removeImage && $existingImage !== '') {
