@@ -127,6 +127,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 <div class="confirm-footer">
   <div class="confirm-footer-inner">
+    <div style="margin-bottom:10px;">
+      <label for="txtTo" style="font-size:13px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">To:</label>
+      <input type="text" id="txtTo" placeholder="Enter recipient..." style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='#d1d5db'">
+    </div>
     <button class="btn-confirm" id="btnConfirm" onclick="handleConfirmClick()">
       <span id="btnText">Purchase</span>
     </button>
@@ -217,7 +221,8 @@ function finishOrder() {
   btn.disabled = true;
 
   // Send order to backend
-  var payload = JSON.stringify({ orderType: orderType, items: items });
+  var txtTo = (document.getElementById('txtTo').value || '').trim();
+  var payload = JSON.stringify({ orderType: orderType, items: items, txtTo: txtTo });
 
   var xhr = new XMLHttpRequest();
   xhr.open('POST', 'submit_order.php', true);

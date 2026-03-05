@@ -23,6 +23,7 @@ if (!$input) {
 }
 
 $orderType = isset($input['orderType']) ? strtoupper(clean($connect, $input['orderType'])) : 'PURCHASE';
+$txtTo = isset($input['txtTo']) ? clean($connect, $input['txtTo']) : '';
 $items = isset($input['items']) ? $input['items'] : [];
 
 if (empty($items)) {
@@ -71,7 +72,7 @@ foreach ($items as $item) {
                 '0',
                 '',
                 '0',
-                ''
+                '" . mysqli_real_escape_string($connect, $txtTo) . "'
             )";
 
     if (mysqli_query($connect, $sql)) {
