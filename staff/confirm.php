@@ -78,16 +78,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-confirm.stock-in { background: var(--blue); }
 .btn-confirm.stock-in:hover { background: #1d4ed8; }
 
-.countdown-bar { display: none; margin-bottom: 10px; }
-.countdown-bar.active { display: block; }
-.countdown-label { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
-.countdown-label .tap-cancel { font-size: 11px; color: var(--text-muted); font-weight: 500; }
-.progress-track { height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
-.progress-fill { height: 100%; border-radius: 3px; background: var(--primary); width: 0%; transition: none; }
-.progress-fill.stock-in { background: var(--blue); }
-.progress-fill.running { transition: width 2s linear; }
-.btn-confirm.cancelling { background: #6b7280; }
-.btn-confirm.cancelling:hover { background: #4b5563; }
 
 .success-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; justify-content: center; align-items: center; padding: 16px; }
 .success-overlay.active { display: flex; }
@@ -137,15 +127,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 <div class="confirm-footer">
   <div class="confirm-footer-inner">
-    <div class="countdown-bar" id="countdownBar">
-      <div class="countdown-label">
-        <span id="countdownLabel">Purchase in 2…</span>
-        <span class="tap-cancel">tap to cancel</span>
-      </div>
-      <div class="progress-track">
-        <div class="progress-fill" id="progressFill"></div>
-      </div>
-    </div>
     <button class="btn-confirm" id="btnConfirm" onclick="handleConfirmClick()">
       <span id="btnText">Purchase</span>
     </button>
@@ -225,85 +206,11 @@ function updateType() {
   }
 }
 
-var countdownTimer = null;
-var isCounting = false;
-
 function handleConfirmClick() {
-  if (isCounting) cancelCountdown();
-  else startCountdown();
-}
-
-function startCountdown() {
-  var btn = document.getElementById('btnConfirm');
-  var btnText = document.getElementById('btnText');
-  var bar = document.getElementById('countdownBar');
-  var fill = document.getElementById('progressFill');
-  var countLabel = document.getElementById('countdownLabel');
-  var label = orderType === 'purchase' ? 'Purchase' : 'Stock In';
-  var count = 2;
-
-  isCounting = true;
-
-  fill.classList.remove('running');
-  fill.className = 'progress-fill' + (orderType === 'stockin' ? ' stock-in' : '');
-  fill.style.width = '0%';
-  bar.classList.add('active');
-  void fill.offsetWidth;
-  fill.classList.add('running');
-  fill.style.width = '100%';
-
-  countLabel.textContent = label + ' in ' + count + '…';
-  btnText.textContent = 'Cancel';
-  btn.className = 'btn-confirm cancelling';
-
-  document.querySelectorAll('input[name="orderType"]').forEach(function(r) { r.disabled = true; });
-
-  countdownTimer = setInterval(function() {
-    count--;
-    if (count > 0) {
-      countLabel.textContent = label + ' in ' + count + '…';
-    } else {
-      clearInterval(countdownTimer);
-      countdownTimer = null;
-      countLabel.textContent = 'Submitting…';
-      btnText.textContent = 'Submitting…';
-      isCounting = false;
-      setTimeout(function() { finishOrder(); }, 300);
-    }
-  }, 1000);
-}
-
-function cancelCountdown() {
-  clearInterval(countdownTimer);
-  countdownTimer = null;
-  isCounting = false;
-
-  var btn = document.getElementById('btnConfirm');
-  var btnText = document.getElementById('btnText');
-  var bar = document.getElementById('countdownBar');
-  var fill = document.getElementById('progressFill');
-
-  bar.classList.remove('active');
-  fill.classList.remove('running');
-  fill.style.width = '0%';
-
-  document.querySelectorAll('input[name="orderType"]').forEach(function(r) { r.disabled = false; });
-  if (orderType === 'purchase') {
-    btnText.textContent = 'Purchase';
-    btn.className = 'btn-confirm';
-  } else {
-    btnText.textContent = 'Stock In';
-    btn.className = 'btn-confirm stock-in';
-  }
+  finishOrder();
 }
 
 function finishOrder() {
-  var bar = document.getElementById('countdownBar');
-  var fill = document.getElementById('progressFill');
-  bar.classList.remove('active');
-  fill.classList.remove('running');
-  fill.style.width = '0%';
-
   var btn = document.getElementById('btnConfirm');
   var btnText = document.getElementById('btnText');
   btnText.textContent = 'Submitting…';

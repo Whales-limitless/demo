@@ -165,8 +165,6 @@ function render() {
     if (item.rack) tagsHtml += '<span class="item-tag item-tag-rack">Rack: ' + item.rack + '</span>';
     else tagsHtml += '<span class="item-tag item-tag-rack unset">No Rack</span>';
 
-    var maxWarning = item.qty >= item.maxQty ? '<div class="max-warning">Max: ' + item.maxQty + ' available</div>' : '';
-
     return '<div class="cart-item ' + (item.checked ? '' : 'unchecked') + '" style="animation-delay:' + i*0.05 + 's" id="cartRow_' + item.id + '">' +
       '<input type="checkbox" class="item-checkbox" ' + (item.checked ? 'checked' : '') + ' onchange="toggleItem(' + item.id + ', this.checked)">' +
       imgHtml +
@@ -180,10 +178,9 @@ function render() {
         '<div class="item-tags">' + tagsHtml + '</div>' +
         '<div class="qty-control">' +
           '<button onclick="changeQty(' + item.id + ',-1)">−</button>' +
-          '<input type="number" id="qtyInput_' + item.id + '" value="' + item.qty + '" min="1" max="' + item.maxQty + '" onchange="setQty(' + item.id + ',this.value)">' +
+          '<input type="number" id="qtyInput_' + item.id + '" value="' + item.qty + '" min="1" max="99" onchange="setQty(' + item.id + ',this.value)">' +
           '<button onclick="changeQty(' + item.id + ',1)">+</button>' +
         '</div>' +
-        maxWarning +
       '</div>' +
     '</div>';
   }).join('');
@@ -216,7 +213,7 @@ function changeQty(id, delta) {
   var item = cartItems.find(function(i) { return i.id === id; });
   if (!item) return;
   var nq = item.qty + delta;
-  if (nq < 1 || nq > item.maxQty) return;
+  if (nq < 1) return;
   item.qty = nq;
   saveCart();
   render();
@@ -227,7 +224,6 @@ function setQty(id, val) {
   if (!item) return;
   var v = parseInt(val) || 1;
   if (v < 1) v = 1;
-  if (v > item.maxQty) v = item.maxQty;
   item.qty = v;
   saveCart();
   render();
