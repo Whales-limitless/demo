@@ -14,6 +14,113 @@ $connect->set_charset("utf8mb4");
 
 $action = $_POST['action'] ?? '';
 
+// ===================== IMAGE UPLOAD HELPER =====================
+
+function handleProductImage($existingImage = '', $removeImage = false) {
+    $uploadDir = __DIR__ . '/../product_img/';
+
+    // If removing image, delete old file and return empty
+    if ($removeImage && $existingImage !== '') {
+        $oldPath = $uploadDir . $existingImage;
+        if (file_exists($oldPath)) {
+            @unlink($oldPath);
+        }
+        return '';
+    }
+
+    // If no new file uploaded, keep existing
+    if (!isset($_FILES['product_image']) || $_FILES['product_image']['error'] !== UPLOAD_ERR_OK) {
+        return $removeImage ? '' : $existingImage;
+    }
+
+    $file = $_FILES['product_image'];
+
+    // Validate size (10MB max)
+    if ($file['size'] > 10 * 1024 * 1024) {
+        return ['error' => 'Image must be smaller than 10MB.'];
+    }
+
+    // Validate type
+    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+
+    if (!in_array($mimeType, $allowedTypes)) {
+        return ['error' => 'Only JPG, PNG, GIF, and WebP images are allowed.'];
+    }
+
+    // Generate unique filename
+    $fileName = 'prod_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.jpg';
+    $destPath = $uploadDir . $fileName;
+
+    // Compress and save
+    $result = compressProductImage($file['tmp_name'], $destPath, $mimeType);
+    if ($result === false) {
+        return ['error' => 'Failed to process image.'];
+    }
+
+    // Delete old image if replacing
+    if ($existingImage !== '') {
+        $oldPath = $uploadDir . $existingImage;
+        if (file_exists($oldPath)) {
+            @unlink($oldPath);
+        }
+    }
+
+    return $fileName;
+}
+
+function compressProductImage($source, $destination, $mimeType) {
+    // Create image resource based on mime type
+    switch ($mimeType) {
+        case 'image/jpeg':
+            $image = @imagecreatefromjpeg($source);
+            break;
+        case 'image/png':
+            $image = @imagecreatefrompng($source);
+            break;
+        case 'image/gif':
+            $image = @imagecreatefromgif($source);
+            break;
+        case 'image/webp':
+            $image = @imagecreatefromwebp($source);
+            break;
+        default:
+            return false;
+    }
+
+    if (!$image) return false;
+
+    // Resize if too large (max 800px on longest side - optimized for product images)
+    $maxDim = 800;
+    $origW = imagesx($image);
+    $origH = imagesy($image);
+
+    if ($origW > $maxDim || $origH > $maxDim) {
+        if ($origW >= $origH) {
+            $newW = $maxDim;
+            $newH = intval($origH * $maxDim / $origW);
+        } else {
+            $newH = $maxDim;
+            $newW = intval($origW * $maxDim / $origH);
+        }
+        $resized = imagecreatetruecolor($newW, $newH);
+        // Preserve transparency for PNG/GIF
+        imagealphablending($resized, false);
+        imagesavealpha($resized, true);
+        imagecopyresampled($resized, $image, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+        imagedestroy($image);
+        $image = $resized;
+    }
+
+    // Save as JPEG with 75% quality (good balance of quality and file size)
+    $result = imagejpeg($image, $destination, 75);
+    imagedestroy($image);
+
+    return $result;
+}
+
 // ===================== PRODUCT ACTIONS =====================
 
 if ($action === 'list') {
@@ -59,7 +166,7 @@ if ($action === 'list') {
     $offset = ($page - 1) * $perPage;
 
     // Fetch page
-    $sql = "SELECT `id`, `barcode`, `code`, `name`, `cat`, `sub_cat`, COALESCE(`qoh`, 0) AS `qoh`, `uom`, `rack`, `checked`
+    $sql = "SELECT `id`, `barcode`, `code`, `name`, `cat`, `sub_cat`, COALESCE(`qoh`, 0) AS `qoh`, `uom`, `rack`, `checked`, `img1` AS `image`
             FROM `PRODUCTS` WHERE $where ORDER BY `checked` DESC, `name` ASC LIMIT ?, ?";
     $stmt = $connect->prepare($sql);
     $fetchTypes = $types . "ii";
@@ -83,7 +190,7 @@ if ($action === 'list') {
 
 } elseif ($action === 'get') {
     $id = intval($_POST['id'] ?? 0);
-    $stmt = $connect->prepare("SELECT * FROM `PRODUCTS` WHERE `id` = ? LIMIT 1");
+    $stmt = $connect->prepare("SELECT *, `img1` AS `image` FROM `PRODUCTS` WHERE `id` = ? LIMIT 1");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -124,8 +231,17 @@ if ($action === 'list') {
     }
     $chk->close();
 
-    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`cat_code`,`sub_code`,`uom`,`rack`,`qoh`,`checked`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
-    $stmt->bind_param("ssssssssssds", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $qoh, $checked);
+    // Handle image upload
+    $removeImg = (trim($_POST['remove_image'] ?? '0') === '1');
+    $imageResult = handleProductImage('', $removeImg);
+    if (is_array($imageResult) && isset($imageResult['error'])) {
+        echo json_encode($imageResult);
+        exit;
+    }
+    $image = is_string($imageResult) ? $imageResult : '';
+
+    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`cat_code`,`sub_code`,`uom`,`rack`,`qoh`,`checked`,`img1`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $stmt->bind_param("ssssssssssdss", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $qoh, $checked, $image);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Product created successfully.']);
@@ -154,8 +270,18 @@ if ($action === 'list') {
         exit;
     }
 
-    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`cat_code`=?,`sub_code`=?,`uom`=?,`rack`=?,`qoh`=?,`checked`=? WHERE `id`=?");
-    $stmt->bind_param("ssssssssssdsi", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $qoh, $checked, $id);
+    // Handle image upload
+    $existingImage = trim($_POST['existing_image'] ?? '');
+    $removeImg = (trim($_POST['remove_image'] ?? '0') === '1');
+    $imageResult = handleProductImage($existingImage, $removeImg);
+    if (is_array($imageResult) && isset($imageResult['error'])) {
+        echo json_encode($imageResult);
+        exit;
+    }
+    $image = is_string($imageResult) ? $imageResult : $existingImage;
+
+    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`cat_code`=?,`sub_code`=?,`uom`=?,`rack`=?,`qoh`=?,`checked`=?,`img1`=? WHERE `id`=?");
+    $stmt->bind_param("ssssssssssdssi", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $qoh, $checked, $image, $id);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Product updated successfully.']);
