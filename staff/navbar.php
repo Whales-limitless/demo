@@ -6,7 +6,7 @@
   </button>
   <?php if ($navUserType === 'A' || $navUserType === 'S'): ?>
   <div class="nav-search" id="navSearch">
-    <input type="text" placeholder="Search product name or barcode…" id="searchInput" autocomplete="off">
+    <input type="text" placeholder="Search product name…" id="searchInput" autocomplete="off">
     <button aria-label="Search">
       <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
     </button>

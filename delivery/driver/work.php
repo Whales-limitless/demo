@@ -161,7 +161,7 @@ $img3 = $checkrow["IMG3"];
 								$imageSize = convert_filesize($_FILES["image1"]["size"]); 
 
 								// Compress size and upload image 
-								$compressedImage = compressImage($imageTemp, $imageUploadPath, 40); 
+								$compressedImage = compressImage($imageTemp, $imageUploadPath, 85); 
 
 								if($compressedImage){ 
 									$compressedImageSize = filesize($compressedImage); 
@@ -195,7 +195,7 @@ $img3 = $checkrow["IMG3"];
 								$imageSize = convert_filesize($_FILES["image2"]["size"]); 
 
 								// Compress size and upload image 
-								$compressedImage = compressImage($imageTemp, $imageUploadPath, 40); 
+								$compressedImage = compressImage($imageTemp, $imageUploadPath, 85); 
 
 								if($compressedImage){ 
 									$compressedImageSize = filesize($compressedImage); 
@@ -229,7 +229,7 @@ $img3 = $checkrow["IMG3"];
 								$imageSize = convert_filesize($_FILES["image3"]["size"]); 
 
 								// Compress size and upload image 
-								$compressedImage = compressImage($imageTemp, $imageUploadPath, 40); 
+								$compressedImage = compressImage($imageTemp, $imageUploadPath, 85); 
 
 								if($compressedImage){ 
 									$compressedImageSize = filesize($compressedImage); 

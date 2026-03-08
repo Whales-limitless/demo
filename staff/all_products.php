@@ -286,37 +286,21 @@ function getUrlParam(name) {
   return params.get(name) || '';
 }
 
-// Relevance scoring: higher = better match
+// Relevance scoring: higher = better match (search by product name only)
 function scoreProduct(p, q) {
   var ql = q.toLowerCase();
   var name = (p.name || '').toLowerCase();
-  var sku = (p.sku || '').toLowerCase();
-  var barcode = (p.barcode || '').toLowerCase();
 
   var score = 0;
 
-  // Exact matches (highest priority)
-  if (barcode === ql) score += 1000;
-  if (sku === ql) score += 900;
+  // Exact name match (highest priority)
   if (name === ql) score += 800;
 
   // Starts with (high priority)
-  if (barcode.indexOf(ql) === 0) score += 500;
-  if (sku.indexOf(ql) === 0) score += 400;
   if (name.indexOf(ql) === 0) score += 300;
 
   // Contains (lower priority)
-  if (barcode.indexOf(ql) !== -1) score += 100;
-  if (sku.indexOf(ql) !== -1) score += 80;
   if (name.indexOf(ql) !== -1) score += 60;
-
-  // Partial/progressive matching (e.g. "1170" also matches "117", "11")
-  // Check if the query progressively matches from the start
-  for (var len = ql.length - 1; len >= 2; len--) {
-    var partial = ql.substring(0, len);
-    if (barcode.indexOf(partial) === 0) score += 10 + len;
-    if (sku.indexOf(partial) === 0) score += 8 + len;
-  }
 
   return score;
 }

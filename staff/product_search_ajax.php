@@ -19,7 +19,7 @@ if ($search === '') {
 
 $like = '%' . $search . '%';
 
-// Exact barcode match first (uses index), then partial name/barcode matches.
+// Search by product name only.
 // No LOWER() wrapping — relies on utf8mb4_unicode_ci collation for case-insensitive matching.
 // LEFT JOIN directly on category table with indexed cat_code for fast lookups.
 $stmt = $connect->prepare("
@@ -28,14 +28,12 @@ $stmt = $connect->prepare("
            c.`cat_name` AS category_name
     FROM `PRODUCTS` p
     LEFT JOIN `category` c ON p.`cat_code` = c.`cat_code`
-    WHERE (p.`name` LIKE ? OR p.`barcode` LIKE ?)
+    WHERE p.`name` LIKE ?
       AND (p.`checked` != 'N' OR p.`checked` IS NULL)
-    ORDER BY
-        CASE WHEN p.`barcode` = ? THEN 0 ELSE 1 END,
-        p.`name` ASC
+    ORDER BY p.`name` ASC
     LIMIT 20
 ");
-$stmt->bind_param("sss", $like, $like, $search);
+$stmt->bind_param("s", $like);
 $stmt->execute();
 $result = $stmt->get_result();
 

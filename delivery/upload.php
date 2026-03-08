@@ -77,7 +77,7 @@ if(isset($_POST["submit"])){
 				$imageSize = convert_filesize($_FILES["image"]["size"]); 
 
 				// Compress size and upload image 
-				$compressedImage = compressImage($imageTemp, $imageUploadPath, 40); 
+				$compressedImage = compressImage($imageTemp, $imageUploadPath, 85); 
 				
 				if($compressedImage){ 
 					$compressedImageSize = filesize($compressedImage); 
