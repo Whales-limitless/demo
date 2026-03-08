@@ -94,13 +94,40 @@ if ($action === "done") {
         echo "Error: Order not found.";
     }
 
+// ===================== EDIT ORDER (Purchase Date + Admin Remark) =====================
+} elseif ($action === "edit_order") {
+    $salnum = $connect->real_escape_string($_POST['salnum'] ?? '');
+    $adminrmk = $connect->real_escape_string($_POST['adminrmk'] ?? '');
+    $purchasedate = $_POST['purchasedate'] ?? '';
+
+    // Validate date format if provided
+    $pdateVal = 'NULL';
+    if (!empty($purchasedate)) {
+        $dt = DateTime::createFromFormat('Y-m-d', $purchasedate);
+        if ($dt && $dt->format('Y-m-d') === $purchasedate) {
+            $pdateVal = "'" . $connect->real_escape_string($purchasedate) . "'";
+        }
+    }
+
+    $sqlord = $connect->query("SELECT ID FROM `orderlist` WHERE SALNUM = '$salnum' LIMIT 1");
+    if ($sqlord && $sqlord->num_rows > 0) {
+        $result = $connect->query("UPDATE `orderlist` SET ADMINRMK = '$adminrmk', PURCHASEDATE = $pdateVal WHERE SALNUM = '$salnum'");
+        if ($result) {
+            echo "Saved.";
+        } else {
+            echo "Error: " . $connect->error;
+        }
+    } else {
+        echo "Error: Order not found.";
+    }
+
 // ===================== LIVE POLL (AJAX) =====================
 } elseif ($action === "poll") {
     header('Content-Type: application/json; charset=utf-8');
 
     // Rebuild orderlist2 summary
     $connect->query("TRUNCATE TABLE `orderlist2`");
-    $connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
+    $connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY,PURCHASEDATE) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY,PURCHASEDATE FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
     $connect->query("UPDATE orderlist2 AS b INNER JOIN MEMBER AS g ON b.ACCODE = g.ACCODE SET b.HP = g.HP");
 
     // Fetch orders

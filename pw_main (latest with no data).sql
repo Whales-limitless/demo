@@ -256,7 +256,8 @@ CREATE TABLE `orderlist` (
   `view_status` varchar(20) DEFAULT '',
   `ADMINRMK` varchar(500) DEFAULT '',
   `SOUND` varchar(5) DEFAULT '',
-  `TXTTO` varchar(100) DEFAULT ''
+  `TXTTO` varchar(100) DEFAULT '',
+  `PURCHASEDATE` date DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -275,7 +276,8 @@ CREATE TABLE `orderlist2` (
   `SDATE` date DEFAULT NULL,
   `TTIME` time DEFAULT NULL,
   `SUMQTY` int(11) NOT NULL DEFAULT 0,
-  `HP` varchar(50) NOT NULL DEFAULT ''
+  `HP` varchar(50) NOT NULL DEFAULT '',
+  `PURCHASEDATE` date DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
