@@ -474,7 +474,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         /* Fixed Save Button */
         .save-bar {
             position: fixed;
-            bottom: 0;
+            bottom: 62px;
             left: 0;
             right: 0;
             z-index: 99;
@@ -567,9 +567,9 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             }
         }
 
-        /* Adjust padding when save bar visible */
+        /* Adjust padding when save bar visible (footer 62px + save bar ~60px + spacing) */
         body.count-active {
-            padding-bottom: 140px;
+            padding-bottom: 180px;
         }
     </style>
 </head>
