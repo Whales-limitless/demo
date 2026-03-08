@@ -70,7 +70,7 @@ if ($action === 'upload') {
                     $src = $resized;
                 }
 
-                imagejpeg($src, $filePath, 40);
+                imagejpeg($src, $filePath, 85);
                 imagedestroy($src);
 
                 $imgCol = 'IMG' . $i;
