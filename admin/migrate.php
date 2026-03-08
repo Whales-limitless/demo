@@ -371,10 +371,11 @@ if ($action === 'rebuild_products' || $action === 'rebuild_orderlist' || $action
                 `ADMINRMK` VARCHAR(500) DEFAULT '',
                 `SOUND` VARCHAR(5) DEFAULT '',
                 `TXTTO` VARCHAR(100) DEFAULT '',
+                `PURCHASEDATE` DATE DEFAULT NULL,
                 INDEX `idx_orderlist_barcode` (`BARCODE`),
                 INDEX `idx_orderlist_sdate_status` (`SDATE`, `STATUS`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-            ['ID','OUTLET','SDATE','ACCODE','NAME','SALNUM','BARCODE','PDESC','QTY','PTYPE','TRANSNO','TDATE','TTIME','STATUS','PRINT','view_status','ADMINRMK','SOUND','TXTTO'],
+            ['ID','OUTLET','SDATE','ACCODE','NAME','SALNUM','BARCODE','PDESC','QTY','PTYPE','TRANSNO','TDATE','TTIME','STATUS','PRINT','view_status','ADMINRMK','SOUND','TXTTO','PURCHASEDATE'],
             $rebuildResults
         );
     }

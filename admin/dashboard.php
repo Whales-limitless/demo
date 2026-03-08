@@ -21,11 +21,17 @@ $connect->query("CREATE TABLE IF NOT EXISTS `orderlist2` (
   `TTIME` time DEFAULT NULL,
   `SUMQTY` int(11) NOT NULL DEFAULT 0,
   `HP` varchar(50) NOT NULL DEFAULT '',
+  `PURCHASEDATE` date DEFAULT NULL,
   PRIMARY KEY (`ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+// Ensure PURCHASEDATE column exists on orderlist (run once, safe to repeat)
+$connect->query("ALTER TABLE `orderlist` ADD COLUMN `PURCHASEDATE` DATE DEFAULT NULL");
+// Ensure PURCHASEDATE column exists on orderlist2
+$connect->query("ALTER TABLE `orderlist2` ADD COLUMN `PURCHASEDATE` DATE DEFAULT NULL");
+
 $connect->query("TRUNCATE TABLE `orderlist2`");
-$connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
+$connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY,PURCHASEDATE) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY,PURCHASEDATE FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
 $connect->query("UPDATE orderlist2 AS b INNER JOIN MEMBER AS g ON b.ACCODE = g.ACCODE SET b.HP = g.HP");
 
 $newOrderCount = 0;
@@ -155,6 +161,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 }
 .btn-action:hover { opacity: 0.85; color: #fff; }
 .btn-view { background: #6b7280; }
+.btn-edit { background: #f59e0b; }
 .btn-done { background: #3b82f6; }
 .btn-delete { background: #ef4444; }
 
@@ -213,12 +220,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>Qty</th>
                         <th>To / Remark</th>
                         <th>Admin Remark</th>
+                        <th>Purchase Date</th>
                         <th style="width:1%">Action</th>
                     </tr>
                 </thead>
                 <tbody id="ordersBody">
                     <?php if (count($orders) === 0): ?>
-                    <tr class="no-results"><td colspan="9"><i class="fas fa-inbox" style="font-size:24px;margin-bottom:8px;display:block;"></i>No orders found</td></tr>
+                    <tr class="no-results"><td colspan="10"><i class="fas fa-inbox" style="font-size:24px;margin-bottom:8px;display:block;"></i>No orders found</td></tr>
                     <?php else: ?>
                     <?php foreach ($orders as $i => $order):
                         $salnum = htmlspecialchars($order['SALNUM'] ?? '');
@@ -232,8 +240,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <td><?php echo htmlspecialchars($order['SUMQTY'] ?? '0'); ?></td>
                         <td><?php echo htmlspecialchars($order['TXTTO'] ?? ''); ?></td>
                         <td><?php echo htmlspecialchars($order['ADMINRMK'] ?? ''); ?></td>
+                        <td><?php echo !empty($order['PURCHASEDATE']) ? date('d/m/Y', strtotime($order['PURCHASEDATE'])) : ''; ?></td>
                         <td style="white-space:nowrap">
                             <a href="order_detail.php?salnum=<?php echo $salnum; ?>" class="btn-action btn-view"><i class="fas fa-eye"></i></a>
+                            <button type="button" onclick="openEditModal('<?php echo $salnum; ?>', '<?php echo htmlspecialchars($order['ADMINRMK'] ?? '', ENT_QUOTES); ?>', '<?php echo $order['PURCHASEDATE'] ?? ''; ?>');" class="btn-action btn-edit"><i class="fas fa-pen"></i></button>
                             <button type="button" onclick="donebtn('<?php echo $salnum; ?>');" class="btn-action btn-done"><i class="fas fa-check"></i></button>
                             <button type="button" onclick="deletebtn('<?php echo $salnum; ?>');" class="btn-action btn-delete"><i class="fas fa-trash"></i></button>
                         </td>
@@ -244,6 +254,37 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             </table>
         </div>
     </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-pen"></i> Edit Order</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editSalnum">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Order No</label>
+          <input type="text" class="form-control" id="editOrderNo" readonly style="background:#f3f4f6;">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Purchase Date</label>
+          <input type="date" class="form-control" id="editPurchaseDate">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Admin Remark</label>
+          <textarea class="form-control" id="editAdminRmk" rows="3" placeholder="Enter admin remark..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" onclick="saveEdit();"><i class="fas fa-check"></i> Save</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
@@ -368,7 +409,7 @@ function renderTable(orders) {
     var query = (document.getElementById('searchInput').value || '').toLowerCase();
 
     if (orders.length === 0) {
-        tbody.innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-inbox" style="font-size:24px;margin-bottom:8px;display:block;"></i>No orders found</td></tr>';
+        tbody.innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-inbox" style="font-size:24px;margin-bottom:8px;display:block;"></i>No orders found</td></tr>';
         document.getElementById('orderCount').textContent = '0 order(s)';
         return;
     }
@@ -385,6 +426,8 @@ function renderTable(orders) {
         var qty     = esc((o.SUMQTY || '0') + '');
         var txtto   = esc(o.TXTTO || '');
         var rmk     = esc(o.ADMINRMK || '');
+        var pdate   = formatDate(o.PURCHASEDATE);
+        var pdateRaw = o.PURCHASEDATE || '';
         var isNew   = !knownSalnums[o.SALNUM];
 
         var searchStr = ((o.SALNUM||'') + ' ' + (o.NAME||'') + ' ' + (o.TXTTO||'') + ' ' + (o.ADMINRMK||'') + ' ' + (o.SDATE||'')).toLowerCase();
@@ -401,8 +444,10 @@ function renderTable(orders) {
         html += '<td>' + qty + '</td>';
         html += '<td>' + txtto + '</td>';
         html += '<td>' + rmk + '</td>';
+        html += '<td>' + pdate + '</td>';
         html += '<td style="white-space:nowrap">';
         html += '<a href="order_detail.php?salnum=' + salnum + '" class="btn-action btn-view"><i class="fas fa-eye"></i></a>';
+        html += '<button type="button" onclick="openEditModal(\'' + salnum.replace(/'/g, "\\'") + '\', \'' + (o.ADMINRMK||'').replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\', \'' + pdateRaw + '\');" class="btn-action btn-edit"><i class="fas fa-pen"></i></button>';
         html += '<button type="button" onclick="donebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-done"><i class="fas fa-check"></i></button>';
         html += '<button type="button" onclick="deletebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-delete"><i class="fas fa-trash"></i></button>';
         html += '</td></tr>';
@@ -495,6 +540,43 @@ function deletebtn(id) {
                     doPoll();
                 } else Swal.fire({ icon: 'error', title: 'Error', text: data });
             });
+        }
+    });
+}
+
+// ── Edit Modal ─────────────────────────────────────────
+
+var editModalInstance = null;
+
+function openEditModal(salnum, adminrmk, purchasedate) {
+    document.getElementById('editSalnum').value = salnum;
+    document.getElementById('editOrderNo').value = salnum;
+    document.getElementById('editAdminRmk').value = adminrmk || '';
+    document.getElementById('editPurchaseDate').value = purchasedate || '';
+
+    if (!editModalInstance) {
+        editModalInstance = new bootstrap.Modal(document.getElementById('editModal'));
+    }
+    editModalInstance.show();
+}
+
+function saveEdit() {
+    var salnum = document.getElementById('editSalnum').value;
+    var adminrmk = document.getElementById('editAdminRmk').value;
+    var purchasedate = document.getElementById('editPurchaseDate').value;
+
+    $.post('admin_ajax.php', {
+        action: 'edit_order',
+        salnum: salnum,
+        adminrmk: adminrmk,
+        purchasedate: purchasedate
+    }, function(data) {
+        if (data.trim() === 'Saved.') {
+            if (editModalInstance) editModalInstance.hide();
+            Swal.fire({ icon: 'success', text: 'Order updated', timer: 1500, showConfirmButton: false });
+            doPoll();
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: data });
         }
     });
 }
