@@ -64,7 +64,7 @@ if ($action === 'get_products') {
              WHERE sti.`barcode` = p.`barcode` AND sti.`counted_qty` IS NOT NULL
             ) AS last_stock_take
         FROM `PRODUCTS` p
-        WHERE p.`checked` = 'Y' AND p.`sub_cat` = ?
+        WHERE p.`checked` = 'Y' AND p.`barcode` IS NOT NULL AND p.`barcode` != '' AND p.`sub_cat` = ?
         ORDER BY p.`name` ASC
     ");
     $stmt->bind_param("s", $subCat);
@@ -128,14 +128,14 @@ if ($action === 'get_products') {
             $itemStmt->close();
         } else {
             // Include all products matching filter
-            $where = "WHERE `checked` = 'Y'";
+            $where = "WHERE `checked` = 'Y' AND `barcode` IS NOT NULL AND `barcode` != ''";
             if ($filterSubCatVal) {
                 $where .= " AND `sub_cat` = '" . $connect->real_escape_string($filterSubCatVal) . "'";
             } elseif ($filterCatVal) {
                 $where .= " AND `cat` = '" . $connect->real_escape_string($filterCatVal) . "'";
             }
 
-            $productResult = $connect->query("SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` $where ORDER BY `barcode` ASC");
+            $productResult = $connect->query("SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` $where ORDER BY `name` ASC");
             if ($productResult && $productResult->num_rows > 0) {
                 $itemStmt = $connect->prepare("INSERT INTO `stock_take_item` (`stock_take_id`,`barcode`,`product_desc`,`system_qty`,`status`) VALUES (?,?,?,?,'PENDING')");
                 while ($p = $productResult->fetch_assoc()) {

@@ -149,7 +149,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 <!-- Create Modal -->
 <div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-clipboard-check"></i> New Stock Take Session</h5>
@@ -184,15 +184,20 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 </div>
                 <div class="mb-3" id="productSelectRow" style="display:none;">
                     <label class="form-label fw-semibold">Select Products</label>
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="checkbox" id="selectAllProducts" checked onchange="toggleAllProducts();">
-                        <label class="form-check-label fw-semibold" for="selectAllProducts">Select All</label>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" id="selectAllProducts" checked onchange="toggleAllProducts();">
+                            <label class="form-check-label fw-semibold" for="selectAllProducts">Select All</label>
+                        </div>
+                        <div class="ms-auto" style="font-size:12px;color:var(--text-muted);">
+                            <span id="selectedCount">0</span> selected
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <input type="text" id="productSearchInput" class="form-control form-control-sm" placeholder="Search product name or barcode..." oninput="filterProductList();">
                     </div>
                     <div id="productListContainer" style="max-height:300px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;padding:8px;">
                         <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Select a sub-category to load products</div>
-                    </div>
-                    <div class="mt-1" style="font-size:12px;color:var(--text-muted);">
-                        <span id="selectedCount">0</span> product(s) selected
                     </div>
                 </div>
             </div>
@@ -266,7 +271,8 @@ function loadProducts() {
         var html = '';
         allProducts.forEach(function(p, i) {
             var lastDate = p.last_stock_take ? p.last_stock_take : 'Never';
-            html += '<div class="form-check py-1 px-2" style="border-bottom:1px solid #f3f4f6;">' +
+            var searchText = (p.barcode || '') + ' ' + (p.name || '');
+            html += '<div class="form-check py-1 px-2 product-check-row" data-search="' + escHtml(searchText.toLowerCase()) + '" style="border-bottom:1px solid #f3f4f6;">' +
                 '<input class="form-check-input product-check" type="checkbox" value="' + escHtml(p.barcode) + '" id="prod_' + i + '" checked onchange="updateSelectedCount();">' +
                 '<label class="form-check-label w-100" for="prod_' + i + '" style="font-size:12px;cursor:pointer;">' +
                 '<div class="d-flex justify-content-between align-items-center">' +
@@ -283,8 +289,22 @@ function loadProducts() {
 
 function toggleAllProducts() {
     var checked = document.getElementById('selectAllProducts').checked;
-    document.querySelectorAll('.product-check').forEach(function(cb) { cb.checked = checked; });
+    // Only toggle visible (non-filtered) checkboxes
+    document.querySelectorAll('.product-check-row').forEach(function(row) {
+        if (row.style.display !== 'none') {
+            row.querySelector('.product-check').checked = checked;
+        }
+    });
     updateSelectedCount();
+}
+
+function filterProductList() {
+    var query = document.getElementById('productSearchInput').value.toLowerCase().trim();
+    var rows = document.querySelectorAll('.product-check-row');
+    rows.forEach(function(row) {
+        var text = (row.getAttribute('data-search') || '').toLowerCase();
+        row.style.display = (!query || text.indexOf(query) > -1) ? '' : 'none';
+    });
 }
 
 function updateSelectedCount() {
@@ -319,6 +339,11 @@ function openCreateModal() {
     document.getElementById('fSubCat').innerHTML = '<option value="">-- Select Sub-Category --</option>';
     document.getElementById('catGroupRow').style.display = 'none';
     document.getElementById('subCatRow').style.display = 'none';
+    document.getElementById('productSelectRow').style.display = 'none';
+    allProducts = [];
+    document.getElementById('productListContainer').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Select a sub-category to load products</div>';
+    document.getElementById('productSearchInput').value = '';
+    updateSelectedCount();
     createModalObj.show();
 }
 
@@ -333,10 +358,14 @@ function createSession() {
     // Collect selected product barcodes (for PARTIAL type)
     var selectedBarcodes = [];
     if (type === 'PARTIAL') {
+        if (subCat === '') {
+            Swal.fire({ icon: 'warning', text: 'Please select a sub-category for partial stock take.' });
+            return;
+        }
         document.querySelectorAll('.product-check:checked').forEach(function(cb) {
             selectedBarcodes.push(cb.value);
         });
-        if (selectedBarcodes.length === 0 && subCat !== '') {
+        if (selectedBarcodes.length === 0) {
             Swal.fire({ icon: 'warning', text: 'Please select at least one product.' });
             return;
         }
