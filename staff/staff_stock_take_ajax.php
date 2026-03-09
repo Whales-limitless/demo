@@ -24,7 +24,9 @@ if (strpos($contentType, 'application/json') !== false) {
 // Ensure status column exists in stock_take_item table
 function ensureItemStatusColumn($connect) {
     $result = $connect->query("SHOW COLUMNS FROM `stock_take_item` LIKE 'status'");
-    if ($result && $result->num_rows === 0) {
+    $exists = ($result && $result->num_rows > 0);
+    if ($result) $result->free();
+    if (!$exists) {
         $connect->query("ALTER TABLE `stock_take_item` ADD COLUMN `status` VARCHAR(10) NOT NULL DEFAULT 'PENDING' AFTER `adj_applied`");
     }
 }
@@ -35,18 +37,25 @@ $staffName = $_SESSION['user_name'] ?? 'Staff';
 if ($action === 'list_sessions') {
     ensureItemStatusColumn($connect);
     // Show DRAFT sessions (for counting) and SUBMITTED sessions (view only)
+    // Use a single query with LEFT JOIN to avoid nested queries on the same connection
     $sessions = [];
-    $result = $connect->query("SELECT `id`, `session_code`, `description`, `type`, `filter_cat`, `status`, `created_by`, `created_at` FROM `stock_take` WHERE `status` IN ('DRAFT', 'SUBMITTED') ORDER BY `id` DESC");
+    $result = $connect->query("
+        SELECT st.`id`, st.`session_code`, st.`description`, st.`type`, st.`filter_cat`, st.`status`, st.`created_by`, st.`created_at`,
+            COUNT(sti.`id`) AS total,
+            SUM(CASE WHEN sti.`status` = 'COUNTED' THEN 1 ELSE 0 END) AS counted
+        FROM `stock_take` st
+        LEFT JOIN `stock_take_item` sti ON sti.`stock_take_id` = st.`id`
+        WHERE st.`status` IN ('DRAFT', 'SUBMITTED')
+        GROUP BY st.`id`
+        ORDER BY st.`id` DESC
+    ");
     if ($result) {
         while ($r = $result->fetch_assoc()) {
-            $sid = intval($r['id']);
-            $countResult = $connect->query("SELECT COUNT(*) AS total, SUM(CASE WHEN `status` = 'COUNTED' THEN 1 ELSE 0 END) AS counted FROM `stock_take_item` WHERE `stock_take_id` = $sid");
-            if ($countResult && $cr = $countResult->fetch_assoc()) {
-                $r['total'] = intval($cr['total']);
-                $r['counted'] = intval($cr['counted']);
-            }
+            $r['total'] = intval($r['total']);
+            $r['counted'] = intval($r['counted']);
             $sessions[] = $r;
         }
+        $result->free();
     }
     echo json_encode(['success' => true, 'sessions' => $sessions]);
 
@@ -60,17 +69,22 @@ if ($action === 'list_sessions') {
 
     $chk = $connect->query("SELECT `status`, `session_code`, `description` FROM `stock_take` WHERE `id` = $sessionId LIMIT 1");
     if (!$chk || $chk->num_rows === 0) {
+        if ($chk) $chk->free();
         echo json_encode(['error' => 'Session not found.']);
         exit;
     }
     $row = $chk->fetch_assoc();
+    $chk->free();
     if (!in_array($row['status'], ['DRAFT'])) {
         echo json_encode(['error' => 'Session is not available for counting.']);
         exit;
     }
 
     $items = [];
-    $result = $connect->query("SELECT `id`, `barcode`, `product_desc`, `system_qty`, `counted_qty`, `variance`, `remark`, `counted_by`, `counted_at`, `adj_applied`, `status` FROM `stock_take_item` WHERE `stock_take_id` = $sessionId ORDER BY `id` ASC");
+    $stmt = $connect->prepare("SELECT `id`, `barcode`, `product_desc`, `system_qty`, `counted_qty`, `variance`, `remark`, `counted_by`, `counted_at`, `adj_applied`, `status` FROM `stock_take_item` WHERE `stock_take_id` = ? ORDER BY `id` ASC");
+    $stmt->bind_param("i", $sessionId);
+    $stmt->execute();
+    $result = $stmt->get_result();
     if ($result) {
         while ($r = $result->fetch_assoc()) {
             $r['description'] = $r['product_desc'];
@@ -80,7 +94,9 @@ if ($action === 'list_sessions') {
             }
             $items[] = $r;
         }
+        $result->free();
     }
+    $stmt->close();
     echo json_encode([
         'success' => true,
         'session_code' => $row['session_code'],
@@ -102,10 +118,12 @@ if ($action === 'list_sessions') {
 
     $chk = $connect->query("SELECT `status` FROM `stock_take` WHERE `id` = $sessionId LIMIT 1");
     if (!$chk || $chk->num_rows === 0) {
+        if ($chk) $chk->free();
         echo json_encode(['error' => 'Session not found.']);
         exit;
     }
     $row = $chk->fetch_assoc();
+    $chk->free();
     if ($row['status'] !== 'DRAFT') {
         echo json_encode(['error' => 'Session is not available for counting.']);
         exit;
@@ -157,10 +175,12 @@ if ($action === 'list_sessions') {
 
     $chk = $connect->query("SELECT `status` FROM `stock_take` WHERE `id` = $sessionId LIMIT 1");
     if (!$chk || $chk->num_rows === 0) {
+        if ($chk) $chk->free();
         echo json_encode(['error' => 'Session not found.']);
         exit;
     }
     $row = $chk->fetch_assoc();
+    $chk->free();
     if ($row['status'] !== 'DRAFT') {
         echo json_encode(['error' => 'Session is not available for submission.']);
         exit;
