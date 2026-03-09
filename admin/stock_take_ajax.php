@@ -29,13 +29,16 @@ function generateSessionCode($connect) {
         $num = intval(substr($row['session_code'], -3));
         $next = $num + 1;
     }
+    if ($result) $result->free();
     return $prefix . str_pad($next, 3, '0', STR_PAD_LEFT);
 }
 
 // Ensure filter_sub_cat column exists in stock_take table
 function ensureFilterSubCatColumn($connect) {
     $result = $connect->query("SHOW COLUMNS FROM `stock_take` LIKE 'filter_sub_cat'");
-    if ($result && $result->num_rows === 0) {
+    $exists = ($result && $result->num_rows > 0);
+    if ($result) $result->free();
+    if (!$exists) {
         $connect->query("ALTER TABLE `stock_take` ADD COLUMN `filter_sub_cat` VARCHAR(50) DEFAULT NULL AFTER `filter_cat`");
     }
 }
@@ -43,7 +46,9 @@ function ensureFilterSubCatColumn($connect) {
 // Ensure status column exists in stock_take_item table
 function ensureItemStatusColumn($connect) {
     $result = $connect->query("SHOW COLUMNS FROM `stock_take_item` LIKE 'status'");
-    if ($result && $result->num_rows === 0) {
+    $exists = ($result && $result->num_rows > 0);
+    if ($result) $result->free();
+    if (!$exists) {
         $connect->query("ALTER TABLE `stock_take_item` ADD COLUMN `status` VARCHAR(10) NOT NULL DEFAULT 'PENDING' AFTER `adj_applied`");
     }
 }
@@ -164,10 +169,13 @@ if ($action === 'get_products') {
             $itemStmt->close();
         }
 
-        // Debug log result
+        if (!$connect->commit()) {
+            throw new Exception('Failed to commit transaction: ' . $connect->error);
+        }
+
+        // Debug log result (after commit to ensure accuracy)
         file_put_contents(__DIR__ . '/stock_take_debug.log', date('Y-m-d H:i:s') . " RESULT: session=$sessionId, collected=" . count($productsToInsert) . ", inserted=$itemCount\n", FILE_APPEND);
 
-        $connect->commit();
         echo json_encode(['success' => 'Stock take session ' . $sessionCode . ' created with ' . $itemCount . ' items.', 'session_id' => $sessionId, 'item_count' => $itemCount]);
 
     } catch (Exception $e) {
