@@ -64,7 +64,7 @@ if ($action === 'get_products') {
              WHERE sti.`barcode` = p.`barcode` AND sti.`counted_qty` IS NOT NULL
             ) AS last_stock_take
         FROM `PRODUCTS` p
-        WHERE p.`checked` = 'Y' AND p.`barcode` IS NOT NULL AND p.`barcode` != '' AND p.`sub_cat` = ?
+        WHERE (p.`checked` != 'N' OR p.`checked` IS NULL) AND p.`barcode` IS NOT NULL AND p.`barcode` != '' AND p.`sub_cat` = ?
         ORDER BY p.`name` ASC
     ");
     $stmt->bind_param("s", $subCat);
@@ -117,7 +117,7 @@ if ($action === 'get_products') {
             foreach ($selectedProducts as $barcode) {
                 $barcode = trim($barcode);
                 if ($barcode === '') continue;
-                $pResult = $connect->query("SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE `barcode` = '" . $connect->real_escape_string($barcode) . "' AND `checked` = 'Y' LIMIT 1");
+                $pResult = $connect->query("SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE `barcode` = '" . $connect->real_escape_string($barcode) . "' AND (`checked` != 'N' OR `checked` IS NULL) LIMIT 1");
                 if ($pResult && $p = $pResult->fetch_assoc()) {
                     $name = $p['name'];
                     $sysQty = floatval($p['qoh']);
@@ -128,7 +128,7 @@ if ($action === 'get_products') {
             $itemStmt->close();
         } else {
             // Include all products matching filter
-            $where = "WHERE `checked` = 'Y' AND `barcode` IS NOT NULL AND `barcode` != ''";
+            $where = "WHERE (`checked` != 'N' OR `checked` IS NULL) AND `barcode` IS NOT NULL AND `barcode` != ''";
             if ($filterSubCatVal) {
                 $where .= " AND `sub_cat` = '" . $connect->real_escape_string($filterSubCatVal) . "'";
             } elseif ($filterCatVal) {
@@ -184,7 +184,7 @@ if ($action === 'get_products') {
 
     try {
         // Calculate variance directly in SQL to avoid nested queries
-        $stmt = $connect->prepare("UPDATE `stock_take_item` SET `counted_qty`=?, `variance`= ? - `system_qty`, `remark`=?, `counted_by`=?, `counted_at`=NOW() WHERE `id`=? AND `stock_take_id`=?");
+        $stmt = $connect->prepare("UPDATE `stock_take_item` SET `counted_qty`=?, `variance`= ? - `system_qty`, `remark`=?, `counted_by`=?, `counted_at`=NOW(), `status`='COUNTED' WHERE `id`=? AND `stock_take_id`=?");
         if (!$stmt) {
             throw new Exception('Failed to prepare statement: ' . $connect->error);
         }

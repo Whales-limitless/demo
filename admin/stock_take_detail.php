@@ -177,8 +177,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th style="width:100px">Counted Qty</th>
                         <th style="width:90px">Variance</th>
                         <th>Remark</th>
+                        <th style="width:100px">Counted By</th>
                         <th style="width:110px">Counted Date</th>
-                        <th style="width:70px">Status</th>
+                        <th style="width:80px">Status</th>
                         <th style="width:80px">Adj Applied</th>
                     </tr>
                 </thead>
@@ -186,8 +187,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     <?php foreach ($items as $idx => $item): ?>
                     <tr data-item-id="<?php echo $item['id']; ?>" data-search="<?php echo htmlspecialchars(strtolower(($item['barcode'] ?? '') . ' ' . ($item['product_desc'] ?? ''))); ?>">
                         <td><?php echo $idx + 1; ?></td>
-                        <td><?php echo htmlspecialchars($item['barcode']); ?></td>
-                        <td><?php echo htmlspecialchars($item['product_desc']); ?></td>
+                        <td><?php echo !empty($item['barcode']) ? htmlspecialchars($item['barcode']) : '<span style="color:#d97706;font-size:11px;">N/A</span>'; ?></td>
+                        <td><?php echo !empty($item['product_desc']) ? htmlspecialchars($item['product_desc']) : '<span style="color:#d97706;font-size:11px;">N/A</span>'; ?></td>
                         <td><?php echo $item['system_qty']; ?></td>
                         <td>
                             <?php if ($canEdit && !$item['adj_applied']): ?>
@@ -215,11 +216,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                             <?php echo htmlspecialchars($item['remark'] ?? ''); ?>
                             <?php endif; ?>
                         </td>
+                        <td style="font-size:12px;"><?php echo !empty($item['counted_by']) ? htmlspecialchars($item['counted_by']) : '-'; ?></td>
                         <td style="font-size:12px;"><?php echo !empty($item['counted_at']) ? date('d/m/Y H:i', strtotime($item['counted_at'])) : '-'; ?></td>
                         <td><?php
                             $itemStatus = $item['status'] ?? 'PENDING';
-                            if ($itemStatus === 'COUNTED') echo '<span style="color:#16a34a;font-weight:600;font-size:11px;">COUNTED</span>';
-                            else echo '<span style="color:#d97706;font-weight:600;font-size:11px;">PENDING</span>';
+                            if ($itemStatus === 'COUNTED') echo '<span class="badge-st badge-APPROVED" style="font-size:10px;">COUNTED</span>';
+                            else echo '<span class="badge-st badge-SUBMITTED" style="font-size:10px;">PENDING</span>';
                         ?></td>
                         <td><?php echo $item['adj_applied'] ? '<span style="color:#16a34a;font-weight:700;">Yes</span>' : '-'; ?></td>
                     </tr>
