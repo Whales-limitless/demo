@@ -33,6 +33,7 @@ if($getfilter == "yesterday"){
 		<!-- Bootstrap core CSS -->
 		<!-- Custom styles for this template -->
 		<link href="../assets/dashboard.css" rel="stylesheet">
+		<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 		<style>
 			.bd-placeholder-img {
 				font-size: 1.125rem;
@@ -140,7 +141,12 @@ if($getfilter == "yesterday"){
 														while($itemrow = $item->fetch_assoc()){
 														?>
 														<li class="list-group-item d-flex justify-content-between align-items-center">
-															<h6><?php echo $itemrow["PDESC"]; ?></h6>
+															<div>
+																<h6 class="mb-0"><?php echo $itemrow["PDESC"]; ?></h6>
+																<?php if(isset($itemrow["INSTALL"]) && $itemrow["INSTALL"] === "Y"){ ?>
+																<span class="badge bg-warning text-dark" style="font-size:10px;"><i class="fas fa-tools"></i> Installation Required</span>
+																<?php } ?>
+															</div>
 															<h3><span class="badge bg-primary badge-lg rounded-pill"><?php echo $itemrow["QTY"] . " " . $itemrow["UOM"]; ?></span></h3>
 														</li>
 														<?php

@@ -164,10 +164,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="do-items">
         <h6 style="font-weight:700;margin-bottom:8px;">Order Items</h6>
         <table>
-            <thead><tr><th>No</th><th>Description</th><th>Qty</th><th>UOM</th></tr></thead>
+            <thead><tr><th>No</th><th>Description</th><th>Qty</th><th>UOM</th><th>Installation</th></tr></thead>
             <tbody>
                 <?php if (count($viewItems) === 0): ?>
-                <tr><td colspan="4" style="text-align:center;color:var(--text-muted);">No items</td></tr>
+                <tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No items</td></tr>
                 <?php else: ?>
                 <?php foreach ($viewItems as $idx => $item): ?>
                 <tr>
@@ -175,6 +175,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     <td><?php echo htmlspecialchars($item['PDESC'] ?? ''); ?></td>
                     <td><?php echo htmlspecialchars($item['QTY'] ?? ''); ?></td>
                     <td><?php echo htmlspecialchars($item['UOM'] ?? ''); ?></td>
+                    <td><?php echo (isset($item['INSTALL']) && $item['INSTALL'] === 'Y') ? '<span style="color:#f59e0b;font-weight:600;"><i class="fas fa-tools"></i> Yes</span>' : '-'; ?></td>
                 </tr>
                 <?php endforeach; ?>
                 <?php endif; ?>

@@ -177,6 +177,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th style="width:100px">Counted Qty</th>
                         <th style="width:90px">Variance</th>
                         <th>Remark</th>
+                        <th style="width:110px">Counted Date</th>
+                        <th style="width:70px">Status</th>
                         <th style="width:80px">Adj Applied</th>
                     </tr>
                 </thead>
@@ -213,6 +215,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                             <?php echo htmlspecialchars($item['remark'] ?? ''); ?>
                             <?php endif; ?>
                         </td>
+                        <td style="font-size:12px;"><?php echo !empty($item['counted_at']) ? date('d/m/Y H:i', strtotime($item['counted_at'])) : '-'; ?></td>
+                        <td><?php
+                            $itemStatus = $item['status'] ?? 'PENDING';
+                            if ($itemStatus === 'COUNTED') echo '<span style="color:#16a34a;font-weight:600;font-size:11px;">COUNTED</span>';
+                            else echo '<span style="color:#d97706;font-weight:600;font-size:11px;">PENDING</span>';
+                        ?></td>
                         <td><?php echo $item['adj_applied'] ? '<span style="color:#16a34a;font-weight:700;">Yes</span>' : '-'; ?></td>
                     </tr>
                     <?php endforeach; ?>

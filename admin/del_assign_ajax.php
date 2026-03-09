@@ -11,6 +11,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 include('../staff/dbconnection.php');
 $connect->set_charset("utf8mb4");
 
+// Support both form-encoded and JSON body
+$contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+if (strpos($contentType, 'application/json') !== false) {
+    $jsonInput = json_decode(file_get_contents('php://input'), true);
+    if ($jsonInput) { $_POST = array_merge($_POST, $jsonInput); }
+}
+
 $action = $_POST['action'] ?? '';
 
 if ($action === 'load') {
@@ -35,6 +42,20 @@ if ($action === 'load') {
 
     echo json_encode(['available' => $available, 'assigned' => $assigned]);
 
+} elseif ($action === 'get_items') {
+    $ordno = trim($_POST['ordno'] ?? '');
+    if ($ordno === '') { echo json_encode(['error' => 'Invalid order number.']); exit; }
+
+    $items = [];
+    $stmt = $connect->prepare("SELECT * FROM `del_orderlistdesc` WHERE `ORDERNO` = ? ORDER BY `PDESC` ASC");
+    $stmt->bind_param("s", $ordno);
+    $stmt->execute();
+    $r = $stmt->get_result();
+    while ($row = $r->fetch_assoc()) { $items[] = $row; }
+    $stmt->close();
+
+    echo json_encode(['items' => $items]);
+
 } elseif ($action === 'assign') {
     $id = intval($_POST['id'] ?? 0);
     $driverCode = trim($_POST['driver_code'] ?? '');
@@ -50,6 +71,22 @@ if ($action === 'load') {
     if ($dr->num_rows > 0) { $driverName = $dr->fetch_assoc()['NAME']; }
     $ds->close();
 
+    // Update installation flags for items
+    $installItems = $_POST['install_items'] ?? [];
+    if (is_array($installItems) && count($installItems) > 0) {
+        $ustmt = $connect->prepare("UPDATE `del_orderlistdesc` SET `INSTALL` = ? WHERE `ID` = ?");
+        foreach ($installItems as $item) {
+            $itemId = intval($item['id'] ?? 0);
+            $install = ($item['install'] ?? '') === 'Y' ? 'Y' : '';
+            if ($itemId > 0) {
+                $ustmt->bind_param("si", $install, $itemId);
+                $ustmt->execute();
+            }
+        }
+        $ustmt->close();
+    }
+
+    // Assign order to driver
     $stmt = $connect->prepare("UPDATE `del_orderlist` SET `DRIVERCODE` = ?, `DRIVER` = ?, `STATUS` = 'A' WHERE `ID` = ?");
     $stmt->bind_param("ssi", $driverCode, $driverName, $id);
     if ($stmt->execute()) { echo json_encode(['success' => 'Order assigned.']); }
