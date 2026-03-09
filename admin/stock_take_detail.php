@@ -17,13 +17,11 @@ if ($sessionId <= 0) {
 }
 
 $session = null;
-$stmt = $connect->prepare("SELECT * FROM `stock_take` WHERE `id` = ? LIMIT 1");
-$stmt->bind_param("i", $sessionId);
-$stmt->execute();
-$result = $stmt->get_result();
-$session = $result->fetch_assoc();
-$result->free();
-$stmt->close();
+$sessionResult = $connect->query("SELECT * FROM `stock_take` WHERE `id` = " . intval($sessionId) . " LIMIT 1");
+if ($sessionResult) {
+    $session = $sessionResult->fetch_assoc();
+    $sessionResult->free();
+}
 
 if (!$session) {
     header("Location: stock_take.php");
