@@ -81,10 +81,7 @@ if ($action === 'list_sessions') {
     }
 
     $items = [];
-    $stmt = $connect->prepare("SELECT `id`, `barcode`, `product_desc`, `system_qty`, `counted_qty`, `variance`, `remark`, `counted_by`, `counted_at`, `adj_applied`, `status` FROM `stock_take_item` WHERE `stock_take_id` = ? ORDER BY `id` ASC");
-    $stmt->bind_param("i", $sessionId);
-    $stmt->execute();
-    $result = $stmt->get_result();
+    $result = $connect->query("SELECT `id`, `barcode`, `product_desc`, `system_qty`, `counted_qty`, `variance`, `remark`, `counted_by`, `counted_at`, `adj_applied`, `status` FROM `stock_take_item` WHERE `stock_take_id` = " . intval($sessionId) . " ORDER BY `id` ASC");
     if ($result) {
         while ($r = $result->fetch_assoc()) {
             $r['description'] = $r['product_desc'];
@@ -96,7 +93,6 @@ if ($action === 'list_sessions') {
         }
         $result->free();
     }
-    $stmt->close();
     echo json_encode([
         'success' => true,
         'session_code' => $row['session_code'],

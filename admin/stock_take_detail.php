@@ -30,17 +30,15 @@ if (!$session) {
     exit;
 }
 
-// Fetch stock take items using prepared statement for clean result handling
+// Fetch stock take items
 $items = [];
-$itemStmt = $connect->prepare("SELECT * FROM `stock_take_item` WHERE `stock_take_id` = ? ORDER BY `id` ASC");
-$itemStmt->bind_param("i", $sessionId);
-$itemStmt->execute();
-$itemResult = $itemStmt->get_result();
+$itemResult = $connect->query("SELECT * FROM `stock_take_item` WHERE `stock_take_id` = " . intval($sessionId) . " ORDER BY `id` ASC");
 if ($itemResult) {
-    $items = $itemResult->fetch_all(MYSQLI_ASSOC);
+    while ($r = $itemResult->fetch_assoc()) {
+        $items[] = $r;
+    }
     $itemResult->free();
 }
-$itemStmt->close();
 
 $isDraft = ($session['status'] === 'DRAFT');
 $isSubmitted = ($session['status'] === 'SUBMITTED');
