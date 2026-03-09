@@ -114,51 +114,58 @@ if ($action === 'get_products') {
         $sessionId = $connect->insert_id;
         $stmt->close();
 
-        // Populate stock_take_item with products
-        $itemCount = 0;
-        $itemStmt = $connect->prepare("INSERT INTO `stock_take_item` (`stock_take_id`,`barcode`,`product_desc`,`system_qty`,`status`) VALUES (?,?,?,?,'PENDING')");
+        // Step 1: Collect all product data FIRST (before opening insert statement)
+        $productsToInsert = [];
 
         if ($type === 'PARTIAL') {
-            // Use specific selected products
+            // Look up each selected product
             foreach ($selectedProducts as $barcode) {
                 $barcode = trim($barcode);
                 if ($barcode === '') continue;
                 $pResult = $connect->query("SELECT TRIM(`barcode`) AS barcode, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE TRIM(`barcode`) = '" . $connect->real_escape_string($barcode) . "' AND (`checked` != 'N' OR `checked` IS NULL) LIMIT 1");
                 if ($pResult && $p = $pResult->fetch_assoc()) {
-                    $bc = $p['barcode'];
-                    $name = $p['name'];
-                    $sysQty = floatval($p['qoh']);
-                    $itemStmt->bind_param("issd", $sessionId, $bc, $name, $sysQty);
-                    $itemStmt->execute();
-                    $itemCount++;
+                    $productsToInsert[] = ['barcode' => $p['barcode'], 'name' => $p['name'], 'qoh' => floatval($p['qoh'])];
                 }
+                if ($pResult) $pResult->free();
             }
         } else {
-            // FULL type - include all products matching filter
+            // FULL type - get all products matching filter
             $where = "WHERE (`checked` != 'N' OR `checked` IS NULL) AND TRIM(`barcode`) != '' AND `barcode` IS NOT NULL";
             if ($filterSubCatVal) {
                 $where .= " AND `sub_cat` = '" . $connect->real_escape_string($filterSubCatVal) . "'";
             } elseif ($filterCatVal) {
                 $where .= " AND `cat` = '" . $connect->real_escape_string($filterCatVal) . "'";
             }
-
             $productResult = $connect->query("SELECT TRIM(`barcode`) AS barcode, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` $where ORDER BY `name` ASC");
             if ($productResult) {
                 while ($p = $productResult->fetch_assoc()) {
-                    $bc = $p['barcode'];
-                    if ($bc === '') continue;
-                    $name = $p['name'];
-                    $sysQty = floatval($p['qoh']);
-                    $itemStmt->bind_param("issd", $sessionId, $bc, $name, $sysQty);
-                    $itemStmt->execute();
-                    $itemCount++;
+                    if (trim($p['barcode']) === '') continue;
+                    $productsToInsert[] = ['barcode' => $p['barcode'], 'name' => $p['name'], 'qoh' => floatval($p['qoh'])];
                 }
+                $productResult->free();
             }
         }
-        $itemStmt->close();
+
+        // Step 2: Insert all collected products
+        $itemCount = 0;
+        if (!empty($productsToInsert)) {
+            $itemStmt = $connect->prepare("INSERT INTO `stock_take_item` (`stock_take_id`,`barcode`,`product_desc`,`system_qty`,`status`) VALUES (?,?,?,?,'PENDING')");
+            foreach ($productsToInsert as $prod) {
+                $bc = $prod['barcode'];
+                $nm = $prod['name'];
+                $sq = $prod['qoh'];
+                $itemStmt->bind_param("issd", $sessionId, $bc, $nm, $sq);
+                if ($itemStmt->execute()) {
+                    $itemCount++;
+                } else {
+                    file_put_contents(__DIR__ . '/stock_take_debug.log', date('Y-m-d H:i:s') . " INSERT FAIL: barcode=$bc, error=" . $itemStmt->error . "\n", FILE_APPEND);
+                }
+            }
+            $itemStmt->close();
+        }
 
         // Debug log result
-        file_put_contents(__DIR__ . '/stock_take_debug.log', date('Y-m-d H:i:s') . " RESULT: session=$sessionId, items=$itemCount\n", FILE_APPEND);
+        file_put_contents(__DIR__ . '/stock_take_debug.log', date('Y-m-d H:i:s') . " RESULT: session=$sessionId, collected=" . count($productsToInsert) . ", inserted=$itemCount\n", FILE_APPEND);
 
         $connect->commit();
         echo json_encode(['success' => 'Stock take session ' . $sessionCode . ' created with ' . $itemCount . ' items.', 'session_id' => $sessionId, 'item_count' => $itemCount]);
