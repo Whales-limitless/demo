@@ -282,15 +282,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
     <?php endif; ?>
 
-    <?php if ($viewSession['status'] === 'DRAFT'): ?>
-    <div class="detail-card">
-        <div class="action-bar">
-            <button class="btn-delete" style="padding:10px 24px;border-radius:10px;font-size:14px;" onclick="deleteSession(<?php echo $viewId; ?>);">
-                <i class="fas fa-trash"></i> Delete Session
-            </button>
-        </div>
-    </div>
-    <?php endif; ?>
 
     <div class="table-card">
         <div class="table-toolbar">
