@@ -178,9 +178,22 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 </div>
                 <div class="mb-3" id="subCatRow" style="display:none;">
                     <label class="form-label fw-semibold">Sub-Category Filter</label>
-                    <select id="fSubCat" class="form-select">
+                    <select id="fSubCat" class="form-select" onchange="loadProducts();">
                         <option value="">-- Select Sub-Category --</option>
                     </select>
+                </div>
+                <div class="mb-3" id="productSelectRow" style="display:none;">
+                    <label class="form-label fw-semibold">Select Products</label>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="selectAllProducts" checked onchange="toggleAllProducts();">
+                        <label class="form-check-label fw-semibold" for="selectAllProducts">Select All</label>
+                    </div>
+                    <div id="productListContainer" style="max-height:300px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;padding:8px;">
+                        <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Select a sub-category to load products</div>
+                    </div>
+                    <div class="mt-1" style="font-size:12px;color:var(--text-muted);">
+                        <span id="selectedCount">0</span> product(s) selected
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -200,13 +213,18 @@ document.addEventListener('DOMContentLoaded', function() {
     createModalObj = new bootstrap.Modal(document.getElementById('createModal'));
 });
 
+var allProducts = [];
+
 document.getElementById('fType').addEventListener('change', function() {
     var isPartial = this.value === 'PARTIAL';
     document.getElementById('catGroupRow').style.display = isPartial ? 'block' : 'none';
     document.getElementById('subCatRow').style.display = isPartial ? 'block' : 'none';
+    document.getElementById('productSelectRow').style.display = isPartial ? 'block' : 'none';
     if (!isPartial) {
         document.getElementById('fCatGroup').value = '';
         document.getElementById('fSubCat').innerHTML = '<option value="">-- Select Sub-Category --</option>';
+        allProducts = [];
+        document.getElementById('productListContainer').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Select a sub-category to load products</div>';
     }
 });
 
@@ -214,6 +232,9 @@ function loadSubCatFilter() {
     var catGroupId = document.getElementById('fCatGroup').value;
     var sel = document.getElementById('fSubCat');
     sel.innerHTML = '<option value="">-- Select Sub-Category --</option>';
+    allProducts = [];
+    document.getElementById('productListContainer').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Select a sub-category to load products</div>';
+    updateSelectedCount();
     if (!catGroupId) return;
 
     $.post('product_ajax.php', { action: 'subcat_list', category_id: catGroupId }, function(subs) {
@@ -221,6 +242,54 @@ function loadSubCatFilter() {
             sel.innerHTML += '<option value="' + escHtml(s.name) + '">' + escHtml(s.name) + '</option>';
         });
     }, 'json');
+}
+
+function loadProducts() {
+    var subCat = document.getElementById('fSubCat').value;
+    var container = document.getElementById('productListContainer');
+    allProducts = [];
+    if (!subCat) {
+        container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Select a sub-category to load products</div>';
+        updateSelectedCount();
+        return;
+    }
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Loading products...</div>';
+
+    $.post('stock_take_ajax.php', { action: 'get_products', sub_cat: subCat }, function(data) {
+        if (data.error) { container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">' + escHtml(data.error) + '</div>'; return; }
+        allProducts = data.products || [];
+        if (allProducts.length === 0) {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">No products found in this sub-category</div>';
+            updateSelectedCount();
+            return;
+        }
+        var html = '';
+        allProducts.forEach(function(p, i) {
+            var lastDate = p.last_stock_take ? p.last_stock_take : 'Never';
+            html += '<div class="form-check py-1 px-2" style="border-bottom:1px solid #f3f4f6;">' +
+                '<input class="form-check-input product-check" type="checkbox" value="' + escHtml(p.barcode) + '" id="prod_' + i + '" checked onchange="updateSelectedCount();">' +
+                '<label class="form-check-label w-100" for="prod_' + i + '" style="font-size:12px;cursor:pointer;">' +
+                '<div class="d-flex justify-content-between align-items-center">' +
+                '<div><strong>' + escHtml(p.barcode) + '</strong> - ' + escHtml(p.name) + '</div>' +
+                '<div style="font-size:11px;color:' + (p.last_stock_take ? '#16a34a' : '#9ca3af') + ';white-space:nowrap;margin-left:8px;">' + escHtml(lastDate) + '</div>' +
+                '</div>' +
+                '</label></div>';
+        });
+        container.innerHTML = html;
+        document.getElementById('selectAllProducts').checked = true;
+        updateSelectedCount();
+    }, 'json');
+}
+
+function toggleAllProducts() {
+    var checked = document.getElementById('selectAllProducts').checked;
+    document.querySelectorAll('.product-check').forEach(function(cb) { cb.checked = checked; });
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    var count = document.querySelectorAll('.product-check:checked').length;
+    document.getElementById('selectedCount').textContent = count;
 }
 
 function escHtml(s) {
@@ -261,9 +330,22 @@ function createSession() {
     var catGroupName = catGroupSel.selectedOptions[0] ? catGroupSel.selectedOptions[0].textContent.trim() : '';
     if (catGroupSel.value === '') catGroupName = '';
 
+    // Collect selected product barcodes (for PARTIAL type)
+    var selectedBarcodes = [];
+    if (type === 'PARTIAL') {
+        document.querySelectorAll('.product-check:checked').forEach(function(cb) {
+            selectedBarcodes.push(cb.value);
+        });
+        if (selectedBarcodes.length === 0 && subCat !== '') {
+            Swal.fire({ icon: 'warning', text: 'Please select at least one product.' });
+            return;
+        }
+    }
+
     $.ajax({
         type: 'POST', url: 'stock_take_ajax.php',
-        data: { action: 'create', description: desc, type: type, filter_cat: catGroupName, filter_sub_cat: subCat },
+        contentType: 'application/json',
+        data: JSON.stringify({ action: 'create', description: desc, type: type, filter_cat: catGroupName, filter_sub_cat: subCat, products: selectedBarcodes }),
         dataType: 'json',
         success: function(data) {
             if (data.success) {

@@ -254,6 +254,76 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             to { transform: rotate(360deg); }
         }
 
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            gap: 0;
+            margin-bottom: 16px;
+            background: var(--surface);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            background: var(--surface);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            position: relative;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            background: #fef2f2;
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--primary);
+        }
+
+        .tab-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 6px;
+        }
+
+        .tab-badge.pending-badge {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .tab-badge.done-badge {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .submitted-date {
+            font-size: 11px;
+            color: #16a34a;
+            margin-top: 4px;
+        }
+
         /* Count View */
         .count-header {
             display: flex;
@@ -613,6 +683,15 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                 </div>
             </div>
 
+            <div class="tab-nav">
+                <button class="tab-btn active" id="tabPending" onclick="switchTab('pending')">
+                    Pending <span class="tab-badge pending-badge" id="pendingCount">0</span>
+                </button>
+                <button class="tab-btn" id="tabSubmitted" onclick="switchTab('submitted')">
+                    Submitted <span class="tab-badge done-badge" id="submittedCount">0</span>
+                </button>
+            </div>
+
             <div class="search-wrap">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
@@ -648,6 +727,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     <script>
         let currentSessionId = null;
         let currentItems = [];
+        let currentTab = 'pending';
 
         // ---- Session List ----
 
@@ -688,14 +768,13 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             sessions.forEach(session => {
                 let statusClass = 'draft';
                 let statusLabel = 'Draft';
-                if (session.status === 'SUBMITTED') { statusClass = 'submitted'; statusLabel = 'Submitted'; }
+                if (session.status === 'SUBMITTED') { statusClass = 'submitted'; statusLabel = 'Completed'; }
                 else if (session.status === 'APPROVED') { statusClass = 'approved'; statusLabel = 'Approved'; }
 
                 const counted = parseInt(session.counted) || 0;
                 const total = parseInt(session.total) || 0;
                 const progressPct = total > 0 ? Math.round((counted / total) * 100) : 0;
                 const isDraft = session.status === 'DRAFT';
-                const btnLabel = isDraft ? 'Start Count' : 'View';
 
                 html += '<div class="session-card">' +
                     '<div class="session-card-top">' +
@@ -731,6 +810,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
         function openSession(sessionId) {
             currentSessionId = sessionId;
+            currentTab = 'pending';
             const container = document.getElementById('itemsContainer');
             container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Loading items...</p></div>';
 
@@ -739,6 +819,10 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             document.getElementById('saveBar').style.display = 'flex';
             document.body.classList.add('count-active');
             document.getElementById('itemSearch').value = '';
+
+            // Reset tab state
+            document.getElementById('tabPending').classList.add('active');
+            document.getElementById('tabSubmitted').classList.remove('active');
 
             fetch('staff_stock_take_ajax.php', {
                 method: 'POST',
@@ -751,9 +835,10 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                     document.getElementById('countSessionCode').textContent = data.session_code || 'Session #' + sessionId;
                     document.getElementById('countSessionDesc').textContent = data.description || '';
                     currentItems = data.items || [];
-                    renderItems(currentItems);
+                    updateTabCounts();
+                    renderItems();
                 } else {
-                    container.innerHTML = '<div class="empty-state"><p>Error loading items. Please try again.</p></div>';
+                    container.innerHTML = '<div class="empty-state"><p>' + (data.error || 'Error loading items.') + '</p></div>';
                 }
             })
             .catch(error => {
@@ -762,21 +847,46 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             });
         }
 
-        function renderItems(items) {
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tabPending').classList.toggle('active', tab === 'pending');
+            document.getElementById('tabSubmitted').classList.toggle('active', tab === 'submitted');
+            document.getElementById('itemSearch').value = '';
+
+            // Show/hide save bar based on tab
+            document.getElementById('saveBar').style.display = tab === 'pending' ? 'flex' : 'none';
+
+            renderItems();
+        }
+
+        function updateTabCounts() {
+            const pending = currentItems.filter(i => i.item_status !== 'COUNTED').length;
+            const submitted = currentItems.filter(i => i.item_status === 'COUNTED').length;
+            document.getElementById('pendingCount').textContent = pending;
+            document.getElementById('submittedCount').textContent = submitted;
+        }
+
+        function renderItems() {
             const container = document.getElementById('itemsContainer');
             const summary = document.getElementById('itemsSummary');
 
-            if (items.length === 0) {
-                container.innerHTML = '<div class="empty-state"><p>No items in this session.</p></div>';
+            const isPending = currentTab === 'pending';
+            const filteredItems = currentItems.filter(i =>
+                isPending ? (i.item_status !== 'COUNTED') : (i.item_status === 'COUNTED')
+            );
+
+            if (filteredItems.length === 0) {
+                const msg = isPending ? 'All items have been submitted!' : 'No items submitted yet.';
+                container.innerHTML = '<div class="empty-state"><p>' + msg + '</p></div>';
                 summary.innerHTML = '';
                 return;
             }
 
-            summary.innerHTML = 'Showing <strong>' + items.length + '</strong> item' + (items.length !== 1 ? 's' : '');
+            summary.innerHTML = 'Showing <strong>' + filteredItems.length + '</strong> item' + (filteredItems.length !== 1 ? 's' : '');
 
             let html = '';
 
-            items.forEach((item, index) => {
+            filteredItems.forEach((item, index) => {
                 const systemQty = parseFloat(item.system_qty) || 0;
                 const countedQty = item.counted_qty !== null && item.counted_qty !== '' ? parseFloat(item.counted_qty) : '';
                 const remark = item.remark || '';
@@ -785,23 +895,19 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                 let varianceDisplay = '-';
 
                 if (variance !== '') {
-                    if (variance > 0) {
-                        varianceClass = 'positive';
-                        varianceDisplay = '+' + variance;
-                    } else if (variance < 0) {
-                        varianceClass = 'negative';
-                        varianceDisplay = '' + variance;
-                    } else {
-                        varianceClass = 'zero';
-                        varianceDisplay = '0';
-                    }
+                    if (variance > 0) { varianceClass = 'positive'; varianceDisplay = '+' + variance; }
+                    else if (variance < 0) { varianceClass = 'negative'; varianceDisplay = '' + variance; }
+                    else { varianceClass = 'zero'; varianceDisplay = '0'; }
                 }
+
+                const isSubmittedItem = item.item_status === 'COUNTED';
 
                 html += '<div class="item-card" data-barcode="' + escapeAttr(item.barcode || '') + '" data-description="' + escapeAttr(item.description || '') + '" data-item-id="' + escapeAttr(item.id) + '">' +
                     '<div class="item-card-header">' +
                         '<span class="item-barcode">' + escapeHtml(item.barcode || 'N/A') + '</span>' +
                     '</div>' +
                     '<div class="item-description">' + escapeHtml(item.description || 'No description') + '</div>' +
+                    (isSubmittedItem && item.counted_at ? '<div class="submitted-date">Submitted: ' + escapeHtml(item.counted_at) + '</div>' : '') +
                     '<div class="item-fields">' +
                         '<div class="item-field">' +
                             '<span class="item-field-label">System Qty</span>' +
@@ -809,7 +915,9 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                         '</div>' +
                         '<div class="item-field">' +
                             '<span class="item-field-label">Counted Qty</span>' +
-                            '<input type="number" class="counted-input" data-index="' + index + '" data-system-qty="' + systemQty + '" value="' + (countedQty !== '' ? countedQty : '') + '" placeholder="Enter count" inputmode="numeric" onchange="updateVariance(this)" oninput="updateVariance(this)">' +
+                            (isSubmittedItem ?
+                                '<div class="item-field-value">' + (countedQty !== '' ? countedQty : '-') + '</div>' :
+                                '<input type="number" class="counted-input" data-index="' + index + '" data-system-qty="' + systemQty + '" value="' + (countedQty !== '' ? countedQty : '') + '" placeholder="Enter count" inputmode="numeric" onchange="updateVariance(this)" oninput="updateVariance(this)">') +
                         '</div>' +
                         '<div class="item-field">' +
                             '<span class="item-field-label">Variance</span>' +
@@ -817,7 +925,9 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                         '</div>' +
                         '<div class="item-field">' +
                             '<span class="item-field-label">Remark</span>' +
-                            '<input type="text" class="remark-input" data-index="' + index + '" value="' + escapeAttr(remark) + '" placeholder="Optional remark">' +
+                            (isSubmittedItem ?
+                                '<div class="item-field-value">' + escapeHtml(remark || '-') + '</div>' :
+                                '<input type="text" class="remark-input" data-index="' + index + '" value="' + escapeAttr(remark) + '" placeholder="Optional remark">') +
                         '</div>' +
                     '</div>' +
                 '</div>';
@@ -841,17 +951,9 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             }
 
             const variance = countedQty - systemQty;
-
-            if (variance > 0) {
-                varianceEl.textContent = '+' + variance;
-                varianceEl.className = 'variance-value positive';
-            } else if (variance < 0) {
-                varianceEl.textContent = '' + variance;
-                varianceEl.className = 'variance-value negative';
-            } else {
-                varianceEl.textContent = '0';
-                varianceEl.className = 'variance-value zero';
-            }
+            if (variance > 0) { varianceEl.textContent = '+' + variance; varianceEl.className = 'variance-value positive'; }
+            else if (variance < 0) { varianceEl.textContent = '' + variance; varianceEl.className = 'variance-value negative'; }
+            else { varianceEl.textContent = '0'; varianceEl.className = 'variance-value zero'; }
         }
 
         function filterItems() {
@@ -887,7 +989,8 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             } else {
                 const noResults = document.getElementById('noResultsMsg');
                 if (noResults) noResults.style.display = 'none';
-                summary.innerHTML = 'Showing <strong>' + visibleCount + '</strong> of <strong>' + currentItems.length + '</strong> item' + (currentItems.length !== 1 ? 's' : '');
+                const total = currentItems.filter(i => currentTab === 'pending' ? i.item_status !== 'COUNTED' : i.item_status === 'COUNTED').length;
+                summary.innerHTML = 'Showing <strong>' + visibleCount + '</strong> of <strong>' + total + '</strong> item' + (total !== 1 ? 's' : '');
             }
         }
 
@@ -965,8 +1068,8 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             }
 
             Swal.fire({
-                title: 'Submit Stock Take?',
-                text: 'Once submitted, you cannot edit the counts anymore. Admin will review and approve.',
+                title: 'Submit ' + counts.length + ' item(s)?',
+                text: 'These items will be marked as counted. You can continue counting remaining items later.',
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#C8102E',
@@ -986,8 +1089,16 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                 .then(data => {
                     btns.forEach(b => b.disabled = false);
                     if (data.success) {
-                        Swal.fire({ icon: 'success', title: 'Submitted!', text: 'Stock take has been submitted for admin review.', confirmButtonColor: '#C8102E' }).then(() => {
-                            backToList();
+                        let msg = data.success;
+                        if (data.session_completed) {
+                            msg = 'All items submitted! Session is now complete and sent for admin review.';
+                        }
+                        Swal.fire({ icon: 'success', title: 'Submitted!', text: msg, confirmButtonColor: '#C8102E' }).then(() => {
+                            if (data.session_completed) {
+                                backToList();
+                            } else {
+                                openSession(currentSessionId);
+                            }
                         });
                     } else {
                         Swal.fire({ icon: 'error', title: 'Submit Failed', text: data.message || data.error || 'An error occurred.', confirmButtonColor: '#C8102E' });

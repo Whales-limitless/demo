@@ -12,6 +12,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 include('../staff/dbconnection.php');
 $connect->set_charset("utf8mb4");
 
+// Support both form-encoded and JSON body
+$contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+if (strpos($contentType, 'application/json') !== false) {
+    $jsonInput = json_decode(file_get_contents('php://input'), true);
+    if ($jsonInput) { $_POST = array_merge($_POST, $jsonInput); }
+}
+
 $action = $_POST['action'] ?? '';
 
 function generateSessionCode($connect) {
@@ -33,17 +40,60 @@ function ensureFilterSubCatColumn($connect) {
     }
 }
 
-if ($action === 'create') {
+// Ensure status column exists in stock_take_item table
+function ensureItemStatusColumn($connect) {
+    $result = $connect->query("SHOW COLUMNS FROM `stock_take_item` LIKE 'status'");
+    if ($result && $result->num_rows === 0) {
+        $connect->query("ALTER TABLE `stock_take_item` ADD COLUMN `status` VARCHAR(10) NOT NULL DEFAULT 'PENDING' AFTER `adj_applied`");
+    }
+}
+
+if ($action === 'get_products') {
+    // Return products for a given sub-category with last stock take date
+    $subCat = trim($_POST['sub_cat'] ?? '');
+    if ($subCat === '') {
+        echo json_encode(['error' => 'Sub-category required.']);
+        exit;
+    }
+
+    $products = [];
+    $stmt = $connect->prepare("
+        SELECT p.`barcode`, p.`name`, COALESCE(p.`qoh`, 0) AS qoh,
+            (SELECT MAX(sti.`counted_at`) FROM `stock_take_item` sti
+             INNER JOIN `stock_take` st ON sti.`stock_take_id` = st.`id`
+             WHERE sti.`barcode` = p.`barcode` AND sti.`counted_qty` IS NOT NULL
+            ) AS last_stock_take
+        FROM `PRODUCTS` p
+        WHERE p.`checked` = 'Y' AND p.`sub_cat` = ?
+        ORDER BY p.`name` ASC
+    ");
+    $stmt->bind_param("s", $subCat);
+    $stmt->execute();
+    $r = $stmt->get_result();
+    while ($row = $r->fetch_assoc()) {
+        if ($row['last_stock_take']) {
+            $row['last_stock_take'] = date('d/m/Y', strtotime($row['last_stock_take']));
+        }
+        $products[] = $row;
+    }
+    $stmt->close();
+
+    echo json_encode(['products' => $products]);
+
+} elseif ($action === 'create') {
     $desc = trim($_POST['description'] ?? '');
     $type = trim($_POST['type'] ?? 'FULL');
     $filterCat = trim($_POST['filter_cat'] ?? '');
     $filterSubCat = trim($_POST['filter_sub_cat'] ?? '');
+    $selectedProducts = $_POST['products'] ?? [];
     $createdBy = $_SESSION['admin_name'] ?? 'Admin';
 
     if (!in_array($type, ['FULL', 'PARTIAL'])) $type = 'FULL';
+    if (!is_array($selectedProducts)) $selectedProducts = [];
 
-    // Ensure filter_sub_cat column exists
+    // Ensure columns exist
     ensureFilterSubCatColumn($connect);
+    ensureItemStatusColumn($connect);
 
     $sessionCode = generateSessionCode($connect);
     $filterCatVal = ($type === 'PARTIAL' && $filterCat !== '') ? $filterCat : null;
@@ -60,25 +110,43 @@ if ($action === 'create') {
         $sessionId = $connect->insert_id;
         $stmt->close();
 
-        // Populate stock_take_item with current products
-        $where = "WHERE `checked` = 'Y'";
-        if ($filterSubCatVal) {
-            $where .= " AND `sub_cat` = '" . $connect->real_escape_string($filterSubCatVal) . "'";
-        } elseif ($filterCatVal) {
-            $where .= " AND `cat` = '" . $connect->real_escape_string($filterCatVal) . "'";
-        }
-
-        $productResult = $connect->query("SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` $where ORDER BY `barcode` ASC");
-        if ($productResult && $productResult->num_rows > 0) {
-            $itemStmt = $connect->prepare("INSERT INTO `stock_take_item` (`stock_take_id`,`barcode`,`product_desc`,`system_qty`) VALUES (?,?,?,?)");
-            while ($p = $productResult->fetch_assoc()) {
-                $barcode = $p['barcode'];
-                $name = $p['name'];
-                $sysQty = floatval($p['qoh']);
-                $itemStmt->bind_param("issd", $sessionId, $barcode, $name, $sysQty);
-                $itemStmt->execute();
+        // Populate stock_take_item with products
+        if ($type === 'PARTIAL' && !empty($selectedProducts)) {
+            // Use specific selected products
+            $itemStmt = $connect->prepare("INSERT INTO `stock_take_item` (`stock_take_id`,`barcode`,`product_desc`,`system_qty`,`status`) VALUES (?,?,?,?,'PENDING')");
+            foreach ($selectedProducts as $barcode) {
+                $barcode = trim($barcode);
+                if ($barcode === '') continue;
+                $pResult = $connect->query("SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE `barcode` = '" . $connect->real_escape_string($barcode) . "' AND `checked` = 'Y' LIMIT 1");
+                if ($pResult && $p = $pResult->fetch_assoc()) {
+                    $name = $p['name'];
+                    $sysQty = floatval($p['qoh']);
+                    $itemStmt->bind_param("issd", $sessionId, $barcode, $name, $sysQty);
+                    $itemStmt->execute();
+                }
             }
             $itemStmt->close();
+        } else {
+            // Include all products matching filter
+            $where = "WHERE `checked` = 'Y'";
+            if ($filterSubCatVal) {
+                $where .= " AND `sub_cat` = '" . $connect->real_escape_string($filterSubCatVal) . "'";
+            } elseif ($filterCatVal) {
+                $where .= " AND `cat` = '" . $connect->real_escape_string($filterCatVal) . "'";
+            }
+
+            $productResult = $connect->query("SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` $where ORDER BY `barcode` ASC");
+            if ($productResult && $productResult->num_rows > 0) {
+                $itemStmt = $connect->prepare("INSERT INTO `stock_take_item` (`stock_take_id`,`barcode`,`product_desc`,`system_qty`,`status`) VALUES (?,?,?,?,'PENDING')");
+                while ($p = $productResult->fetch_assoc()) {
+                    $barcode = $p['barcode'];
+                    $name = $p['name'];
+                    $sysQty = floatval($p['qoh']);
+                    $itemStmt->bind_param("issd", $sessionId, $barcode, $name, $sysQty);
+                    $itemStmt->execute();
+                }
+                $itemStmt->close();
+            }
         }
 
         $connect->commit();
