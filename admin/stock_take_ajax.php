@@ -58,13 +58,13 @@ if ($action === 'get_products') {
 
     $products = [];
     $stmt = $connect->prepare("
-        SELECT p.`barcode`, p.`name`, COALESCE(p.`qoh`, 0) AS qoh,
+        SELECT TRIM(p.`barcode`) AS barcode, p.`name`, COALESCE(p.`qoh`, 0) AS qoh,
             (SELECT MAX(sti.`counted_at`) FROM `stock_take_item` sti
              INNER JOIN `stock_take` st ON sti.`stock_take_id` = st.`id`
-             WHERE sti.`barcode` = p.`barcode` AND sti.`counted_qty` IS NOT NULL
+             WHERE sti.`barcode` = TRIM(p.`barcode`) AND sti.`counted_qty` IS NOT NULL
             ) AS last_stock_take
         FROM `PRODUCTS` p
-        WHERE (p.`checked` != 'N' OR p.`checked` IS NULL) AND p.`barcode` IS NOT NULL AND p.`barcode` != '' AND p.`sub_cat` = ?
+        WHERE (p.`checked` != 'N' OR p.`checked` IS NULL) AND TRIM(p.`barcode`) != '' AND p.`barcode` IS NOT NULL AND p.`sub_cat` = ?
         ORDER BY p.`name` ASC
     ");
     $stmt->bind_param("s", $subCat);
@@ -91,6 +91,10 @@ if ($action === 'get_products') {
     if (!in_array($type, ['FULL', 'PARTIAL'])) $type = 'FULL';
     if (!is_array($selectedProducts)) $selectedProducts = [];
 
+    // Debug log
+    $debugLog = date('Y-m-d H:i:s') . " CREATE: type=$type, cat=$filterCat, subcat=$filterSubCat, products=" . json_encode($selectedProducts) . "\n";
+    file_put_contents(__DIR__ . '/stock_take_debug.log', $debugLog, FILE_APPEND);
+
     // Ensure columns exist
     ensureFilterSubCatColumn($connect);
     ensureItemStatusColumn($connect);
@@ -111,46 +115,53 @@ if ($action === 'get_products') {
         $stmt->close();
 
         // Populate stock_take_item with products
-        if ($type === 'PARTIAL' && !empty($selectedProducts)) {
+        $itemCount = 0;
+        $itemStmt = $connect->prepare("INSERT INTO `stock_take_item` (`stock_take_id`,`barcode`,`product_desc`,`system_qty`,`status`) VALUES (?,?,?,?,'PENDING')");
+
+        if ($type === 'PARTIAL') {
             // Use specific selected products
-            $itemStmt = $connect->prepare("INSERT INTO `stock_take_item` (`stock_take_id`,`barcode`,`product_desc`,`system_qty`,`status`) VALUES (?,?,?,?,'PENDING')");
             foreach ($selectedProducts as $barcode) {
                 $barcode = trim($barcode);
                 if ($barcode === '') continue;
-                $pResult = $connect->query("SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE `barcode` = '" . $connect->real_escape_string($barcode) . "' AND (`checked` != 'N' OR `checked` IS NULL) LIMIT 1");
+                $pResult = $connect->query("SELECT TRIM(`barcode`) AS barcode, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE TRIM(`barcode`) = '" . $connect->real_escape_string($barcode) . "' AND (`checked` != 'N' OR `checked` IS NULL) LIMIT 1");
                 if ($pResult && $p = $pResult->fetch_assoc()) {
+                    $bc = $p['barcode'];
                     $name = $p['name'];
                     $sysQty = floatval($p['qoh']);
-                    $itemStmt->bind_param("issd", $sessionId, $barcode, $name, $sysQty);
+                    $itemStmt->bind_param("issd", $sessionId, $bc, $name, $sysQty);
                     $itemStmt->execute();
+                    $itemCount++;
                 }
             }
-            $itemStmt->close();
         } else {
-            // Include all products matching filter
-            $where = "WHERE (`checked` != 'N' OR `checked` IS NULL) AND `barcode` IS NOT NULL AND `barcode` != ''";
+            // FULL type - include all products matching filter
+            $where = "WHERE (`checked` != 'N' OR `checked` IS NULL) AND TRIM(`barcode`) != '' AND `barcode` IS NOT NULL";
             if ($filterSubCatVal) {
                 $where .= " AND `sub_cat` = '" . $connect->real_escape_string($filterSubCatVal) . "'";
             } elseif ($filterCatVal) {
                 $where .= " AND `cat` = '" . $connect->real_escape_string($filterCatVal) . "'";
             }
 
-            $productResult = $connect->query("SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` $where ORDER BY `name` ASC");
-            if ($productResult && $productResult->num_rows > 0) {
-                $itemStmt = $connect->prepare("INSERT INTO `stock_take_item` (`stock_take_id`,`barcode`,`product_desc`,`system_qty`,`status`) VALUES (?,?,?,?,'PENDING')");
+            $productResult = $connect->query("SELECT TRIM(`barcode`) AS barcode, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` $where ORDER BY `name` ASC");
+            if ($productResult) {
                 while ($p = $productResult->fetch_assoc()) {
-                    $barcode = $p['barcode'];
+                    $bc = $p['barcode'];
+                    if ($bc === '') continue;
                     $name = $p['name'];
                     $sysQty = floatval($p['qoh']);
-                    $itemStmt->bind_param("issd", $sessionId, $barcode, $name, $sysQty);
+                    $itemStmt->bind_param("issd", $sessionId, $bc, $name, $sysQty);
                     $itemStmt->execute();
+                    $itemCount++;
                 }
-                $itemStmt->close();
             }
         }
+        $itemStmt->close();
+
+        // Debug log result
+        file_put_contents(__DIR__ . '/stock_take_debug.log', date('Y-m-d H:i:s') . " RESULT: session=$sessionId, items=$itemCount\n", FILE_APPEND);
 
         $connect->commit();
-        echo json_encode(['success' => 'Stock take session ' . $sessionCode . ' created.', 'session_id' => $sessionId]);
+        echo json_encode(['success' => 'Stock take session ' . $sessionCode . ' created with ' . $itemCount . ' items.', 'session_id' => $sessionId, 'item_count' => $itemCount]);
 
     } catch (Exception $e) {
         $connect->rollback();
