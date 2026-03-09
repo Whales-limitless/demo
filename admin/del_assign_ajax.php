@@ -18,6 +18,12 @@ if (strpos($contentType, 'application/json') !== false) {
     if ($jsonInput) { $_POST = array_merge($_POST, $jsonInput); }
 }
 
+// Ensure INSTALL column exists in del_orderlistdesc
+$colCheck = $connect->query("SHOW COLUMNS FROM `del_orderlistdesc` LIKE 'INSTALL'");
+if ($colCheck && $colCheck->num_rows === 0) {
+    $connect->query("ALTER TABLE `del_orderlistdesc` ADD COLUMN `INSTALL` VARCHAR(1) NOT NULL DEFAULT '' AFTER `UOM`");
+}
+
 $action = $_POST['action'] ?? '';
 
 if ($action === 'load') {
