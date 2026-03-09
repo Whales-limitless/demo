@@ -152,17 +152,18 @@ $hasSigFile = file_exists(__DIR__ . '/' . $sigPath);
 
             <table class="do-table">
                 <thead>
-                    <tr><th>No.</th><th>Description</th><th>Qty</th></tr>
+                    <tr><th>No.</th><th>Description</th><th>Qty</th><th>Install</th></tr>
                 </thead>
                 <tbody>
                     <?php if (count($items) === 0): ?>
-                    <tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:20px;">No items</td></tr>
+                    <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">No items</td></tr>
                     <?php else: ?>
                     <?php foreach ($items as $idx => $item): ?>
                     <tr>
                         <td><?php echo $idx + 1; ?></td>
                         <td><?php echo htmlspecialchars($item['PDESC'] ?? ''); ?></td>
                         <td><?php echo htmlspecialchars(($item['QTY'] ?? '') . ' ' . ($item['UOM'] ?? '')); ?></td>
+                        <td><?php echo (isset($item['INSTALL']) && $item['INSTALL'] === 'Y') ? '<span style="color:#f59e0b;font-weight:600;">Yes</span>' : '-'; ?></td>
                     </tr>
                     <?php endforeach; ?>
                     <?php endif; ?>

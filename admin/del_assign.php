@@ -42,6 +42,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-action { padding: 5px 12px; border: none; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); display: inline-block; margin: 1px; color: #fff; }
 .btn-assign { background: #16a34a; } .btn-assign:hover { background: #15803d; }
 .btn-unassign { background: #ef4444; } .btn-unassign:hover { background: #dc2626; }
+.install-check { width: 18px; height: 18px; cursor: pointer; accent-color: #f59e0b; }
+.install-label { font-size: 12px; color: #f59e0b; font-weight: 600; margin-left: 4px; }
 
 /* Dual panel */
 .assign-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -91,10 +93,37 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
+<!-- Installation Modal -->
+<div class="modal fade" id="installModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border-radius:var(--radius);border:none;box-shadow:var(--shadow-md);">
+            <div class="modal-header" style="border-bottom:1px solid #e5e7eb;">
+                <h5 class="modal-title" style="font-family:'Outfit',sans-serif;font-weight:700;"><i class="fas fa-tools" style="color:#f59e0b;margin-right:6px;"></i>Set Installation Required</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Select items that require installation for this order:</p>
+                <div id="installItemList"></div>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #e5e7eb;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmAssignBtn" onclick="confirmAssign();"><i class="fas fa-check"></i> Assign</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+var installModal = null;
+var pendingAssign = { orderId: 0, driverCode: '', ordno: '' };
+
+document.addEventListener('DOMContentLoaded', function() {
+    installModal = new bootstrap.Modal(document.getElementById('installModal'));
+});
+
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 function onDriverChange() {
@@ -129,16 +158,74 @@ function renderPanel(containerId, orders, actionType, driverCode) {
         var btnText = actionType === 'assign' ? 'Assign' : 'Remove';
         return '<div class="order-row">' +
             '<div class="order-info"><strong>' + escHtml(o.ORDNO||'') + '</strong><small>' + escHtml(o.DELDATE||'') + ' | ' + escHtml(o.CUSTOMER||'') + ' | ' + escHtml(o.LOCATION||'') + '</small></div>' +
-            '<button class="btn-action ' + btnClass + '" onclick="transferOrder(' + o.ID + ',\'' + actionType + '\',\'' + escHtml(driverCode) + '\')"><i class="fas ' + btnIcon + '"></i> ' + btnText + '</button>' +
+            '<button class="btn-action ' + btnClass + '" onclick="transferOrder(' + o.ID + ',\'' + actionType + '\',\'' + escHtml(driverCode) + '\',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas ' + btnIcon + '"></i> ' + btnText + '</button>' +
         '</div>';
     }).join('');
 }
 
-function transferOrder(orderId, actionType, driverCode) {
+function transferOrder(orderId, actionType, driverCode, ordno) {
+    if (actionType === 'assign') {
+        // Show installation modal before assigning
+        pendingAssign = { orderId: orderId, driverCode: driverCode, ordno: ordno };
+        loadInstallItems(ordno);
+    } else {
+        // Unassign directly
+        $.ajax({
+            type: 'POST', url: 'del_assign_ajax.php', data: { action: 'unassign', id: orderId, driver_code: driverCode }, dataType: 'json',
+            success: function(data) {
+                if (data.success) { loadAssignment(driverCode); }
+                else { Swal.fire({ icon: 'error', text: data.error || 'Failed.' }); }
+            }
+        });
+    }
+}
+
+function loadInstallItems(ordno) {
     $.ajax({
-        type: 'POST', url: 'del_assign_ajax.php', data: { action: actionType, id: orderId, driver_code: driverCode }, dataType: 'json',
+        type: 'POST', url: 'del_assign_ajax.php', data: { action: 'get_items', ordno: ordno }, dataType: 'json',
         success: function(data) {
-            if (data.success) { loadAssignment(driverCode); }
+            if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
+            var items = data.items || [];
+            var html = '';
+            if (items.length === 0) {
+                html = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No items in this order</div>';
+            } else {
+                html = '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
+                html += '<thead><tr><th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;">Item</th><th style="padding:8px;text-align:center;border-bottom:2px solid #e5e7eb;">Qty</th><th style="padding:8px;text-align:center;border-bottom:2px solid #e5e7eb;">Installation</th></tr></thead>';
+                html += '<tbody>';
+                items.forEach(function(item) {
+                    var checked = item.INSTALL === 'Y' ? 'checked' : '';
+                    html += '<tr><td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + escHtml(item.PDESC) + '</td>' +
+                        '<td style="padding:8px;text-align:center;border-bottom:1px solid #f3f4f6;">' + escHtml(item.QTY + ' ' + item.UOM) + '</td>' +
+                        '<td style="padding:8px;text-align:center;border-bottom:1px solid #f3f4f6;"><input type="checkbox" class="install-check" data-id="' + item.ID + '" ' + checked + '></td></tr>';
+                });
+                html += '</tbody></table>';
+            }
+            document.getElementById('installItemList').innerHTML = html;
+            installModal.show();
+        }
+    });
+}
+
+function confirmAssign() {
+    // Collect installation flags
+    var installItems = [];
+    document.querySelectorAll('#installItemList .install-check').forEach(function(cb) {
+        installItems.push({ id: parseInt(cb.getAttribute('data-id')), install: cb.checked ? 'Y' : '' });
+    });
+
+    $.ajax({
+        type: 'POST', url: 'del_assign_ajax.php', dataType: 'json',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            action: 'assign',
+            id: pendingAssign.orderId,
+            driver_code: pendingAssign.driverCode,
+            install_items: installItems
+        }),
+        success: function(data) {
+            installModal.hide();
+            if (data.success) { loadAssignment(pendingAssign.driverCode); }
             else { Swal.fire({ icon: 'error', text: data.error || 'Failed.' }); }
         }
     });

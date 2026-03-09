@@ -50,6 +50,7 @@ $sanitized_ordno = preg_replace('/[\/\\\\:*?"<>|]/', '_', $_GET['ordno']);
 <link href="../assets/dashboard.css" rel="stylesheet">
 
 <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.2.0/css/bootstrap.min.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
 <!--<script>
 window.onload = function() { window.print(); }
@@ -59,7 +60,7 @@ window.onload = function() { window.print(); }
 	<div id="wrap" class="d-none d-sm-block" >
         <div class="container">
             <br>
-            
+
             <div class="d-print-none">
                 <div class="row">
                     <div class="col-md-2">
@@ -74,7 +75,7 @@ window.onload = function() { window.print(); }
                     </div>
                 </div>
             </div>
-			
+
 			<div style="width: 100%; display: table;font-size:11px">
                 <div style="display: table-row">
                     <div style="width: 22.5%; display: table-cell;">
@@ -101,8 +102,8 @@ window.onload = function() { window.print(); }
                     </div>
                 </div>
             </div>
-            
-            
+
+
         </div>
 		<br>
 
@@ -112,8 +113,9 @@ window.onload = function() { window.print(); }
                     <thead>
                         <tr>
                             <th style="width:1%;padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black">NO.</th>
-                            <th style="width:80%;padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black">DESCRIPTION</th>
-                            <th style="width:19%;padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black">QUANTITY</th>
+                            <th style="width:60%;padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black">DESCRIPTION</th>
+                            <th style="width:15%;padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black">QUANTITY</th>
+                            <th style="width:24%;padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black">INSTALL</th>
                         </tr>
                     </thead>
 
@@ -121,7 +123,7 @@ window.onload = function() { window.print(); }
                         <?php
                         $query3  = "SELECT * FROM `del_orderlistdesc` WHERE ORDERNO = '".$ordno."'";
                         $result  = mysqli_query($connect,$query3);
-                        
+
                         $num_rows = $result->num_rows;
                         if ($num_rows > 0){
                             $rownumber = "";
@@ -132,16 +134,17 @@ window.onload = function() { window.print(); }
                                     <td style="padding-top:2px;padding-bottom:2px;border:1px solid black"><?php echo $rownumber; $rownumber++ ?></td>
                                     <td style="padding-top:2px;padding-bottom:2px;border:1px solid black"><?php echo $row['PDESC']; ?></td>
                                     <td style="padding-top:2px;padding-bottom:2px;text-align:right;border:1px solid black"><?php echo $row['QTY'].' '.$row['UOM']; ?></td>
+                                    <td style="padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black"><?php echo (isset($row['INSTALL']) && $row['INSTALL'] === 'Y') ? '<i class="fas fa-tools" style="color:#f59e0b;"></i> Yes' : '-'; ?></td>
                                 </tr>
 								<?php
                             }
                         }
                         ?>
-                
+
                     </tbody>
                 </table>
             </div><br><br><br><br>
-			
+
 			<div style="width: 100%; display: table;font-size:11px">
                 <div style="display: table-row">
                     <div style="width: 30%; display: table-cell;">
@@ -155,7 +158,7 @@ window.onload = function() { window.print(); }
 									<?php
 								}
 								?>
-								
+
 								<a href="sign.php?ordno=<?php echo $_GET['ordno']; ?>" class="btn btn-sm btn-success d-print-none" >Sign</a>
                                 </div>
                             </div>
@@ -173,7 +176,7 @@ window.onload = function() { window.print(); }
                     </div>
                 </div>
             </div>
-			
+
 			<div style="width: 100%; display: table;font-size:11px">
                 <div style="display: table-row">
                     <div style="width: 70%; display: table-cell;">
@@ -242,7 +245,7 @@ window.onload = function() { window.print(); }
                     </div>
                 </div>
             </div>
-			
+
 			<div style="width: 100%; display: table;font-size:11px">
                 <div style="display: table-row">
                     <div style="width: 70%; display: table-cell;">
@@ -267,11 +270,11 @@ window.onload = function() { window.print(); }
             </div>
         </div>
 	</div>
-	
+
 	<div id="wrap" class="d-block d-sm-none">
         <div class="container">
             <br>
-            
+
             <div class="d-print-none">
                 <div class="row">
                     <div class="col-md-12">
@@ -281,7 +284,7 @@ window.onload = function() { window.print(); }
                     </div>
                 </div>
             </div>
-			
+
 			<div style="width: 100%; display: table;">
                 <div style="display: table-row">
 					<div style="width: 100%; display: table-cell;">
@@ -291,7 +294,7 @@ window.onload = function() { window.print(); }
 					</div>
                 </div>
             </div>
-			
+
 			<div style="width: 100%; display: table;">
                 <div style="display: table-row">
                     <div style="width: 100%; display: table-cell;">
@@ -314,36 +317,38 @@ window.onload = function() { window.print(); }
                     <thead>
                         <tr>
                             <th style="width:1%;padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black">NO.</th>
-                            <th style="width:80%;padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black">DESCRIPTION</th>
-                            <th style="width:19%;padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black">QUANTITY</th>
+                            <th style="width:55%;padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black">DESCRIPTION</th>
+                            <th style="width:20%;padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black">QTY</th>
+                            <th style="width:24%;padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black">INSTALL</th>
                         </tr>
                     </thead>
 
                     <tbody>
                         <?php
-                        $query3  = "SELECT * FROM `del_orderlistdesc` WHERE ORDERNO = '".$ordno."'";
-                        $result  = mysqli_query($connect,$query3);
-                        
-                        $num_rows = $result->num_rows;
-                        if ($num_rows > 0){
-                            $rownumber = "";
-                            $rownumber = $rownumber+1;
-                            while($row = mysqli_fetch_array($result)){
+                        $query3m  = "SELECT * FROM `del_orderlistdesc` WHERE ORDERNO = '".$ordno."'";
+                        $resultm  = mysqli_query($connect,$query3m);
+
+                        $num_rowsm = $resultm->num_rows;
+                        if ($num_rowsm > 0){
+                            $rownumberm = "";
+                            $rownumberm = $rownumberm+1;
+                            while($rowm = mysqli_fetch_array($resultm)){
 								?>
                                 <tr>
-                                    <td style="padding-top:2px;padding-bottom:2px;border:1px solid black"><?php echo $rownumber; $rownumber++ ?></td>
-                                    <td style="padding-top:2px;padding-bottom:2px;border:1px solid black"><?php echo $row['PDESC']; ?></td>
-                                    <td style="padding-top:2px;padding-bottom:2px;text-align:right;border:1px solid black"><?php echo $row['QTY'].' '.$row['UOM']; ?></td>
+                                    <td style="padding-top:2px;padding-bottom:2px;border:1px solid black"><?php echo $rownumberm; $rownumberm++ ?></td>
+                                    <td style="padding-top:2px;padding-bottom:2px;border:1px solid black"><?php echo $rowm['PDESC']; ?></td>
+                                    <td style="padding-top:2px;padding-bottom:2px;text-align:right;border:1px solid black"><?php echo $rowm['QTY'].' '.$rowm['UOM']; ?></td>
+                                    <td style="padding-top:2px;padding-bottom:2px;text-align:center;border:1px solid black"><?php echo (isset($rowm['INSTALL']) && $rowm['INSTALL'] === 'Y') ? '<i class="fas fa-tools" style="color:#f59e0b;"></i> Yes' : '-'; ?></td>
                                 </tr>
 								<?php
                             }
                         }
                         ?>
-                
+
                     </tbody>
                 </table>
             </div><br><br><br><br>
-			
+
 			<div style="width: 100%; display: table;font-size:11px">
                 <div style="display: table-row">
                     <div style="width: 30%; display: table-cell;">
@@ -357,7 +362,7 @@ window.onload = function() { window.print(); }
 									<?php
 								}
 								?>
-								
+
 								<a href="sign.php?ordno=<?php echo $_GET['ordno']; ?>" class="btn btn-sm btn-success d-print-none" >Sign</a>
                                 </div>
                             </div>
@@ -375,7 +380,7 @@ window.onload = function() { window.print(); }
                     </div>
                 </div>
             </div>
-			
+
 			<div style="width: 100%; display: table;font-size:11px">
                 <div style="display: table-row">
                     <div style="width: 70%; display: table-cell;">
@@ -444,7 +449,7 @@ window.onload = function() { window.print(); }
                     </div>
                 </div>
             </div>
-			
+
 			<div style="width: 100%; display: table;font-size:11px">
                 <div style="display: table-row">
                     <div style="width: 70%; display: table-cell;">
@@ -470,11 +475,11 @@ window.onload = function() { window.print(); }
         </div>
 	</div>
 </body>
-	
+
 <script>
 function printpage(){
     window.print();
 }
 </script>
-	
+
 </html>
