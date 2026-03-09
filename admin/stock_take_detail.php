@@ -31,12 +31,19 @@ if (!$session) {
 
 // Fetch stock take items
 $items = [];
-$itemResult = $connect->query("SELECT * FROM `stock_take_item` WHERE `stock_take_id` = $sessionId ORDER BY `id` ASC");
+$itemQuery = "SELECT * FROM `stock_take_item` WHERE `stock_take_id` = $sessionId ORDER BY `id` ASC";
+$itemResult = $connect->query($itemQuery);
+$debugItemInfo = "Query: $itemQuery | ";
 if ($itemResult) {
+    $debugItemInfo .= "Rows: " . $itemResult->num_rows;
     while ($r = $itemResult->fetch_assoc()) {
         $items[] = $r;
     }
+} else {
+    $debugItemInfo .= "Error: " . $connect->error;
 }
+// Temporary debug - write to log
+file_put_contents(__DIR__ . '/stock_take_debug.log', date('Y-m-d H:i:s') . " DETAIL PAGE: sessionId=$sessionId, items=" . count($items) . " | $debugItemInfo\n", FILE_APPEND);
 
 $isDraft = ($session['status'] === 'DRAFT');
 $isSubmitted = ($session['status'] === 'SUBMITTED');
@@ -156,6 +163,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <div class="stat-box"><div class="num"><?php echo $counted; ?></div><div class="lbl">Counted</div></div>
         <div class="stat-box"><div class="num" style="color:#d97706;"><?php echo $withVariance; ?></div><div class="lbl">With Variance</div></div>
         <div class="stat-box"><div class="num" style="color:#16a34a;"><?php echo $adjApplied; ?></div><div class="lbl">Adjustments Applied</div></div>
+    </div>
+
+    <!-- Debug info - remove after fixing -->
+    <div class="card" style="background:#fef3c7;border:1px solid #f59e0b;font-size:12px;font-family:monospace;">
+        <strong>DEBUG:</strong> sessionId=<?php echo $sessionId; ?> | items_in_array=<?php echo count($items); ?> | query_rows=<?php echo $itemResult ? $itemResult->num_rows : 'ERROR'; ?>
+        <?php if (count($items) > 0): ?> | first_item_barcode="<?php echo htmlspecialchars($items[0]['barcode'] ?? 'NULL'); ?>" | first_item_desc="<?php echo htmlspecialchars($items[0]['product_desc'] ?? 'NULL'); ?>"<?php endif; ?>
     </div>
 
     <div class="card">
