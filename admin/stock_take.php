@@ -196,7 +196,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     <div class="mb-2">
                         <input type="text" id="productSearchInput" class="form-control form-control-sm" placeholder="Search product name or barcode..." oninput="filterProductList();">
                     </div>
-                    <div id="productListContainer" style="max-height:300px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;padding:8px;">
+                    <div id="productListContainer" style="max-height:300px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;padding:4px 0;">
                         <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Select a sub-category to load products</div>
                     </div>
                 </div>
@@ -272,14 +272,11 @@ function loadProducts() {
         allProducts.forEach(function(p, i) {
             var lastDate = p.last_stock_take ? p.last_stock_take : 'Never';
             var searchText = (p.barcode || '') + ' ' + (p.name || '');
-            html += '<div class="form-check py-1 px-2 product-check-row" data-search="' + escHtml(searchText.toLowerCase()) + '" style="border-bottom:1px solid #f3f4f6;">' +
-                '<input class="form-check-input product-check" type="checkbox" value="' + escHtml(p.barcode) + '" id="prod_' + i + '" checked onchange="updateSelectedCount();">' +
-                '<label class="form-check-label w-100" for="prod_' + i + '" style="font-size:12px;cursor:pointer;">' +
-                '<div class="d-flex justify-content-between align-items-center">' +
-                '<div><strong>' + escHtml(p.barcode) + '</strong> - ' + escHtml(p.name) + '</div>' +
-                '<div style="font-size:11px;color:' + (p.last_stock_take ? '#16a34a' : '#9ca3af') + ';white-space:nowrap;margin-left:8px;">' + escHtml(lastDate) + '</div>' +
-                '</div>' +
-                '</label></div>';
+            html += '<label class="product-check-row d-flex align-items-center gap-2 px-3 py-2" data-search="' + escHtml(searchText.toLowerCase()) + '" for="prod_' + i + '" style="border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:12px;margin:0;">' +
+                '<input class="form-check-input product-check mt-0" type="checkbox" value="' + escHtml(p.barcode) + '" id="prod_' + i + '" checked onchange="updateSelectedCount();" style="flex-shrink:0;">' +
+                '<span class="flex-grow-1" style="min-width:0;"><strong>' + escHtml(p.barcode) + '</strong> – ' + escHtml(p.name) + '</span>' +
+                '<span style="font-size:11px;color:' + (p.last_stock_take ? '#16a34a' : '#9ca3af') + ';white-space:nowrap;">' + escHtml(lastDate) + '</span>' +
+                '</label>';
         });
         container.innerHTML = html;
         document.getElementById('selectAllProducts').checked = true;
