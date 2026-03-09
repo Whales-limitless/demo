@@ -26,60 +26,89 @@ function generateSessionCode($connect) {
     return $prefix . str_pad($next, 3, '0', STR_PAD_LEFT);
 }
 
-if ($action === 'create') {
+if ($action === 'load_products') {
+    $filterCat = trim($_POST['filter_cat'] ?? '');
+    $filterSubCat = trim($_POST['filter_sub_cat'] ?? '');
+
+    $query = "SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE `checked` = 'Y'";
+    $params = [];
+    $types = '';
+
+    if ($filterCat !== '') {
+        $query .= " AND `cat` = ?";
+        $params[] = $filterCat;
+        $types .= 's';
+    }
+    if ($filterSubCat !== '') {
+        $query .= " AND `sub_cat` = ?";
+        $params[] = $filterSubCat;
+        $types .= 's';
+    }
+
+    $query .= " ORDER BY `name` ASC";
+
+    $products = [];
+    if (!empty($params)) {
+        $stmt = $connect->prepare($query);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($r = $result->fetch_assoc()) {
+            $products[] = $r;
+        }
+        $stmt->close();
+    } else {
+        $result = $connect->query($query);
+        if ($result) {
+            while ($r = $result->fetch_assoc()) {
+                $products[] = $r;
+            }
+        }
+    }
+
+    echo json_encode(['success' => true, 'products' => $products]);
+
+} elseif ($action === 'create') {
     $description = trim($_POST['description'] ?? '');
     $type = trim($_POST['type'] ?? 'FULL');
     $filterCat = trim($_POST['filter_cat'] ?? '');
-    $filterLocation = trim($_POST['filter_location'] ?? '');
+    $filterSubCat = trim($_POST['filter_sub_cat'] ?? '');
+    $barcodesRaw = $_POST['barcodes'] ?? '[]';
+    $selectedBarcodes = json_decode($barcodesRaw, true);
 
     if (!in_array($type, ['FULL', 'PARTIAL'])) {
         echo json_encode(['error' => 'Invalid stock take type.']);
         exit;
     }
 
-    // Build product query based on filters
-    $productQuery = "SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE `checked` = 'Y'";
-    $params = [];
-    $types = '';
-
-    if ($type === 'PARTIAL') {
-        if ($filterCat !== '') {
-            $productQuery .= " AND `cat` = ?";
-            $params[] = $filterCat;
-            $types .= 's';
-        }
-        if ($filterLocation !== '') {
-            $productQuery .= " AND `rack` = ?";
-            $params[] = $filterLocation;
-            $types .= 's';
-        }
-    }
-
-    $productQuery .= " ORDER BY `cat` ASC, `name` ASC";
-
-    // Count products first
-    if (!empty($params)) {
-        $countStmt = $connect->prepare($productQuery);
-        $countStmt->bind_param($types, ...$params);
-        $countStmt->execute();
-        $countResult = $countStmt->get_result();
+    // Build product query
+    if ($type === 'PARTIAL' && !empty($selectedBarcodes)) {
+        // Use selected barcodes
+        $placeholders = implode(',', array_fill(0, count($selectedBarcodes), '?'));
+        $productQuery = "SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE `checked` = 'Y' AND `barcode` IN ($placeholders) ORDER BY `name` ASC";
+        $stmt = $connect->prepare($productQuery);
+        $bindTypes = str_repeat('s', count($selectedBarcodes));
+        $stmt->bind_param($bindTypes, ...$selectedBarcodes);
+        $stmt->execute();
+        $result = $stmt->get_result();
         $products = [];
-        while ($r = $countResult->fetch_assoc()) {
+        while ($r = $result->fetch_assoc()) {
             $products[] = $r;
         }
-        $countStmt->close();
+        $stmt->close();
     } else {
-        $countResult = $connect->query($productQuery);
+        // Full stock take - all active products
+        $result = $connect->query("SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE `checked` = 'Y' ORDER BY `cat` ASC, `name` ASC");
         $products = [];
-        if ($countResult) {
-            while ($r = $countResult->fetch_assoc()) {
+        if ($result) {
+            while ($r = $result->fetch_assoc()) {
                 $products[] = $r;
             }
         }
     }
 
     if (count($products) === 0) {
-        echo json_encode(['error' => 'No products found matching the selected filters.']);
+        echo json_encode(['error' => 'No products found.']);
         exit;
     }
 
@@ -88,11 +117,11 @@ if ($action === 'create') {
     try {
         $sessionCode = generateSessionCode($connect);
         $filterCatVal = ($type === 'PARTIAL' && $filterCat !== '') ? $filterCat : null;
-        $filterLocVal = ($type === 'PARTIAL' && $filterLocation !== '') ? $filterLocation : null;
+        $filterSubCatVal = ($type === 'PARTIAL' && $filterSubCat !== '') ? $filterSubCat : null;
 
         // Create session header
-        $stmt = $connect->prepare("INSERT INTO `stock_take` (`session_code`, `description`, `type`, `filter_cat`, `filter_location`, `status`, `created_by`, `created_at`) VALUES (?, ?, ?, ?, ?, 'DRAFT', ?, NOW())");
-        $stmt->bind_param("ssssss", $sessionCode, $description, $type, $filterCatVal, $filterLocVal, $adminUser);
+        $stmt = $connect->prepare("INSERT INTO `stock_take` (`session_code`, `description`, `type`, `filter_cat`, `filter_sub_cat`, `status`, `created_by`, `created_at`) VALUES (?, ?, ?, ?, ?, 'DRAFT', ?, NOW())");
+        $stmt->bind_param("ssssss", $sessionCode, $description, $type, $filterCatVal, $filterSubCatVal, $adminUser);
         if (!$stmt->execute()) {
             throw new Exception('Failed to create session: ' . $connect->error);
         }
