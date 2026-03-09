@@ -319,6 +319,10 @@ function openCreateModal() {
     document.getElementById('fSubCat').innerHTML = '<option value="">-- Select Sub-Category --</option>';
     document.getElementById('catGroupRow').style.display = 'none';
     document.getElementById('subCatRow').style.display = 'none';
+    document.getElementById('productSelectRow').style.display = 'none';
+    allProducts = [];
+    document.getElementById('productListContainer').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Select a sub-category to load products</div>';
+    updateSelectedCount();
     createModalObj.show();
 }
 
@@ -333,10 +337,14 @@ function createSession() {
     // Collect selected product barcodes (for PARTIAL type)
     var selectedBarcodes = [];
     if (type === 'PARTIAL') {
+        if (subCat === '') {
+            Swal.fire({ icon: 'warning', text: 'Please select a sub-category for partial stock take.' });
+            return;
+        }
         document.querySelectorAll('.product-check:checked').forEach(function(cb) {
             selectedBarcodes.push(cb.value);
         });
-        if (selectedBarcodes.length === 0 && subCat !== '') {
+        if (selectedBarcodes.length === 0) {
             Swal.fire({ icon: 'warning', text: 'Please select at least one product.' });
             return;
         }

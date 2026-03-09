@@ -100,6 +100,9 @@ if($getfilter == "yesterday"){
 							if($row["STATUS"] == ""){
 								$badge = '<span class="badge bg-secondary">Assigned</span>';
 							}
+							// Check if any items require installation
+							$installCheck = $connect->query("SELECT COUNT(*) AS cnt FROM del_orderlistdesc WHERE ORDERNO = '$ordno' AND INSTALL = 'Y'");
+							$hasInstall = ($installCheck && ($installRow = $installCheck->fetch_assoc()) && $installRow['cnt'] > 0);
 						?>
 						<div class="card text-center border border-dark">
 							<div class="card-header">
@@ -127,7 +130,7 @@ if($getfilter == "yesterday"){
 								<div class="btn-group" role="group" >
 
 									<button type="submit" class="btn btn-primary btn-lg" onclick="window.location.href='work.php?id=<?php echo $row["ID"]; ?>';">Go</button>
-									<button class="btn btn-warning btn-lg " data-bs-toggle="modal" data-bs-target="#exampleModal_<?php echo $ordno; ?>">Item</button>
+									<button class="btn btn-warning btn-lg position-relative" data-bs-toggle="modal" data-bs-target="#exampleModal_<?php echo $ordno; ?>">Item<?php if($hasInstall){ ?><span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:9px;"><i class="fas fa-tools"></i> Install</span><?php } ?></button>
 									<button class="btn btn-success btn-lg rounded-end" onclick="window.location.href='vieworder.php?ordno=<?php echo $ordno; ?>';">DO</button>
 									<!-- Modal -->
 									<div class="modal fade" id="exampleModal_<?php echo $ordno; ?>" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
@@ -138,6 +141,11 @@ if($getfilter == "yesterday"){
 													<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 												</div>
 												<div class="modal-body">
+													<?php if($hasInstall){ ?>
+													<div class="alert alert-warning py-2 mb-3" style="font-size:13px;">
+														<i class="fas fa-tools"></i> <strong>This order has items that require installation.</strong>
+													</div>
+													<?php } ?>
 													<ul class="list-group">
 														<?php
 														$item = $connect->query("SELECT * FROM del_orderlistdesc WHERE ORDERNO = '$ordno' ORDER BY PDESC ASC");
