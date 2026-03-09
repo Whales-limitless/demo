@@ -4,81 +4,6 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     header("Location: login.php");
     exit;
 }
-require_once 'dbconnection.php';
-
-// ===================== TREND CONFIG =====================
-$trendConfig = null;
-$trendMap = [];
-
-$tcRes = mysqli_query($connect, "SELECT * FROM `product_trend_config` WHERE `is_active` = 1 LIMIT 1");
-if ($tcRes && $tcRow = mysqli_fetch_assoc($tcRes)) {
-    $trendConfig = $tcRow;
-    $df = mysqli_real_escape_string($connect, $tcRow['date_from']);
-    $dt = mysqli_real_escape_string($connect, $tcRow['date_to']);
-
-    $orderRes = mysqli_query($connect, "
-        SELECT BARCODE, SUM(ABS(QTY)) AS total_ordered
-        FROM `orderlist`
-        WHERE `SDATE` BETWEEN '$df' AND '$dt'
-          AND `STATUS` != 'DELETED'
-        GROUP BY `BARCODE`
-    ");
-    if ($orderRes) {
-        while ($oRow = mysqli_fetch_assoc($orderRes)) {
-            $trendMap[$oRow['BARCODE']] = (int)$oRow['total_ordered'];
-        }
-    }
-}
-
-// Fetch all categories with their subcategories and products
-$cat_result = mysqli_query($connect, "SELECT DISTINCT cat_code, cat_name, MIN(sort_no) AS sort_order FROM category GROUP BY cat_code, cat_name ORDER BY sort_order ASC, cat_name ASC");
-$allCategories = [];
-while ($cat = mysqli_fetch_assoc($cat_result)) {
-    $sub_result = mysqli_query($connect, "SELECT DISTINCT sub_code, sub_cat, MIN(sort_no) AS sort_order FROM category WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat['cat_code']) . "' GROUP BY sub_code, sub_cat ORDER BY sort_order ASC, sub_cat ASC");
-    $subcategories = [];
-    while ($sub = mysqli_fetch_assoc($sub_result)) {
-        $prod_result = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, IFNULL(qoh, 0) AS quantity FROM PRODUCTS WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat['cat_code']) . "' AND sub_code = '" . mysqli_real_escape_string($connect, $sub['sub_code']) . "' ORDER BY name ASC");
-        $products = [];
-        while ($prod = mysqli_fetch_assoc($prod_result)) {
-            $prod['id'] = intval($prod['id']);
-            $prod['quantity'] = intval($prod['quantity']);
-            $prod['inStock'] = $prod['quantity'] > 0;
-
-            if ($trendConfig) {
-                $ordered = $trendMap[$prod['barcode']] ?? 0;
-                if ($ordered >= (int)$trendConfig['green_min']) {
-                    $prod['trend'] = 'green';
-                } elseif ($ordered >= (int)$trendConfig['yellow_min']) {
-                    $prod['trend'] = 'yellow';
-                } elseif ($ordered >= (int)$trendConfig['red_min']) {
-                    $prod['trend'] = 'red';
-                } else {
-                    $prod['trend'] = 'black';
-                }
-                $prod['trend_qty'] = $ordered;
-            } else {
-                $prod['trend'] = null;
-                $prod['trend_qty'] = 0;
-            }
-
-            $products[] = $prod;
-        }
-        if (count($products) > 0) {
-            $subcategories[] = [
-                'id' => $sub['sub_code'],
-                'name' => $sub['sub_cat'],
-                'products' => $products
-            ];
-        }
-    }
-    if (count($subcategories) > 0) {
-        $allCategories[] = [
-            'id' => $cat['cat_code'],
-            'name' => $cat['cat_name'],
-            'subcategories' => $subcategories
-        ];
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -247,6 +172,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
   </div>
 
+  <div id="initialLoading" style="text-align:center;padding:60px 20px;color:var(--text-muted);">
+    <div class="load-spinner" style="margin:0 auto 16px;"></div>
+    <p style="font-size:15px;font-weight:500;">Loading products...</p>
+  </div>
   <div id="productSections"></div>
   <div class="load-sentinel" id="loadSentinel" style="display:none;">
     <div class="load-spinner"></div>
@@ -257,7 +186,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <?php include('mobile-bottombar.php'); ?>
 
 <script>
-var allCategories = <?php echo json_encode($allCategories); ?>;
+var allCategories = [];
 
 var trendLabels = { green: 'Hot', yellow: 'Moderate', red: 'Slow', black: 'Dead' };
 var BATCH_SIZE = 2; // Categories per batch
@@ -265,10 +194,15 @@ var loadedIndex = 0; // Next category index to render
 var isLoading = false;
 var isSearchMode = false;
 var totalProducts = 0;
+var dataLoaded = false;
 
 // Flatten all products for search
 var allProductsFlat = [];
-(function() {
+
+function initProductData(categories) {
+  allCategories = categories;
+  allProductsFlat = [];
+  totalProducts = 0;
   allCategories.forEach(function(cat) {
     cat.subcategories.forEach(function(sc) {
       totalProducts += sc.products.length;
@@ -278,7 +212,9 @@ var allProductsFlat = [];
     });
   });
   document.getElementById('productTotal').textContent = totalProducts + ' products';
-})();
+  document.getElementById('initialLoading').style.display = 'none';
+  dataLoaded = true;
+}
 
 // Get URL query parameter
 function getUrlParam(name) {
@@ -462,17 +398,33 @@ var observer = new IntersectionObserver(function(entries) {
 
 observer.observe(sentinel);
 
-// Initial render - check for URL search query first
-var initialQuery = getUrlParam('q');
-if (initialQuery) {
-  document.getElementById('productSearchInput').value = initialQuery;
-  // Also set the navbar search input to match
-  var navInput = document.getElementById('searchInput');
-  if (navInput) navInput.value = initialQuery;
-  doRelevanceSearch(initialQuery);
-} else {
-  loadNextBatch();
-}
+// Load product data via AJAX then render
+fetch('all_products_ajax.php', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: ''
+})
+.then(function(r) { return r.json(); })
+.then(function(data) {
+  if (data.error) {
+    document.getElementById('initialLoading').innerHTML = '<p style="color:#dc2626;">Failed to load products. Please refresh.</p>';
+    return;
+  }
+  initProductData(data.categories || []);
+
+  var initialQuery = getUrlParam('q');
+  if (initialQuery) {
+    document.getElementById('productSearchInput').value = initialQuery;
+    var navInput = document.getElementById('searchInput');
+    if (navInput) navInput.value = initialQuery;
+    doRelevanceSearch(initialQuery);
+  } else {
+    loadNextBatch();
+  }
+})
+.catch(function() {
+  document.getElementById('initialLoading').innerHTML = '<p style="color:#dc2626;">Failed to load products. Please refresh.</p>';
+});
 
 function renderAllForSearch() {
   // Render remaining categories that haven't been loaded yet
@@ -487,6 +439,7 @@ function renderAllForSearch() {
 
 // Search button click
 document.getElementById('searchBtn').addEventListener('click', function() {
+  if (!dataLoaded) return;
   var q = document.getElementById('productSearchInput').value.trim();
   if (q) doRelevanceSearch(q);
 });
@@ -495,6 +448,7 @@ document.getElementById('searchBtn').addEventListener('click', function() {
 document.getElementById('productSearchInput').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') {
     e.preventDefault();
+    if (!dataLoaded) return;
     var q = this.value.trim();
     if (q) doRelevanceSearch(q);
   }
