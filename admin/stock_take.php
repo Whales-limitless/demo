@@ -40,12 +40,12 @@ if ($catResult) {
     }
 }
 
-// Fetch racks for create modal
-$racks = [];
-$rackResult = $connect->query("SELECT `id`, `code`, `description` FROM `rack` WHERE `status` = 'ACTIVE' ORDER BY `code` ASC");
-if ($rackResult) {
-    while ($r = $rackResult->fetch_assoc()) {
-        $racks[] = $r;
+// Fetch sub categories grouped by cat
+$subCategories = [];
+$subCatResult = $connect->query("SELECT DISTINCT `cat`, `sub_cat` FROM `PRODUCTS` WHERE `sub_cat` IS NOT NULL AND `sub_cat` != '' ORDER BY `cat` ASC, `sub_cat` ASC");
+if ($subCatResult) {
+    while ($r = $subCatResult->fetch_assoc()) {
+        $subCategories[] = $r;
     }
 }
 
@@ -264,8 +264,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 <span><?php echo htmlspecialchars($viewSession['filter_cat'] ?: '-'); ?></span>
             </div>
             <div class="detail-info-item">
-                <label>Filter Location</label>
-                <span><?php echo htmlspecialchars($viewSession['filter_location'] ?: '-'); ?></span>
+                <label>Filter Sub Category</label>
+                <span><?php echo htmlspecialchars($viewSession['filter_sub_cat'] ?: '-'); ?></span>
             </div>
             <?php endif; ?>
         </div>
@@ -433,7 +433,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 <!-- Create Session Modal -->
 <div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-clipboard-check"></i> New Stock Take Session</h5>
@@ -448,27 +448,51 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     <label class="form-label fw-semibold">Type <span class="text-danger">*</span></label>
                     <select id="fType" class="form-select" onchange="toggleFilters();">
                         <option value="FULL">Full Stock Take (All Products)</option>
-                        <option value="PARTIAL">Partial (Filter by Category/Location)</option>
+                        <option value="PARTIAL">Partial (Filter by Category/Sub Category)</option>
                     </select>
                 </div>
                 <div id="filterFields" style="display:none;">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Filter by Category</label>
-                        <select id="fCategory" class="form-select">
-                            <option value="">-- All Categories --</option>
-                            <?php foreach ($categories as $cat): ?>
-                            <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Category</label>
+                            <select id="fCategory" class="form-select" onchange="onCategoryChange();">
+                                <option value="">-- All Categories --</option>
+                                <?php foreach ($categories as $cat): ?>
+                                <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Sub Category</label>
+                            <select id="fSubCategory" class="form-select" onchange="loadProducts();">
+                                <option value="">-- All Sub Categories --</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Filter by Rack/Location</label>
-                        <select id="fLocation" class="form-select">
-                            <option value="">-- All Locations --</option>
-                            <?php foreach ($racks as $rack): ?>
-                            <option value="<?php echo htmlspecialchars($rack['code']); ?>"><?php echo htmlspecialchars($rack['code'] . ($rack['description'] ? ' - ' . $rack['description'] : '')); ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <label class="form-label fw-semibold mb-0">Select Products</label>
+                            <span class="text-muted" style="font-size:12px;" id="productSelCount">0 selected</span>
+                        </div>
+                        <div style="position:relative;margin-bottom:8px;">
+                            <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px;"></i>
+                            <input type="text" id="productSearch" class="form-control" style="padding-left:36px;font-size:13px;" placeholder="Search by product name..." oninput="filterProductTable();">
+                        </div>
+                        <div style="max-height:300px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;">
+                            <table class="data-table" id="productTable" style="margin:0;">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this);"></th>
+                                        <th>Barcode</th>
+                                        <th>Name</th>
+                                        <th>QOH</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="productBody">
+                                    <tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">Select a category or sub category to load products</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -479,6 +503,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         </div>
     </div>
 </div>
+
+<script>
+// Sub categories data from PHP
+var subCategoriesData = <?php echo json_encode($subCategories); ?>;
+</script>
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -565,8 +594,12 @@ function openCreateModal() {
     document.getElementById('fDescription').value = '';
     document.getElementById('fType').value = 'FULL';
     document.getElementById('fCategory').value = '';
-    document.getElementById('fLocation').value = '';
+    document.getElementById('fSubCategory').innerHTML = '<option value="">-- All Sub Categories --</option>';
     document.getElementById('filterFields').style.display = 'none';
+    document.getElementById('productBody').innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">Select a category or sub category to load products</td></tr>';
+    document.getElementById('productSearch').value = '';
+    document.getElementById('productSelCount').textContent = '0 selected';
+    document.getElementById('selectAll').checked = false;
     createModal.show();
 }
 
@@ -575,15 +608,135 @@ function toggleFilters() {
     document.getElementById('filterFields').style.display = type === 'PARTIAL' ? 'block' : 'none';
 }
 
+function onCategoryChange() {
+    var cat = document.getElementById('fCategory').value;
+    var subSelect = document.getElementById('fSubCategory');
+    subSelect.innerHTML = '<option value="">-- All Sub Categories --</option>';
+
+    if (cat !== '') {
+        var filtered = subCategoriesData.filter(function(s) { return s.cat === cat; });
+        filtered.forEach(function(s) {
+            var opt = document.createElement('option');
+            opt.value = s.sub_cat;
+            opt.textContent = s.sub_cat;
+            subSelect.appendChild(opt);
+        });
+    }
+    loadProducts();
+}
+
+function loadProducts() {
+    var cat = document.getElementById('fCategory').value;
+    var subCat = document.getElementById('fSubCategory').value;
+
+    if (cat === '' && subCat === '') {
+        document.getElementById('productBody').innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">Select a category or sub category to load products</td></tr>';
+        updateSelectionCount();
+        return;
+    }
+
+    document.getElementById('productBody').innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+
+    $.ajax({
+        type: 'POST', url: 'stock_take_ajax.php',
+        data: { action: 'load_products', filter_cat: cat, filter_sub_cat: subCat },
+        dataType: 'json',
+        success: function(data) {
+            if (data.success && data.products) {
+                renderProductTable(data.products);
+            } else {
+                document.getElementById('productBody').innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">No products found</td></tr>';
+            }
+            updateSelectionCount();
+        }
+    });
+}
+
+function renderProductTable(products) {
+    var body = document.getElementById('productBody');
+    if (products.length === 0) {
+        body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">No products found</td></tr>';
+        return;
+    }
+    var html = '';
+    products.forEach(function(p) {
+        html += '<tr data-name="' + (p.name || '').toLowerCase() + '">' +
+            '<td><input type="checkbox" class="product-cb" value="' + escapeAttr(p.barcode) + '" checked onchange="updateSelectionCount();"></td>' +
+            '<td>' + escapeHtml(p.barcode) + '</td>' +
+            '<td>' + escapeHtml(p.name) + '</td>' +
+            '<td>' + parseFloat(p.qoh || 0) + '</td>' +
+        '</tr>';
+    });
+    body.innerHTML = html;
+    document.getElementById('selectAll').checked = true;
+    updateSelectionCount();
+}
+
+function filterProductTable() {
+    var query = document.getElementById('productSearch').value.toLowerCase().trim();
+    var rows = document.querySelectorAll('#productBody tr[data-name]');
+    rows.forEach(function(row) {
+        var name = row.getAttribute('data-name') || '';
+        row.style.display = (query === '' || name.indexOf(query) > -1) ? '' : 'none';
+    });
+}
+
+function toggleSelectAll(el) {
+    var checkboxes = document.querySelectorAll('#productBody .product-cb');
+    checkboxes.forEach(function(cb) {
+        var row = cb.closest('tr');
+        if (row.style.display !== 'none') {
+            cb.checked = el.checked;
+        }
+    });
+    updateSelectionCount();
+}
+
+function updateSelectionCount() {
+    var checked = document.querySelectorAll('#productBody .product-cb:checked').length;
+    document.getElementById('productSelCount').textContent = checked + ' selected';
+}
+
+function getSelectedBarcodes() {
+    var barcodes = [];
+    document.querySelectorAll('#productBody .product-cb:checked').forEach(function(cb) {
+        barcodes.push(cb.value);
+    });
+    return barcodes;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
+
+function escapeAttr(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function createSession() {
     var description = document.getElementById('fDescription').value.trim();
     var type = document.getElementById('fType').value;
     var category = document.getElementById('fCategory').value;
-    var location = document.getElementById('fLocation').value;
+    var subCategory = document.getElementById('fSubCategory').value;
+
+    var selectedBarcodes = [];
+    if (type === 'PARTIAL') {
+        selectedBarcodes = getSelectedBarcodes();
+        if (selectedBarcodes.length === 0) {
+            Swal.fire({ icon: 'warning', text: 'Please select at least one product.' });
+            return;
+        }
+    }
+
+    var itemText = type === 'FULL' ? 'All active products will be added to this session.' : selectedBarcodes.length + ' selected product(s) will be added to this session.';
 
     Swal.fire({
         title: 'Create Stock Take Session?',
-        text: type === 'FULL' ? 'All active products will be added to this session.' : 'Filtered products will be added to this session.',
+        text: itemText,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#C8102E',
@@ -593,7 +746,14 @@ function createSession() {
             Swal.fire({ title: 'Creating session...', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
             $.ajax({
                 type: 'POST', url: 'stock_take_ajax.php',
-                data: { action: 'create', description: description, type: type, filter_cat: category, filter_location: location },
+                data: {
+                    action: 'create',
+                    description: description,
+                    type: type,
+                    filter_cat: category,
+                    filter_sub_cat: subCategory,
+                    barcodes: JSON.stringify(selectedBarcodes)
+                },
                 dataType: 'json',
                 success: function(data) {
                     if (data.success) {
