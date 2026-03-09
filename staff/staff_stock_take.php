@@ -547,12 +547,18 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             bottom: 0;
             left: 0;
             right: 0;
-            z-index: 99;
+            z-index: 101;
             background: var(--surface);
             padding: 12px 16px;
             box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1);
             display: flex;
             justify-content: center;
+        }
+
+        @media (max-width: 992px) {
+            .save-bar {
+                bottom: 60px;
+            }
         }
 
         .save-bar .save-btn {
@@ -640,6 +646,12 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         /* Adjust padding when save bar visible */
         body.count-active {
             padding-bottom: 140px;
+        }
+
+        @media (max-width: 992px) {
+            body.count-active {
+                padding-bottom: 200px;
+            }
         }
     </style>
 </head>
