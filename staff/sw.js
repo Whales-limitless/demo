@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pwstaff-v4';
+const CACHE_NAME = 'pwstaff-v5';
 
 // Only pre-cache static assets (no PHP pages - they redirect when not logged in)
 const urlsToCache = [
@@ -7,10 +7,10 @@ const urlsToCache = [
   'offline.html',
   'manifest.json',
   'js/qr-scanner.umd.min.js',
+  'icons/icon-192.png',
+  'icons/icon-512.png',
   'https://cdn.jsdelivr.net/npm/sweetalert2@11',
   'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap',
-  'https://placehold.co/192x192/C8102E/ffffff?text=PWS',
-  'https://placehold.co/512x512/C8102E/ffffff?text=PWS',
 ];
 
 // Install event - cache static assets only
