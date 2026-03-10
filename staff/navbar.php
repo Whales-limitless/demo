@@ -293,5 +293,53 @@ if ('serviceWorker' in navigator) {
 })();
 </script>
 
+<!-- PWA Install Prompt -->
+<div id="pwaInstallPrompt" style="display:none;position:fixed;bottom:80px;left:16px;right:16px;background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.18);padding:20px;z-index:9999;text-align:center;">
+  <p style="margin:0 0 14px;color:#1a1a1a;font-weight:600;font-size:15px;">Install PWSTAFF for a better experience!</p>
+  <button id="pwaInstallBtn" style="margin:4px;padding:12px 24px;border:none;border-radius:10px;background:#C8102E;color:#fff;font-weight:600;font-size:14px;cursor:pointer;">Install App</button>
+  <button id="pwaDismissBtn" style="margin:4px;padding:12px 24px;border:none;border-radius:10px;background:#e5e7eb;color:#1a1a1a;font-weight:600;font-size:14px;cursor:pointer;">Not Now</button>
+</div>
+
+<script>
+// PWA Install Prompt (Android)
+var pwaDeferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  pwaDeferredPrompt = e;
+  document.getElementById('pwaInstallPrompt').style.display = 'block';
+});
+document.getElementById('pwaInstallBtn').addEventListener('click', function() {
+  if (!pwaDeferredPrompt) return;
+  document.getElementById('pwaInstallPrompt').style.display = 'none';
+  pwaDeferredPrompt.prompt();
+  pwaDeferredPrompt.userChoice.then(function() { pwaDeferredPrompt = null; });
+});
+document.getElementById('pwaDismissBtn').addEventListener('click', function() {
+  document.getElementById('pwaInstallPrompt').style.display = 'none';
+  pwaDeferredPrompt = null;
+});
+window.addEventListener('appinstalled', function() {
+  document.getElementById('pwaInstallPrompt').style.display = 'none';
+});
+
+// iOS Add to Home Screen hint
+(function() {
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  var isStandalone = window.navigator.standalone === true;
+  if (isIOS && !isStandalone) {
+    setTimeout(function() {
+      var prompt = document.getElementById('pwaInstallPrompt');
+      if (prompt.style.display === 'none') {
+        prompt.innerHTML = '<p style="margin:0 0 10px;color:#1a1a1a;font-weight:600;font-size:15px;">Install PWSTAFF on iOS:</p>' +
+          '<p style="margin:0 0 6px;color:#6b7280;font-size:14px;">1. Tap the <strong>Share</strong> button <svg style="width:16px;height:16px;vertical-align:middle;" viewBox="0 0 24 24" fill="none" stroke="#C8102E" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></p>' +
+          '<p style="margin:0 0 14px;color:#6b7280;font-size:14px;">2. Tap <strong>"Add to Home Screen"</strong></p>' +
+          '<button onclick="this.parentElement.style.display=\'none\'" style="padding:10px 24px;border:none;border-radius:10px;background:#C8102E;color:#fff;font-weight:600;font-size:14px;cursor:pointer;">Got it!</button>';
+        prompt.style.display = 'block';
+      }
+    }, 3000);
+  }
+})();
+</script>
+
 <!-- Page body wrapper: opened here, closed in mobile-bottombar.php -->
 <div class="page-body">

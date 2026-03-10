@@ -1,29 +1,19 @@
-const CACHE_NAME = 'pwstaff-v3';
+const CACHE_NAME = 'pwstaff-v4';
+
+// Only pre-cache static assets (no PHP pages - they redirect when not logged in)
 const urlsToCache = [
-  './',
-  'index.php',
-  'login.php',
   'components.css',
   'offline-sync.js',
   'offline.html',
   'manifest.json',
   'js/qr-scanner.umd.min.js',
-  'del_dashboard.php',
-  'del_history.php',
-  'del_work.php',
-  'del_vieworder.php',
-  'del_sign.php',
-  'del_report.php',
-  'account.php',
-  'category.php',
-  'all_products.php',
   'https://cdn.jsdelivr.net/npm/sweetalert2@11',
   'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap',
   'https://placehold.co/192x192/C8102E/ffffff?text=PWS',
   'https://placehold.co/512x512/C8102E/ffffff?text=PWS',
 ];
 
-// Install event - cache files
+// Install event - cache static assets only
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -32,36 +22,46 @@ self.addEventListener('install', event => {
         return cache.addAll(urlsToCache);
       })
   );
+  self.skipWaiting();
 });
 
-// Fetch event - serve cached content when offline
+// Fetch event - network first for pages, cache first for assets
 self.addEventListener('fetch', event => {
-  // Skip non-GET requests (POST uploads handled by offline-sync.js)
   if (event.request.method !== 'GET') return;
 
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Return cached version or fetch from network
-        if (response) return response;
-
-        return fetch(event.request).then(networkResponse => {
-          // Cache new successful responses
-          if (networkResponse && networkResponse.ok) {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseClone);
-            });
-          }
-          return networkResponse;
-        }).catch(() => {
-          // If navigation request fails, show offline page
-          if (event.request.mode === 'navigate') {
-            return caches.match('offline.html');
-          }
-          return new Response('', { status: 503 });
+  // For page navigations: network first, fall back to cache, then offline page
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        // Only cache non-redirect, successful responses
+        if (response.ok && !response.redirected) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => {
+        return caches.match(event.request).then(cached => {
+          return cached || caches.match('offline.html');
         });
       })
+    );
+    return;
+  }
+
+  // For assets: cache first, then network
+  event.respondWith(
+    caches.match(event.request).then(response => {
+      if (response) return response;
+      return fetch(event.request).then(networkResponse => {
+        if (networkResponse && networkResponse.ok) {
+          const clone = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return networkResponse;
+      }).catch(() => {
+        return new Response('', { status: 503 });
+      });
+    })
   );
 });
 
