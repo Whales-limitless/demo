@@ -1,31 +1,33 @@
-var CACHE_NAME = 'pwstaff-v1';
+var CACHE_NAME = 'pwstaff-v2';
 var OFFLINE_URL = 'offline.html';
 
-// Core app shell to cache
+// Core assets to cache on install
 var APP_SHELL = [
+  './offline.html',
+  './components.css',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './offline-sync.js',
+  './js/qr-scanner.umd.min.js',
+  'https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js',
+  'https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css'
+];
+
+// Pages to pre-cache after install (will cache in background)
+var PRE_CACHE_PAGES = [
   './',
   './index.php',
   './login.php',
-  './components.css',
-  './offline.html',
-  './manifest.json',
-  './icon-192.svg',
-  './icon-512.svg',
-  './offline-sync.js',
-  './js/qr-scanner.umd.min.js',
-  'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap',
-  'https://cdn.jsdelivr.net/npm/sweetalert2@11'
+  './del_dashboard.php',
+  './del_history.php',
+  './del_report.php',
+  './account.php',
+  './category.php',
+  './all_products.php'
 ];
 
-// Pages to cache when visited
-var DYNAMIC_PAGES = [
-  'category.php', 'products.php', 'all_products.php', 'cart.php',
-  'del_dashboard.php', 'del_history.php', 'del_work.php', 'del_vieworder.php',
-  'del_sign.php', 'del_report.php', 'account.php',
-  'staff_stock_take.php', 'staff_stock_loss.php', 'confirm.php'
-];
-
-// Install: cache app shell
+// Install: cache core assets
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
@@ -36,7 +38,7 @@ self.addEventListener('install', function(event) {
   );
 });
 
-// Activate: clean old caches
+// Activate: clean old caches, then pre-cache pages in background
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(names) {
@@ -46,6 +48,15 @@ self.addEventListener('activate', function(event) {
       );
     }).then(function() {
       return self.clients.claim();
+    }).then(function() {
+      // Pre-cache pages in background (non-blocking)
+      return caches.open(CACHE_NAME).then(function(cache) {
+        return Promise.all(PRE_CACHE_PAGES.map(function(url) {
+          return fetch(url, { credentials: 'same-origin' }).then(function(resp) {
+            if (resp.ok) return cache.put(url, resp);
+          }).catch(function() { /* ignore failures */ });
+        }));
+      });
     })
   );
 });
@@ -54,17 +65,16 @@ self.addEventListener('activate', function(event) {
 self.addEventListener('fetch', function(event) {
   var url = new URL(event.request.url);
 
-  // Skip non-GET requests (POST uploads handled by offline-sync.js)
+  // Skip non-GET (POST uploads handled by offline-sync.js IndexedDB)
   if (event.request.method !== 'GET') return;
 
-  // Skip chrome-extension and other non-http
+  // Skip non-http
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
-  // For navigation requests: network-first, fallback to cache, then offline page
+  // For navigation (page loads): network-first, fallback to cache, then offline page
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).then(function(response) {
-        // Cache successful page loads
         if (response.ok) {
           var clone = response.clone();
           caches.open(CACHE_NAME).then(function(cache) {
@@ -74,19 +84,67 @@ self.addEventListener('fetch', function(event) {
         return response;
       }).catch(function() {
         return caches.match(event.request).then(function(cached) {
-          return cached || caches.match(OFFLINE_URL);
+          if (cached) return cached;
+          // Try matching without query string
+          var cleanUrl = url.origin + url.pathname;
+          return caches.match(cleanUrl).then(function(cached2) {
+            return cached2 || caches.match(OFFLINE_URL);
+          });
         });
       })
     );
     return;
   }
 
-  // For CSS, JS, fonts, images: cache-first, fallback to network
+  // For AJAX _ajax.php endpoints: network-first, cache fallback
+  if (url.pathname.match(/_ajax\.php/)) {
+    event.respondWith(
+      fetch(event.request).then(function(response) {
+        if (response.ok) {
+          var clone = response.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(event.request, clone);
+          });
+        }
+        return response;
+      }).catch(function() {
+        return caches.match(event.request).then(function(cached) {
+          return cached || new Response(JSON.stringify({ error: 'You are offline.' }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        });
+      })
+    );
+    return;
+  }
+
+  // For CSS, JS, fonts, images: cache-first
   if (url.pathname.match(/\.(css|js|svg|png|jpg|jpeg|gif|webp|woff2?|ttf|eot)$/) ||
       url.hostname === 'fonts.googleapis.com' ||
       url.hostname === 'fonts.gstatic.com' ||
       url.hostname === 'cdn.jsdelivr.net' ||
       url.hostname === 'cdnjs.cloudflare.com') {
+    event.respondWith(
+      caches.match(event.request).then(function(cached) {
+        var fetchPromise = fetch(event.request).then(function(response) {
+          if (response.ok) {
+            var clone = response.clone();
+            caches.open(CACHE_NAME).then(function(cache) {
+              cache.put(event.request, clone);
+            });
+          }
+          return response;
+        }).catch(function() {
+          return null;
+        });
+        return cached || fetchPromise || new Response('', { status: 503 });
+      })
+    );
+    return;
+  }
+
+  // For uploaded images (staff/uploads/): cache-first
+  if (url.pathname.indexOf('/uploads/') !== -1) {
     event.respondWith(
       caches.match(event.request).then(function(cached) {
         if (cached) return cached;
@@ -106,7 +164,7 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // For AJAX/API requests: network-first
+  // Everything else: network-first with cache fallback
   event.respondWith(
     fetch(event.request).then(function(response) {
       if (response.ok) {
@@ -118,17 +176,26 @@ self.addEventListener('fetch', function(event) {
       return response;
     }).catch(function() {
       return caches.match(event.request).then(function(cached) {
-        return cached || new Response(JSON.stringify({ error: 'You are offline.' }), {
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return cached || new Response('', { status: 503 });
       });
     })
   );
 });
 
-// Listen for sync events from offline-sync.js
+// Listen for messages from app
 self.addEventListener('message', function(event) {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  // Allow app to trigger pre-caching of specific pages
+  if (event.data && event.data.type === 'CACHE_PAGES') {
+    var pages = event.data.urls || [];
+    caches.open(CACHE_NAME).then(function(cache) {
+      pages.forEach(function(pageUrl) {
+        fetch(pageUrl, { credentials: 'same-origin' }).then(function(resp) {
+          if (resp.ok) cache.put(pageUrl, resp);
+        }).catch(function() {});
+      });
+    });
   }
 });
