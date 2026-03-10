@@ -187,6 +187,80 @@ body {
 
 .cache-message strong { color: var(--text); }
 
+/* Download for Offline */
+.download-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.download-btn {
+  width: 100%;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 12px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--primary);
+  color: #fff;
+  transition: all 0.2s;
+}
+.download-btn:hover { background: var(--primary-dark); }
+.download-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.download-btn svg { width: 20px; height: 20px; }
+
+.download-progress {
+  margin-top: 12px;
+  display: none;
+}
+
+.progress-bar-wrap {
+  background: #e5e7eb;
+  border-radius: 8px;
+  height: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-bar-fill {
+  background: var(--primary);
+  height: 100%;
+  border-radius: 8px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.download-result {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  display: none;
+}
+.download-result.success { background: #dcfce7; color: #16a34a; display: block; }
+.download-result.error { background: #fee2e2; color: #dc2626; display: block; }
+
+.last-download {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 8px;
+}
+
 /* Sync History Section */
 .sync-section {
   background: var(--surface);
@@ -342,6 +416,21 @@ body {
 
     <div class="cache-message" id="cacheMessage">
       Loading offline status...
+    </div>
+
+    <div class="download-section">
+      <button class="download-btn" id="downloadBtn" onclick="startDownload()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download All for Offline
+      </button>
+      <div class="download-progress" id="downloadProgress">
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-text" id="progressText">Preparing...</div>
+      </div>
+      <div class="download-result" id="downloadResult"></div>
+      <div class="last-download" id="lastDownload"></div>
     </div>
   </div>
 
@@ -561,8 +650,112 @@ body {
     d.textContent = s;
     return d.innerHTML;
   }
+
+  // ==================== DOWNLOAD FOR OFFLINE ====================
+  var userType = '<?php echo $indexType; ?>';
+  var downloading = false;
+
+  // Show last download time
+  if (typeof OfflineSync !== 'undefined') {
+    OfflineSync.getData('delivery_data').then(function(record) {
+      if (record && record.saved_at) {
+        var d = new Date(record.saved_at);
+        var timeStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('lastDownload').textContent = 'Last downloaded: ' + timeStr;
+        if (record.data && record.data.order_count !== undefined) {
+          document.getElementById('lastDownload').textContent += ' (' + record.data.order_count + ' orders)';
+        }
+      }
+    });
+  }
+
+  window.startDownload = function() {
+    if (downloading) return;
+    if (!navigator.onLine) {
+      document.getElementById('downloadResult').className = 'download-result error';
+      document.getElementById('downloadResult').textContent = 'You must be online to download data for offline use.';
+      return;
+    }
+    if (typeof OfflineSync === 'undefined' || !OfflineSync.downloadAll) return;
+
+    downloading = true;
+    var btn = document.getElementById('downloadBtn');
+    var progress = document.getElementById('downloadProgress');
+    var fill = document.getElementById('progressFill');
+    var text = document.getElementById('progressText');
+    var result = document.getElementById('downloadResult');
+
+    btn.disabled = true;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;animation:spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Downloading...';
+    progress.style.display = 'block';
+    result.className = 'download-result';
+    result.style.display = 'none';
+    fill.style.width = '0%';
+    text.textContent = 'Preparing...';
+
+    OfflineSync.downloadAll(userType, function(state, completed, total, message) {
+      if (state === 'progress' || state === 'start') {
+        var pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+        fill.style.width = pct + '%';
+        text.textContent = message;
+      } else if (state === 'complete') {
+        fill.style.width = '100%';
+        text.textContent = 'Complete!';
+      } else if (state === 'error') {
+        text.textContent = message;
+      }
+    }).then(function(res) {
+      downloading = false;
+      btn.disabled = false;
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download All for Offline';
+
+      result.className = 'download-result success';
+      var msg = 'Downloaded ' + (res.totalPages || 0) + ' pages';
+      if (res.data && res.data.order_count !== undefined) {
+        msg += ' and ' + res.data.order_count + ' delivery orders';
+      }
+      msg += ' for offline use.';
+      result.textContent = msg;
+
+      // Refresh cache stats
+      setTimeout(loadCacheStats, 1000);
+
+      // Update last download time
+      var now = new Date();
+      var timeStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('lastDownload').textContent = 'Last downloaded: ' + timeStr;
+      if (res.data && res.data.order_count !== undefined) {
+        document.getElementById('lastDownload').textContent += ' (' + res.data.order_count + ' orders)';
+      }
+
+      setTimeout(function() { progress.style.display = 'none'; }, 2000);
+    }).catch(function(err) {
+      downloading = false;
+      btn.disabled = false;
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download All for Offline';
+
+      result.className = 'download-result error';
+      result.textContent = 'Download failed: ' + (err.message || 'Unknown error');
+    });
+  };
+
+  // Auto-download on first visit (if no data cached yet)
+  if (typeof OfflineSync !== 'undefined' && navigator.onLine) {
+    setTimeout(function() {
+      OfflineSync.getData('delivery_data').then(function(record) {
+        if (!record) {
+          // First visit - auto-download
+          window.startDownload();
+        }
+      });
+    }, 2000);
+  }
 })();
 </script>
+
+<style>
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
 
 </body>
 </html>

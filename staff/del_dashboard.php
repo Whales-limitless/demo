@@ -286,33 +286,58 @@ if ($driverCode !== '') {
     <?php include 'mobile-bottombar.php'; ?>
 
     <script>
+    function renderItems(items) {
+        if (items.length === 0) {
+            document.getElementById('itemsBody').innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">No items found.</p>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < items.length; i++) {
+            var installBadge = (items[i].INSTALL === 'Y') ? '<span class="item-install-badge">Installation</span>' : '';
+            html += '<div class="item-row"><span class="item-num">' + (i + 1) + '.</span><span class="item-desc">' + escHtml(items[i].PDESC || '') + installBadge + '</span><span class="item-qty">' + escHtml(items[i].QTY || '') + ' ' + escHtml(items[i].UOM || '') + '</span></div>';
+        }
+        document.getElementById('itemsBody').innerHTML = html;
+    }
+
+    function getItemsFromOfflineData(ordno) {
+        if (typeof OfflineSync === 'undefined' || !OfflineSync.getData) return Promise.resolve(null);
+        return OfflineSync.getData('delivery_data').then(function(record) {
+            if (!record || !record.data || !record.data.orders) return null;
+            for (var i = 0; i < record.data.orders.length; i++) {
+                if (record.data.orders[i].ORDNO === ordno) {
+                    return record.data.orders[i].items || [];
+                }
+            }
+            return null;
+        }).catch(function() { return null; });
+    }
+
     function showItems(orderId, ordno) {
         document.getElementById('itemsTitle').textContent = 'Items - ' + ordno;
         document.getElementById('itemsBody').innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">Loading...</p>';
         document.getElementById('itemsOverlay').classList.add('active');
 
+        // Try network first, fall back to offline data
         fetch('del_dashboard_ajax.php', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: 'action=items&id=' + encodeURIComponent(orderId)
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.error) { document.getElementById('itemsBody').innerHTML = '<p style="color:#dc2626;text-align:center;padding:20px;">' + data.error + '</p>'; return; }
-            var items = data.items || [];
-            if (items.length === 0) {
-                document.getElementById('itemsBody').innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">No items found.</p>';
-                return;
-            }
-            var html = '';
-            for (var i = 0; i < items.length; i++) {
-                var installBadge = (items[i].INSTALL === 'Y') ? '<span class="item-install-badge">Installation</span>' : '';
-                html += '<div class="item-row"><span class="item-num">' + (i + 1) + '.</span><span class="item-desc">' + escHtml(items[i].PDESC || '') + installBadge + '</span><span class="item-qty">' + escHtml(items[i].QTY || '') + ' ' + escHtml(items[i].UOM || '') + '</span></div>';
-            }
-            document.getElementById('itemsBody').innerHTML = html;
+            renderItems(data.items || []);
         })
         .catch(function() {
-            document.getElementById('itemsBody').innerHTML = '<p style="color:#dc2626;text-align:center;padding:20px;">Failed to load items.</p>';
+            // Network failed - try offline data
+            getItemsFromOfflineData(ordno).then(function(items) {
+                if (items !== null) {
+                    renderItems(items);
+                } else {
+                    document.getElementById('itemsBody').innerHTML = '<p style="color:#dc2626;text-align:center;padding:20px;">Offline - item data not downloaded. Use "Download All for Offline" from the Home page.</p>';
+                }
+            });
         });
     }
 

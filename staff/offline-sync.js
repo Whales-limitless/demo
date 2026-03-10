@@ -2,11 +2,13 @@
  * PWSTAFF Offline Sync Library
  * Stores pending uploads in IndexedDB when offline.
  * Auto-syncs one-by-one when back online.
+ * Also handles offline data download & page prefetching.
  */
 var OfflineSync = (function() {
   var DB_NAME = 'pwstaff_sync';
-  var DB_VERSION = 1;
+  var DB_VERSION = 2;
   var STORE_NAME = 'pending_actions';
+  var DATA_STORE = 'offline_data';
   var db = null;
   var syncing = false;
 
@@ -22,6 +24,9 @@ var OfflineSync = (function() {
           store.createIndex('status', 'status', { unique: false });
           store.createIndex('created_at', 'created_at', { unique: false });
         }
+        if (!d.objectStoreNames.contains(DATA_STORE)) {
+          d.createObjectStore(DATA_STORE, { keyPath: 'key' });
+        }
       };
       request.onsuccess = function(e) {
         db = e.target.result;
@@ -31,11 +36,153 @@ var OfflineSync = (function() {
     });
   }
 
+  // ==================== OFFLINE DATA STORE ====================
+
+  // Save data to offline store
+  function saveData(key, data) {
+    return openDB().then(function(d) {
+      return new Promise(function(resolve, reject) {
+        var tx = d.transaction(DATA_STORE, 'readwrite');
+        var store = tx.objectStore(DATA_STORE);
+        var req = store.put({ key: key, data: data, saved_at: new Date().toISOString() });
+        req.onsuccess = function() { resolve(); };
+        req.onerror = function() { reject(req.error); };
+      });
+    });
+  }
+
+  // Get data from offline store
+  function getData(key) {
+    return openDB().then(function(d) {
+      return new Promise(function(resolve, reject) {
+        var tx = d.transaction(DATA_STORE, 'readonly');
+        var store = tx.objectStore(DATA_STORE);
+        var req = store.get(key);
+        req.onsuccess = function() { resolve(req.result || null); };
+        req.onerror = function() { reject(req.error); };
+      });
+    });
+  }
+
+  // ==================== PAGE PREFETCH ====================
+
+  // Prefetch pages for offline use (SW will cache them)
+  function prefetchPages(pages, onProgress) {
+    var completed = 0;
+    var total = pages.length;
+    var results = { success: 0, failed: 0 };
+
+    function fetchOne(url) {
+      return fetch(url, { credentials: 'same-origin' }).then(function(response) {
+        completed++;
+        if (response.ok && !response.redirected) {
+          results.success++;
+        } else {
+          results.failed++;
+        }
+        if (onProgress) onProgress(completed, total, results);
+      }).catch(function() {
+        completed++;
+        results.failed++;
+        if (onProgress) onProgress(completed, total, results);
+      });
+    }
+
+    // Fetch 2 at a time to avoid overwhelming the server
+    var queue = pages.slice();
+    function runNext() {
+      if (queue.length === 0) return Promise.resolve();
+      var url = queue.shift();
+      return fetchOne(url).then(runNext);
+    }
+
+    // Start 2 parallel chains
+    return Promise.all([runNext(), runNext()]).then(function() {
+      return results;
+    });
+  }
+
+  // Download all delivery data for offline use
+  function downloadOfflineData(onProgress) {
+    if (onProgress) onProgress('downloading', 'Downloading delivery data...');
+    return fetch('offline_download.php', { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) throw new Error(data.error);
+        return saveData('delivery_data', data).then(function() {
+          if (onProgress) onProgress('done', 'Data downloaded');
+          return data;
+        });
+      });
+  }
+
+  // Full offline download: data + page prefetch
+  function downloadAll(userType, onProgress) {
+    var pageResults = null;
+    var deliveryData = null;
+
+    // Determine which pages to prefetch based on user type
+    var pages = ['/staff/index.php', '/staff/account.php'];
+    if (userType === 'A' || userType === 'S') {
+      pages.push('/staff/category.php');
+      pages.push('/staff/all_products.php');
+      pages.push('/staff/staff_stock_take.php');
+      pages.push('/staff/staff_stock_loss.php');
+    }
+    if (userType === 'A' || userType === 'D') {
+      pages.push('/staff/del_dashboard.php');
+      pages.push('/staff/del_history.php');
+      pages.push('/staff/del_report.php');
+    }
+
+    if (onProgress) onProgress('start', 0, pages.length + 1, 'Starting offline download...');
+
+    var completedSteps = 0;
+    var totalSteps = pages.length + 1; // +1 for data download
+
+    // Step 1: Download data
+    return downloadOfflineData(function() {})
+      .then(function(data) {
+        deliveryData = data;
+        completedSteps++;
+        if (onProgress) onProgress('progress', completedSteps, totalSteps, 'Data downloaded. Caching pages...');
+
+        // If driver has orders, also prefetch individual order pages
+        if (data && data.orders) {
+          for (var i = 0; i < data.orders.length; i++) {
+            var orderId = data.orders[i].ID;
+            var ordno = data.orders[i].ORDNO;
+            pages.push('/staff/del_work.php?id=' + orderId);
+            pages.push('/staff/del_vieworder.php?ordno=' + encodeURIComponent(ordno));
+          }
+          totalSteps = pages.length + 1;
+        }
+
+        // Step 2: Prefetch all pages
+        return prefetchPages(pages, function(done, total, results) {
+          completedSteps = 1 + done;
+          if (onProgress) onProgress('progress', completedSteps, totalSteps, 'Cached ' + done + ' of ' + total + ' pages...');
+        });
+      })
+      .then(function(results) {
+        pageResults = results;
+        if (onProgress) onProgress('complete', completedSteps, totalSteps, 'Download complete!');
+        return {
+          data: deliveryData,
+          pages: pageResults,
+          totalPages: pageResults ? pageResults.success : 0,
+          totalSteps: totalSteps
+        };
+      })
+      .catch(function(err) {
+        if (onProgress) onProgress('error', completedSteps, totalSteps, 'Error: ' + err.message);
+        throw err;
+      });
+  }
+
+  // ==================== PENDING ACTIONS ====================
+
   // Add a pending action to IndexedDB
-  // type: 'photo_upload' | 'install_upload' | 'signature' | 'job_done'
-  // payload: { url, fields, files[] }
-  //   fields: key-value pairs for FormData
-  //   files: [{ key, data (base64), name, type }]
   function addPending(type, description, payload) {
     return openDB().then(function(d) {
       return new Promise(function(resolve, reject) {
@@ -143,6 +290,17 @@ var OfflineSync = (function() {
   // Sync a single record
   function syncOne(record) {
     var payload = record.payload;
+
+    // Add body string if present (for signature)
+    if (payload.body) {
+      return fetch(payload.url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: payload.body
+      }).then(function(r) { return r.json(); });
+    }
+
     var formData = new FormData();
 
     // Add fields
@@ -161,17 +319,9 @@ var OfflineSync = (function() {
       }
     }
 
-    // Add body string if present (for signature)
-    if (payload.body) {
-      return fetch(payload.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: payload.body
-      }).then(function(r) { return r.json(); });
-    }
-
     return fetch(payload.url, {
       method: 'POST',
+      credentials: 'same-origin',
       body: formData
     }).then(function(r) { return r.json(); });
   }
@@ -195,14 +345,14 @@ var OfflineSync = (function() {
       records.forEach(function(record) {
         chain = chain.then(function() {
           return syncOne(record).then(function(response) {
-            if (response.success) {
+            if (response && response.success) {
               return updateRecord(record.id, {
                 status: 'synced',
                 synced_at: new Date().toISOString()
               });
             } else {
               return updateRecord(record.id, {
-                error: response.error || 'Sync failed'
+                error: (response && response.error) || 'Sync failed'
               });
             }
           }).catch(function(err) {
@@ -279,7 +429,13 @@ var OfflineSync = (function() {
     syncAll: syncAll,
     fileToBase64: fileToBase64,
     onSyncUpdate: onSyncUpdate,
-    cleanOld: cleanOld
+    cleanOld: cleanOld,
+    // Offline data methods
+    saveData: saveData,
+    getData: getData,
+    prefetchPages: prefetchPages,
+    downloadOfflineData: downloadOfflineData,
+    downloadAll: downloadAll
   };
 })();
 
