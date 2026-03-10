@@ -194,6 +194,50 @@ if ($action === 'list') {
     }
     $stmt->close();
 
+} elseif ($action === 'destroy') {
+    $id = intval($_POST['id'] ?? 0);
+    if ($id <= 0) {
+        echo json_encode(['error' => 'Invalid rack ID.']);
+        exit;
+    }
+
+    // Count products that will be unlinked
+    $countStmt = $connect->prepare("SELECT COUNT(*) AS cnt FROM `rack_product` WHERE `rack_id` = ?");
+    $countStmt->bind_param("i", $id);
+    $countStmt->execute();
+    $unlinked = $countStmt->get_result()->fetch_assoc()['cnt'];
+    $countStmt->close();
+
+    // Remove all product assignments for this rack
+    $delProducts = $connect->prepare("DELETE FROM `rack_product` WHERE `rack_id` = ?");
+    $delProducts->bind_param("i", $id);
+    $delProducts->execute();
+    $delProducts->close();
+
+    // Delete the rack itself
+    $delRack = $connect->prepare("DELETE FROM `rack` WHERE `id` = ?");
+    $delRack->bind_param("i", $id);
+    if ($delRack->execute()) {
+        echo json_encode(['success' => 'Rack deleted. ' . $unlinked . ' product(s) unlinked.']);
+    } else {
+        echo json_encode(['error' => 'Failed: ' . $connect->error]);
+    }
+    $delRack->close();
+
+} elseif ($action === 'rack_product_count') {
+    $id = intval($_POST['id'] ?? 0);
+    if ($id <= 0) {
+        echo json_encode(['error' => 'Invalid rack ID.']);
+        exit;
+    }
+
+    $stmt = $connect->prepare("SELECT COUNT(*) AS cnt FROM `rack_product` WHERE `rack_id` = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $count = $stmt->get_result()->fetch_assoc()['cnt'];
+    $stmt->close();
+    echo json_encode(['count' => (int)$count]);
+
 } elseif ($action === 'activate') {
     $id = intval($_POST['id'] ?? 0);
     if ($id <= 0) {
