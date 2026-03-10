@@ -44,7 +44,7 @@ if ($instQ) {
     <style>
         :root { --primary: #C8102E; --primary-dark: #a00d24; --surface: #ffffff; --bg: #f3f4f6; --text: #1a1a1a; --text-muted: #6b7280; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); padding-bottom: 100px; min-height: 100vh; }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); padding-bottom: 160px; min-height: 100vh; }
         h1, h2, h3 { font-family: 'Outfit', sans-serif; }
         .page-header { position: sticky; top: 0; z-index: 100; background: var(--primary); color: #fff; padding: 0 16px; height: 56px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 12px rgba(200,16,46,0.3); }
         .back-btn { display: flex; align-items: center; gap: 4px; background: none; border: none; color: #fff; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500; cursor: pointer; padding: 6px 8px; border-radius: 8px; transition: background 0.2s; text-decoration: none; }
@@ -60,25 +60,29 @@ if ($instQ) {
         .photo-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
         @media (max-width: 480px) { .photo-grid { grid-template-columns: 1fr; } }
 
-        .photo-card { background: var(--surface); border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow: hidden; position: relative; }
-        .photo-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; padding: 10px 12px 0; letter-spacing: 0.3px; }
+        .photo-card { background: var(--surface); border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow: hidden; position: relative; cursor: pointer; }
+        .photo-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; padding: 10px 12px 8px; letter-spacing: 0.3px; }
         .photo-preview { width: 100%; aspect-ratio: 4/3; background: #f9fafb; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .photo-preview img { width: 100%; height: 100%; object-fit: cover; display: none; }
         .photo-preview .placeholder { text-align: center; color: var(--text-muted); }
         .photo-preview .placeholder svg { width: 32px; height: 32px; margin-bottom: 4px; }
         .photo-preview .placeholder p { font-size: 12px; }
-        .photo-input { padding: 10px 12px; }
-        .photo-input input[type="file"] { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 12px; }
+        .photo-card input[type="file"] { display: none; }
         .photo-existing { position: absolute; top: 8px; right: 8px; background: #16a34a; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
 
-        .action-bar { display: flex; gap: 12px; }
+        .action-bar { display: flex; gap: 12px; margin-bottom: 20px; }
         .action-bar button { flex: 1; padding: 14px 20px; border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .action-bar button svg { width: 20px; height: 20px; }
         .btn-upload { background: #374151; color: #fff; }
         .btn-upload:hover { background: #1f2937; }
-        .btn-done { background: #16a34a; color: #fff; }
-        .btn-done:hover { background: #15803d; }
-        .btn-upload:disabled, .btn-done:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-upload:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Floating Job Done button */
+        .floating-done { position: fixed; bottom: 70px; left: 0; right: 0; z-index: 99; padding: 12px 16px; background: linear-gradient(transparent, var(--bg) 20%); }
+        .floating-done button { width: 100%; max-width: 700px; margin: 0 auto; display: flex; padding: 16px 20px; border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; align-items: center; justify-content: center; gap: 8px; background: #16a34a; color: #fff; box-shadow: 0 4px 16px rgba(22,163,74,0.3); }
+        .floating-done button:hover { background: #15803d; }
+        .floating-done button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .floating-done button svg { width: 22px; height: 22px; }
 
         /* Installation section */
         .install-section { margin-bottom: 20px; }
@@ -89,18 +93,18 @@ if ($instQ) {
         .install-item:last-child { border-bottom: none; }
         .install-item-name { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
         .install-item-qty { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
-        .install-photo-area { display: flex; align-items: center; gap: 12px; }
-        .install-preview { width: 80px; height: 60px; background: #f9fafb; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 1px dashed #d1d5db; flex-shrink: 0; }
+        .install-photo-area { cursor: pointer; display: flex; align-items: center; gap: 12px; background: #f9fafb; border-radius: 8px; padding: 8px; border: 1px dashed #d1d5db; }
+        .install-preview { width: 80px; height: 60px; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .install-preview img { width: 100%; height: 100%; object-fit: cover; display: none; }
         .install-preview .placeholder svg { width: 24px; height: 24px; color: var(--text-muted); }
-        .install-photo-input { flex: 1; }
-        .install-photo-input input[type="file"] { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 12px; }
+        .install-photo-label { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+        .install-photo-label svg { width: 16px; height: 16px; }
+        .install-item input[type="file"] { display: none; }
         .install-existing-badge { display: inline-block; background: #16a34a; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
-        .install-upload-bar { padding: 12px 16px; background: var(--surface); border-radius: 0 0 12px 12px; }
-        .btn-install-upload { width: 100%; padding: 12px 20px; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; background: #f59e0b; color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
+        .btn-install-upload { width: 100%; padding: 14px 20px; border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; background: #f59e0b; color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
         .btn-install-upload:hover { background: #d97706; }
         .btn-install-upload:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-install-upload svg { width: 18px; height: 18px; }
+        .btn-install-upload svg { width: 20px; height: 20px; }
     </style>
 </head>
 <body>
@@ -127,7 +131,7 @@ if ($instQ) {
                 $imgField = 'IMG' . $i;
                 $hasImg = !empty($order[$imgField]);
             ?>
-            <div class="photo-card">
+            <div class="photo-card" onclick="document.getElementById('file<?php echo $i; ?>').click()">
                 <div class="photo-label">Photo <?php echo $i; ?></div>
                 <?php if ($hasImg): ?>
                 <div class="photo-existing">Uploaded</div>
@@ -142,9 +146,7 @@ if ($instQ) {
                     </div>
                     <?php endif; ?>
                 </div>
-                <div class="photo-input">
-                    <input type="file" accept="image/*" capture="environment" id="file<?php echo $i; ?>" onchange="previewImage(<?php echo $i; ?>)">
-                </div>
+                <input type="file" accept="image/*" capture="environment" id="file<?php echo $i; ?>" onchange="previewImage(<?php echo $i; ?>)">
             </div>
             <?php endfor; ?>
         </div>
@@ -153,10 +155,6 @@ if ($instQ) {
             <button class="btn-upload" onclick="uploadPhotos()" id="btnUpload">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Upload
-            </button>
-            <button class="btn-done" onclick="markDone()" id="btnDone">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                Job Done
             </button>
         </div>
 
@@ -179,7 +177,7 @@ if ($instQ) {
                         <?php endif; ?>
                     </div>
                     <div class="install-item-qty">Qty: <?php echo htmlspecialchars(($instItem['QTY'] ?? '') . ' ' . ($instItem['UOM'] ?? '')); ?></div>
-                    <div class="install-photo-area">
+                    <div class="install-photo-area" onclick="document.getElementById('installFile<?php echo $instItem['ID']; ?>').click()">
                         <div class="install-preview" id="installPreview<?php echo $instItem['ID']; ?>">
                             <?php if ($hasInstImg): ?>
                             <img src="uploads/<?php echo htmlspecialchars($instItem['INSTALL_IMG']); ?>" style="display:block;" alt="Install photo">
@@ -189,10 +187,12 @@ if ($instQ) {
                             </div>
                             <?php endif; ?>
                         </div>
-                        <div class="install-photo-input">
-                            <input type="file" accept="image/*" capture="environment" id="installFile<?php echo $instItem['ID']; ?>" onchange="previewInstallImage(<?php echo $instItem['ID']; ?>)">
+                        <div class="install-photo-label">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            Tap to take photo
                         </div>
                     </div>
+                    <input type="file" accept="image/*" capture="environment" id="installFile<?php echo $instItem['ID']; ?>" onchange="previewInstallImage(<?php echo $instItem['ID']; ?>)">
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -205,6 +205,14 @@ if ($instQ) {
         </div>
         <?php endif; ?>
 
+    </div>
+
+    <!-- Floating Job Done Button -->
+    <div class="floating-done no-print">
+        <button onclick="markDone()" id="btnDone">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Job Done
+        </button>
     </div>
 
     <?php include 'mobile-bottombar.php'; ?>
