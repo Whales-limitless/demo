@@ -507,12 +507,16 @@ var OfflineSync = (function() {
       }
     }
 
-    // Add files (stored as base64)
+    // Add files - send as base64 POST fields (more reliable than Blob for offline sync)
+    // PHP's $_FILES mechanism can silently fail due to upload_max_filesize, post_max_size,
+    // temp directory issues, or Blob handling differences across browsers.
+    // Sending base64 as POST fields bypasses all of these issues.
     if (payload.files && payload.files.length > 0) {
       for (var i = 0; i < payload.files.length; i++) {
         var f = payload.files[i];
-        var blob = base64ToBlob(f.data, f.type);
-        formData.append(f.key, blob, f.name);
+        // Send the raw base64 data URL string as a POST field with _base64 suffix
+        // Server accepts both $_FILES[key] and $_POST[key_base64]
+        formData.append(f.key + '_base64', f.data);
       }
     }
 

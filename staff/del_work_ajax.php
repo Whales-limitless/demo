@@ -25,74 +25,134 @@ if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0755, true);
 }
 
+// Helper: process an image from raw binary data (decoded from base64 or temp file)
+// Returns the saved filename on success, or null on failure
+function processImageData($imageData, $prefix, $uploadDir) {
+    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+    // Detect MIME type from binary data
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mimeType = $finfo->buffer($imageData);
+
+    if (!in_array($mimeType, $allowedTypes)) {
+        return null;
+    }
+
+    // Create GD image from string data
+    $src = @imagecreatefromstring($imageData);
+    if (!$src) {
+        return null;
+    }
+
+    // Resize if too large (max 1200px on longest side)
+    $maxDim = 1200;
+    $origW = imagesx($src);
+    $origH = imagesy($src);
+    if ($origW > $maxDim || $origH > $maxDim) {
+        if ($origW >= $origH) {
+            $newW = $maxDim;
+            $newH = intval($origH * $maxDim / $origW);
+        } else {
+            $newH = $maxDim;
+            $newW = intval($origW * $maxDim / $origH);
+        }
+        $resized = imagecreatetruecolor($newW, $newH);
+        imagecopyresampled($resized, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+        imagedestroy($src);
+        $src = $resized;
+    }
+
+    $fileName = $prefix . uniqid() . '.jpg';
+    $filePath = $uploadDir . $fileName;
+    imagejpeg($src, $filePath, 85);
+    imagedestroy($src);
+
+    return $fileName;
+}
+
+// Helper: get image data from either $_FILES or base64 POST field
+// Returns raw binary image data or null
+function getImageData($fileKey, $base64Key) {
+    // Method 1: Standard file upload via $_FILES
+    if (isset($_FILES[$fileKey]) && $_FILES[$fileKey]['error'] === UPLOAD_ERR_OK) {
+        $data = file_get_contents($_FILES[$fileKey]['tmp_name']);
+        if ($data !== false && strlen($data) > 0) {
+            return $data;
+        }
+    }
+
+    // Method 2: Base64-encoded data sent as POST field (used by offline sync)
+    if (!empty($_POST[$base64Key])) {
+        $base64 = $_POST[$base64Key];
+        // Strip data URL prefix if present (e.g., "data:image/jpeg;base64,")
+        if (strpos($base64, ',') !== false) {
+            $base64 = substr($base64, strpos($base64, ',') + 1);
+        }
+        $data = base64_decode($base64, true);
+        if ($data !== false && strlen($data) > 0) {
+            return $data;
+        }
+    }
+
+    return null;
+}
+
 if ($action === 'upload') {
     $updated = false;
-    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    $errors = [];
 
     for ($i = 1; $i <= 3; $i++) {
         $fileKey = 'image' . $i;
-        if (isset($_FILES[$fileKey]) && $_FILES[$fileKey]['error'] === UPLOAD_ERR_OK) {
-            $tmpName = $_FILES[$fileKey]['tmp_name'];
-            $mimeType = mime_content_type($tmpName);
+        $base64Key = 'image' . $i . '_base64';
 
-            if (!in_array($mimeType, $allowedTypes)) {
-                continue;
-            }
+        $imageData = getImageData($fileKey, $base64Key);
+        if ($imageData === null) continue;
 
-            // Compress and save as JPEG
-            $fileName = 'n' . $i . uniqid() . '.jpg';
-            $filePath = $uploadDir . $fileName;
-
-            $src = null;
-            switch ($mimeType) {
-                case 'image/jpeg': $src = imagecreatefromjpeg($tmpName); break;
-                case 'image/png': $src = imagecreatefrompng($tmpName); break;
-                case 'image/gif': $src = imagecreatefromgif($tmpName); break;
-                case 'image/webp': $src = imagecreatefromwebp($tmpName); break;
-            }
-
-            if ($src) {
-                // Resize if too large (max 1200px on longest side)
-                $maxDim = 1200;
-                $origW = imagesx($src);
-                $origH = imagesy($src);
-                if ($origW > $maxDim || $origH > $maxDim) {
-                    if ($origW >= $origH) {
-                        $newW = $maxDim;
-                        $newH = intval($origH * $maxDim / $origW);
-                    } else {
-                        $newH = $maxDim;
-                        $newW = intval($origW * $maxDim / $origH);
-                    }
-                    $resized = imagecreatetruecolor($newW, $newH);
-                    imagecopyresampled($resized, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
-                    imagedestroy($src);
-                    $src = $resized;
-                }
-
-                imagejpeg($src, $filePath, 85);
-                imagedestroy($src);
-
-                $imgCol = 'IMG' . $i;
-                $stmt = $connect->prepare("UPDATE `del_orderlist` SET `$imgCol` = ? WHERE `ID` = ?");
-                $stmt->bind_param("si", $fileName, $orderId);
-                $stmt->execute();
-                $stmt->close();
-                $updated = true;
-            }
+        $fileName = processImageData($imageData, 'n' . $i, $uploadDir);
+        if ($fileName) {
+            $imgCol = 'IMG' . $i;
+            $stmt = $connect->prepare("UPDATE `del_orderlist` SET `$imgCol` = ? WHERE `ID` = ?");
+            $stmt->bind_param("si", $fileName, $orderId);
+            $stmt->execute();
+            $stmt->close();
+            $updated = true;
+        } else {
+            $errors[] = 'Photo ' . $i . ': invalid image format or corrupted data';
         }
     }
 
     if ($updated) {
         echo json_encode(['success' => 'Photos uploaded successfully.']);
     } else {
-        echo json_encode(['error' => 'No valid photos were uploaded.']);
+        $errMsg = 'No valid photos were uploaded.';
+        if (!empty($errors)) {
+            $errMsg .= ' Details: ' . implode('; ', $errors);
+        }
+        // Add diagnostic info for debugging
+        $diag = [];
+        for ($i = 1; $i <= 3; $i++) {
+            $fk = 'image' . $i;
+            $b64k = 'image' . $i . '_base64';
+            if (isset($_FILES[$fk])) {
+                $diag[] = $fk . ': error=' . $_FILES[$fk]['error'] . ', size=' . ($_FILES[$fk]['size'] ?? 0);
+            }
+            if (isset($_POST[$b64k])) {
+                $diag[] = $b64k . ': len=' . strlen($_POST[$b64k]);
+            }
+        }
+        if (!empty($diag)) {
+            $errMsg .= ' [' . implode(', ', $diag) . ']';
+        }
+        if (empty($_FILES) && empty(array_filter($_POST, function($k) { return strpos($k, '_base64') !== false; }, ARRAY_FILTER_USE_KEY))) {
+            $errMsg .= ' [No files or base64 data received. Check PHP upload_max_filesize=' . ini_get('upload_max_filesize') . ', post_max_size=' . ini_get('post_max_size') . ']';
+        }
+        echo json_encode(['error' => $errMsg]);
     }
 
 } elseif ($action === 'upload_install') {
     // Upload installation photos for individual items
     $updated = false;
-    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    $errors = [];
 
     // Get the order number for this order
     $stmt = $connect->prepare("SELECT `ORDNO` FROM `del_orderlist` WHERE `ID` = ? LIMIT 1");
@@ -117,61 +177,50 @@ if ($action === 'upload') {
     while ($ir = $instResult->fetch_assoc()) { $validIds[] = intval($ir['ID']); }
     $stmt2->close();
 
+    // Process install photos from both $_FILES and base64 POST fields
+    $processedIds = [];
+
+    // Collect all item IDs to check (from $_FILES keys and $_POST base64 keys)
     foreach ($_FILES as $fileKey => $fileData) {
-        if (strpos($fileKey, 'install_img_') !== 0) continue;
-        if ($fileData['error'] !== UPLOAD_ERR_OK) continue;
-
-        $itemId = intval(str_replace('install_img_', '', $fileKey));
-        if (!in_array($itemId, $validIds)) continue;
-
-        $tmpName = $fileData['tmp_name'];
-        $mimeType = mime_content_type($tmpName);
-        if (!in_array($mimeType, $allowedTypes)) continue;
-
-        $fileName = 'inst' . $itemId . '_' . uniqid() . '.jpg';
-        $filePath = $uploadDir . $fileName;
-
-        $src = null;
-        switch ($mimeType) {
-            case 'image/jpeg': $src = imagecreatefromjpeg($tmpName); break;
-            case 'image/png': $src = imagecreatefrompng($tmpName); break;
-            case 'image/gif': $src = imagecreatefromgif($tmpName); break;
-            case 'image/webp': $src = imagecreatefromwebp($tmpName); break;
+        if (strpos($fileKey, 'install_img_') === 0) {
+            $itemId = intval(str_replace('install_img_', '', $fileKey));
+            if (in_array($itemId, $validIds)) $processedIds[$itemId] = true;
         }
+    }
+    foreach ($_POST as $postKey => $postVal) {
+        if (strpos($postKey, 'install_img_') === 0 && strpos($postKey, '_base64') !== false) {
+            $itemId = intval(str_replace(['install_img_', '_base64'], '', $postKey));
+            if (in_array($itemId, $validIds)) $processedIds[$itemId] = true;
+        }
+    }
 
-        if ($src) {
-            $maxDim = 1200;
-            $origW = imagesx($src);
-            $origH = imagesy($src);
-            if ($origW > $maxDim || $origH > $maxDim) {
-                if ($origW >= $origH) {
-                    $newW = $maxDim;
-                    $newH = intval($origH * $maxDim / $origW);
-                } else {
-                    $newH = $maxDim;
-                    $newW = intval($origW * $maxDim / $origH);
-                }
-                $resized = imagecreatetruecolor($newW, $newH);
-                imagecopyresampled($resized, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
-                imagedestroy($src);
-                $src = $resized;
-            }
+    foreach (array_keys($processedIds) as $itemId) {
+        $fileKey = 'install_img_' . $itemId;
+        $base64Key = 'install_img_' . $itemId . '_base64';
 
-            imagejpeg($src, $filePath, 85);
-            imagedestroy($src);
+        $imageData = getImageData($fileKey, $base64Key);
+        if ($imageData === null) continue;
 
+        $fileName = processImageData($imageData, 'inst' . $itemId . '_', $uploadDir);
+        if ($fileName) {
             $stmtUp = $connect->prepare("UPDATE `del_orderlistdesc` SET `INSTALL_IMG` = ? WHERE `ID` = ?");
             $stmtUp->bind_param("si", $fileName, $itemId);
             $stmtUp->execute();
             $stmtUp->close();
             $updated = true;
+        } else {
+            $errors[] = 'Install item ' . $itemId . ': invalid image';
         }
     }
 
     if ($updated) {
         echo json_encode(['success' => 'Installation photos uploaded successfully.']);
     } else {
-        echo json_encode(['error' => 'No valid installation photos were uploaded.']);
+        $errMsg = 'No valid installation photos were uploaded.';
+        if (!empty($errors)) {
+            $errMsg .= ' Details: ' . implode('; ', $errors);
+        }
+        echo json_encode(['error' => $errMsg]);
     }
 
 } elseif ($action === 'done') {
