@@ -1,6 +1,6 @@
-const CACHE_NAME = 'pwstaff-v7';
+const CACHE_NAME = 'pwstaff-v8';
 
-// Only pre-cache static assets (no PHP pages - they redirect when not logged in)
+// Pre-cache static assets
 const urlsToCache = [
   '/staff/components.css',
   '/staff/offline-sync.js',
@@ -25,25 +25,34 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// Fetch event - network first for pages, cache first for assets
+// Fetch event
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+
+  // Skip prefetch requests - let them through without SW interference
+  // so that offline-sync.js can cache them directly
+  if (event.request.headers.get('X-Prefetch') === 'true') {
+    return; // Don't call respondWith - let the fetch go to network directly
+  }
 
   // For page navigations: network first, fall back to cache, then offline page
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).then(response => {
-        // Only cache non-redirect, successful responses
         if (response.ok && !response.redirected) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, clone);
+            // Cache by URL string to ensure consistent matching
+            cache.put(event.request.url, clone);
             notifyClients('cache-updated');
           });
         }
         return response;
       }).catch(() => {
-        return caches.match(event.request).then(cached => {
+        // Offline - search cache by URL string (ignores Vary headers)
+        return caches.open(CACHE_NAME).then(cache => {
+          return cache.match(event.request.url);
+        }).then(cached => {
           return cached || caches.match('/staff/offline.html');
         });
       })
@@ -84,7 +93,7 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Message handler - respond to cache info requests
+// Message handler
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'GET_CACHE_STATS') {
     getCacheStats().then(stats => {
@@ -109,7 +118,6 @@ async function getCacheStats() {
       const url = new URL(request.url);
       const pathname = url.pathname;
 
-      // Estimate size from content-length header or blob
       let size = 0;
       const cl = response.headers.get('content-length');
       if (cl) {
@@ -122,10 +130,8 @@ async function getCacheStats() {
       }
       totalSize += size;
 
-      // Categorize
-      if (pathname.endsWith('.php') || request.mode === 'navigate' || response.headers.get('content-type')?.includes('text/html')) {
+      if (pathname.endsWith('.php') || pathname.endsWith('.html') || response.headers.get('content-type')?.includes('text/html')) {
         pages++;
-        // Extract a friendly page name
         const name = pathname.split('/').pop() || 'index';
         pageList.push(name);
       } else {
@@ -139,7 +145,6 @@ async function getCacheStats() {
   }
 }
 
-// Notify all clients of cache changes
 function notifyClients(type) {
   self.clients.matchAll().then(clients => {
     clients.forEach(client => {
