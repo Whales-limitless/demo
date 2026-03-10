@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PWSTAFF">
-<link rel="apple-touch-icon" href="https://placehold.co/192x192/C8102E/ffffff?text=PWS">
+<link rel="apple-touch-icon" href="icons/icon-152.png">
 <script src="offline-sync.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
