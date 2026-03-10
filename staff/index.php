@@ -484,20 +484,34 @@ body {
     var names = {
       'index.php': 'Home',
       'login.php': 'Login',
+      'account.php': 'Account',
       'category.php': 'Categories',
       'products.php': 'Products',
       'all_products.php': 'All Products',
+      'all_products_ajax.php': 'Products AJAX',
       'cart.php': 'Cart',
       'confirm.php': 'Confirm Order',
-      'account.php': 'Account',
+      'submit_order.php': 'Submit Order',
+      'icon.php': 'Icon',
       'del_dashboard.php': 'My Deliveries',
+      'del_dashboard_ajax.php': 'Deliveries AJAX',
       'del_work.php': 'Upload Photos',
+      'del_work_ajax.php': 'Upload AJAX',
       'del_vieworder.php': 'View Order',
       'del_sign.php': 'Signature',
+      'del_sign_ajax.php': 'Signature AJAX',
       'del_history.php': 'Delivery History',
       'del_report.php': 'Delivery Reports',
+      'del_report_ajax.php': 'Reports AJAX',
       'staff_stock_take.php': 'Stock Take',
+      'staff_stock_take_ajax.php': 'Stock Take AJAX',
       'staff_stock_loss.php': 'Stock Loss',
+      'staff_stock_loss_ajax.php': 'Stock Loss AJAX',
+      'product_rack_ajax.php': 'Product Rack AJAX',
+      'product_search_ajax.php': 'Product Search AJAX',
+      'navbar.php': 'Navbar',
+      'mobile-bottombar.php': 'Bottom Bar',
+      'offline_download.php': 'Offline Data',
       'offline.html': 'Offline Page'
     };
     return names[filename] || filename;
@@ -710,9 +724,10 @@ body {
       btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download All for Offline';
 
       result.className = 'download-result success';
-      var msg = 'Downloaded ' + (res.totalPages || 0) + ' pages';
+      var totalPhp = res.totalPages || 0;
+      var msg = 'Downloaded ' + totalPhp + ' PHP files';
       if (res.data && res.data.order_count !== undefined) {
-        msg += ' and ' + res.data.order_count + ' delivery orders';
+        msg += ', ' + res.data.order_count + ' delivery orders with items';
       }
       msg += ' for offline use.';
       result.textContent = msg;

@@ -147,19 +147,39 @@ var OfflineSync = (function() {
     var pageResults = null;
     var deliveryData = null;
 
-    // Determine which pages to prefetch based on user type
-    var pages = ['/staff/index.php', '/staff/account.php'];
-    if (userType === 'A' || userType === 'S') {
-      pages.push('/staff/category.php');
-      pages.push('/staff/all_products.php');
-      pages.push('/staff/staff_stock_take.php');
-      pages.push('/staff/staff_stock_loss.php');
-    }
-    if (userType === 'A' || userType === 'D') {
-      pages.push('/staff/del_dashboard.php');
-      pages.push('/staff/del_history.php');
-      pages.push('/staff/del_report.php');
-    }
+    // ALL PHP files in the staff directory (excluding logout which kills session)
+    var pages = [
+      '/staff/index.php',
+      '/staff/login.php',
+      '/staff/account.php',
+      '/staff/category.php',
+      '/staff/products.php',
+      '/staff/all_products.php',
+      '/staff/all_products_ajax.php',
+      '/staff/cart.php',
+      '/staff/confirm.php',
+      '/staff/submit_order.php',
+      '/staff/icon.php',
+      '/staff/del_dashboard.php',
+      '/staff/del_dashboard_ajax.php',
+      '/staff/del_work.php',
+      '/staff/del_work_ajax.php',
+      '/staff/del_vieworder.php',
+      '/staff/del_sign.php',
+      '/staff/del_sign_ajax.php',
+      '/staff/del_history.php',
+      '/staff/del_report.php',
+      '/staff/del_report_ajax.php',
+      '/staff/staff_stock_take.php',
+      '/staff/staff_stock_take_ajax.php',
+      '/staff/staff_stock_loss.php',
+      '/staff/staff_stock_loss_ajax.php',
+      '/staff/product_rack_ajax.php',
+      '/staff/product_search_ajax.php',
+      '/staff/navbar.php',
+      '/staff/mobile-bottombar.php',
+      '/staff/offline_download.php',
+    ];
 
     if (onProgress) onProgress('start', 0, pages.length + 1, 'Starting offline download...');
 
@@ -173,7 +193,7 @@ var OfflineSync = (function() {
         completedSteps++;
         if (onProgress) onProgress('progress', completedSteps, totalSteps, 'Data downloaded. Caching pages...');
 
-        // If driver has orders, also prefetch individual order pages
+        // Also prefetch individual order pages (del_work with specific IDs, del_vieworder with specific ordno)
         if (data && data.orders) {
           for (var i = 0; i < data.orders.length; i++) {
             var orderId = data.orders[i].ID;
