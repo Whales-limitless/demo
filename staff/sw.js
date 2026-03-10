@@ -49,9 +49,22 @@ self.addEventListener('fetch', event => {
         }
         return response;
       }).catch(() => {
-        // Offline - search cache by URL string (ignores Vary headers)
+        // Offline - try multiple lookup strategies before giving up
         return caches.open(CACHE_NAME).then(cache => {
-          return cache.match(event.request.url);
+          // 1. Exact URL match
+          return cache.match(event.request.url).then(cached => {
+            if (cached) return cached;
+            // 2. Try without query string (prefetch may have cached base URL)
+            const url = new URL(event.request.url);
+            if (url.search) {
+              return cache.match(url.origin + url.pathname);
+            }
+            return null;
+          }).then(cached => {
+            if (cached) return cached;
+            // 3. Search ALL caches as last resort (covers edge cases)
+            return caches.match(event.request.url);
+          });
         }).then(cached => {
           return cached || caches.match('/staff/offline.html');
         });
@@ -77,18 +90,40 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// Activate event - clean up old caches and claim clients
+// Activate event - migrate old caches then clean up, and claim clients
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
+      // Find old pwstaff caches to migrate from
+      const oldCaches = cacheNames.filter(n => n !== CACHE_NAME && n.indexOf('pwstaff') === 0);
+      if (oldCaches.length === 0) return Promise.resolve();
+
+      // Migrate cached pages from old caches into the new one
+      return caches.open(CACHE_NAME).then(newCache => {
+        return Promise.all(oldCaches.map(oldName => {
+          return caches.open(oldName).then(oldCache => {
+            return oldCache.keys().then(requests => {
+              return Promise.all(requests.map(request => {
+                return oldCache.match(request).then(response => {
+                  if (response) return newCache.put(request, response);
+                });
+              }));
+            });
+          });
+        }));
+      });
+    }).then(() => {
+      // Now delete all old caches (including non-pwstaff ones)
+      return caches.keys().then(cacheNames => {
+        return Promise.all(
+          cacheNames.map(cacheName => {
+            if (cacheName !== CACHE_NAME) {
+              console.log('Deleting old cache:', cacheName);
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      });
     }).then(() => self.clients.claim())
   );
 });

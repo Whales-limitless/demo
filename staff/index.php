@@ -356,6 +356,13 @@ body {
 .sync-status.synced { background: #dcfce7; color: #16a34a; }
 .sync-status.error { background: #fee2e2; color: #dc2626; }
 
+.sync-error {
+  font-size: 11px;
+  color: #dc2626;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
 .sync-empty {
   text-align: center;
   padding: 16px;
@@ -624,7 +631,11 @@ body {
 
       html += '<div class="sync-item">';
       html += '<div class="sync-icon ' + ti.cls + '">' + ti.icon + '</div>';
-      html += '<div class="sync-info"><div class="sync-desc">' + escHtml(r.description) + '</div><div class="sync-time">' + timeStr + '</div></div>';
+      html += '<div class="sync-info"><div class="sync-desc">' + escHtml(r.description) + '</div><div class="sync-time">' + timeStr + '</div>';
+      if (r.error) {
+        html += '<div class="sync-error">' + escHtml(r.error) + (r.retries ? ' (attempt ' + r.retries + '/3)' : '') + '</div>';
+      }
+      html += '</div>';
       html += '<span class="sync-status ' + statusCls + '">' + statusText + '</span>';
       html += '</div>';
     }
