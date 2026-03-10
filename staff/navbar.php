@@ -1,15 +1,15 @@
 <!-- NAVBAR -->
 <!-- PWA Meta Tags -->
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="/staff/manifest.json">
 <meta name="theme-color" content="#C8102E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PWSTAFF">
-<link rel="apple-touch-icon" href="icons/icon-152.png">
+<link rel="apple-touch-icon" href="/staff/icons/icon-152.png">
 <script src="offline-sync.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js')
+  navigator.serviceWorker.register('/staff/sw.js')
     .then(function(reg) { console.log('PWSTAFF SW registered'); })
     .catch(function(e) { console.warn('SW register failed:', e); });
 }

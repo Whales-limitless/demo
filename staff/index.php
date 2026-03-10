@@ -12,6 +12,13 @@ $userName = htmlspecialchars($_SESSION['user_name'] ?? 'Staff');
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Staff Home</title>
+<!-- PWA Meta Tags (must be in <head> for install prompt) -->
+<link rel="manifest" href="/staff/manifest.json">
+<meta name="theme-color" content="#C8102E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PWSTAFF">
+<link rel="apple-touch-icon" href="/staff/icons/icon-152.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="components.css">
 <style>

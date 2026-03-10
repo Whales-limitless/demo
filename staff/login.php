@@ -50,15 +50,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PWSTAFF - Login</title>
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="/staff/manifest.json">
 <meta name="theme-color" content="#C8102E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PWSTAFF">
-<link rel="apple-touch-icon" href="icons/icon-152.png">
+<link rel="apple-touch-icon" href="/staff/icons/icon-152.png">
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(function(e) { console.warn('SW register failed:', e); });
+  navigator.serviceWorker.register('/staff/sw.js').catch(function(e) { console.warn('SW register failed:', e); });
 }
 </script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">

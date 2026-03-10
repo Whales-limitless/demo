@@ -2,13 +2,13 @@ const CACHE_NAME = 'pwstaff-v6';
 
 // Only pre-cache static assets (no PHP pages - they redirect when not logged in)
 const urlsToCache = [
-  'components.css',
-  'offline-sync.js',
-  'offline.html',
-  'manifest.json',
-  'js/qr-scanner.umd.min.js',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
+  '/staff/components.css',
+  '/staff/offline-sync.js',
+  '/staff/offline.html',
+  '/staff/manifest.json',
+  '/staff/js/qr-scanner.umd.min.js',
+  '/staff/icons/icon-192.png',
+  '/staff/icons/icon-512.png',
   'https://cdn.jsdelivr.net/npm/sweetalert2@11',
   'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap',
 ];
@@ -41,7 +41,7 @@ self.addEventListener('fetch', event => {
         return response;
       }).catch(() => {
         return caches.match(event.request).then(cached => {
-          return cached || caches.match('offline.html');
+          return cached || caches.match('/staff/offline.html');
         });
       })
     );
