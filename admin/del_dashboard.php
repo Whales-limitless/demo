@@ -62,6 +62,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 /* Image modal */
 .img-modal-body img { max-width: 100%; border-radius: 8px; margin-bottom: 10px; }
+.install-photos-section { margin-top: 16px; padding-top: 16px; border-top: 2px dashed #f59e0b; }
+.install-photos-title { font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; color: #92400e; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.install-photos-title i { color: #f59e0b; }
+.install-photo-item { margin-bottom: 14px; }
+.install-photo-item .install-product-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; padding: 4px 10px; background: #fef3c7; border-radius: 6px; display: inline-block; }
+.install-photo-item img { max-width: 100%; border-radius: 8px; }
 
 @media (max-width: 768px) {
     .page-content { padding: 16px; }
@@ -212,7 +218,7 @@ function renderTable(orders) {
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 function viewOrder(id) {
-    window.open('del_order.php?view=' + id, '_blank');
+    window.location.href = 'del_order.php?view=' + id;
 }
 
 function viewImages(id) {
@@ -225,6 +231,21 @@ function viewImages(id) {
             if (data.IMG2) html += '<img src="../staff/uploads/' + data.IMG2 + '" alt="Photo 2">';
             if (data.IMG3) html += '<img src="../staff/uploads/' + data.IMG3 + '" alt="Photo 3">';
             if (!html) html = '<p class="text-muted text-center">No photos uploaded.</p>';
+
+            // Installation photos
+            var instPhotos = data.install_photos || [];
+            if (instPhotos.length > 0) {
+                html += '<div class="install-photos-section">';
+                html += '<div class="install-photos-title"><i class="fas fa-tools"></i> Installation Photos</div>';
+                for (var i = 0; i < instPhotos.length; i++) {
+                    html += '<div class="install-photo-item">';
+                    html += '<div class="install-product-name">' + escHtml(instPhotos[i].PDESC) + '</div>';
+                    html += '<img src="../staff/uploads/' + instPhotos[i].INSTALL_IMG + '" alt="Installation - ' + escHtml(instPhotos[i].PDESC) + '">';
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
+
             document.getElementById('imgModalBody').innerHTML = html;
             imgModal.show();
         }

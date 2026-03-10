@@ -9,6 +9,7 @@ include('dbconnection.php');
 $connect->set_charset("utf8mb4");
 
 $orderId = intval($_GET['id'] ?? 0);
+$fromPage = ($_GET['from'] ?? '') === 'history' ? 'del_history.php' : 'del_dashboard.php';
 if ($orderId <= 0) { header("Location: del_dashboard.php"); exit; }
 
 $stmt = $connect->prepare("SELECT o.*, c.NAME AS CUSTNAME FROM `del_orderlist` o LEFT JOIN `del_customer` c ON o.CUSTOMERCODE = c.CODE WHERE o.ID = ? LIMIT 1");
@@ -111,7 +112,7 @@ if ($instQ) {
     <?php include 'navbar.php'; ?>
 
     <header class="page-header">
-        <a href="del_dashboard.php" class="back-btn">
+        <a href="<?php echo $fromPage; ?>" class="back-btn">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
             </svg>
@@ -219,6 +220,7 @@ if ($instQ) {
 
     <script>
     var orderId = <?php echo $orderId; ?>;
+    var backPage = '<?php echo $fromPage; ?>';
 
     function previewImage(num) {
         var input = document.getElementById('file' + num);
@@ -234,20 +236,38 @@ if ($instQ) {
         }
     }
 
-    function uploadPhotos() {
-        var formData = new FormData();
-        formData.append('action', 'upload');
-        formData.append('id', orderId);
+    var uploadBtnHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload';
+    var installBtnHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload Installation Photos';
+    var orderNo = '<?php echo addslashes($order['ORDNO'] ?? ''); ?>';
 
-        var hasFile = false;
+    function savePhotosOffline() {
+        var files = [];
+        var promises = [];
         for (var i = 1; i <= 3; i++) {
             var input = document.getElementById('file' + i);
             if (input.files && input.files[0]) {
-                formData.append('image' + i, input.files[0]);
-                hasFile = true;
+                (function(idx, file) {
+                    promises.push(OfflineSync.fileToBase64(file).then(function(b64) {
+                        files.push({ key: 'image' + idx, data: b64, name: file.name, type: file.type });
+                    }));
+                })(i, input.files[0]);
             }
         }
+        return Promise.all(promises).then(function() {
+            return OfflineSync.addPending('photo_upload', 'Delivery photos - ' + orderNo, {
+                url: 'del_work_ajax.php',
+                fields: { action: 'upload', id: orderId },
+                files: files
+            });
+        });
+    }
 
+    function uploadPhotos() {
+        var hasFile = false;
+        for (var i = 1; i <= 3; i++) {
+            var input = document.getElementById('file' + i);
+            if (input.files && input.files[0]) { hasFile = true; break; }
+        }
         if (!hasFile) {
             Swal.fire({ icon: 'warning', text: 'Please select at least one photo to upload.', confirmButtonColor: '#C8102E' });
             return;
@@ -257,23 +277,41 @@ if ($instQ) {
         btn.disabled = true;
         btn.innerHTML = '<span>Uploading...</span>';
 
+        if (!navigator.onLine) {
+            savePhotosOffline().then(function() {
+                btn.disabled = false;
+                btn.innerHTML = uploadBtnHtml;
+                Swal.fire({ icon: 'info', title: 'Saved Offline', text: 'Photos will sync automatically when you are back online.', confirmButtonColor: '#C8102E' });
+            });
+            return;
+        }
+
+        var formData = new FormData();
+        formData.append('action', 'upload');
+        formData.append('id', orderId);
+        for (var i = 1; i <= 3; i++) {
+            var input = document.getElementById('file' + i);
+            if (input.files && input.files[0]) formData.append('image' + i, input.files[0]);
+        }
+
         fetch('del_work_ajax.php', { method: 'POST', body: formData })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             btn.disabled = false;
-            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload';
+            btn.innerHTML = uploadBtnHtml;
             if (data.success) {
-                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
-                    location.reload();
-                });
+                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { location.reload(); });
             } else {
                 Swal.fire({ icon: 'error', text: data.error || 'Upload failed.', confirmButtonColor: '#C8102E' });
             }
         })
         .catch(function() {
-            btn.disabled = false;
-            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload';
-            Swal.fire({ icon: 'error', text: 'Network error. Please try again.', confirmButtonColor: '#C8102E' });
+            // Network failed, save offline
+            savePhotosOffline().then(function() {
+                btn.disabled = false;
+                btn.innerHTML = uploadBtnHtml;
+                Swal.fire({ icon: 'info', title: 'Saved Offline', text: 'Photos will sync automatically when you are back online.', confirmButtonColor: '#C8102E' });
+            });
         });
     }
 
@@ -293,21 +331,35 @@ if ($instQ) {
         }
     }
 
-    function uploadInstallPhotos() {
-        var formData = new FormData();
-        formData.append('action', 'upload_install');
-        formData.append('id', orderId);
-
-        var hasFile = false;
+    function saveInstallOffline() {
+        var files = [];
+        var promises = [];
         for (var i = 0; i < installItemIds.length; i++) {
             var itemId = installItemIds[i];
             var input = document.getElementById('installFile' + itemId);
             if (input && input.files && input.files[0]) {
-                formData.append('install_img_' + itemId, input.files[0]);
-                hasFile = true;
+                (function(id, file) {
+                    promises.push(OfflineSync.fileToBase64(file).then(function(b64) {
+                        files.push({ key: 'install_img_' + id, data: b64, name: file.name, type: file.type });
+                    }));
+                })(itemId, input.files[0]);
             }
         }
+        return Promise.all(promises).then(function() {
+            return OfflineSync.addPending('install_upload', 'Install photos - ' + orderNo, {
+                url: 'del_work_ajax.php',
+                fields: { action: 'upload_install', id: orderId },
+                files: files
+            });
+        });
+    }
 
+    function uploadInstallPhotos() {
+        var hasFile = false;
+        for (var i = 0; i < installItemIds.length; i++) {
+            var input = document.getElementById('installFile' + installItemIds[i]);
+            if (input && input.files && input.files[0]) { hasFile = true; break; }
+        }
         if (!hasFile) {
             Swal.fire({ icon: 'warning', text: 'Please select at least one installation photo to upload.', confirmButtonColor: '#f59e0b' });
             return;
@@ -317,23 +369,41 @@ if ($instQ) {
         btn.disabled = true;
         btn.innerHTML = '<span>Uploading...</span>';
 
+        if (!navigator.onLine) {
+            saveInstallOffline().then(function() {
+                btn.disabled = false;
+                btn.innerHTML = installBtnHtml;
+                Swal.fire({ icon: 'info', title: 'Saved Offline', text: 'Install photos will sync automatically when you are back online.', confirmButtonColor: '#f59e0b' });
+            });
+            return;
+        }
+
+        var formData = new FormData();
+        formData.append('action', 'upload_install');
+        formData.append('id', orderId);
+        for (var i = 0; i < installItemIds.length; i++) {
+            var itemId = installItemIds[i];
+            var input = document.getElementById('installFile' + itemId);
+            if (input && input.files && input.files[0]) formData.append('install_img_' + itemId, input.files[0]);
+        }
+
         fetch('del_work_ajax.php', { method: 'POST', body: formData })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             btn.disabled = false;
-            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload Installation Photos';
+            btn.innerHTML = installBtnHtml;
             if (data.success) {
-                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
-                    location.reload();
-                });
+                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { location.reload(); });
             } else {
                 Swal.fire({ icon: 'error', text: data.error || 'Upload failed.', confirmButtonColor: '#C8102E' });
             }
         })
         .catch(function() {
-            btn.disabled = false;
-            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload Installation Photos';
-            Swal.fire({ icon: 'error', text: 'Network error. Please try again.', confirmButtonColor: '#C8102E' });
+            saveInstallOffline().then(function() {
+                btn.disabled = false;
+                btn.innerHTML = installBtnHtml;
+                Swal.fire({ icon: 'info', title: 'Saved Offline', text: 'Install photos will sync automatically when you are back online.', confirmButtonColor: '#f59e0b' });
+            });
         });
     }
 
@@ -351,6 +421,20 @@ if ($instQ) {
             var btn = document.getElementById('btnDone');
             btn.disabled = true;
 
+            if (!navigator.onLine) {
+                OfflineSync.addPending('job_done', 'Job Done - ' + orderNo, {
+                    url: 'del_work_ajax.php',
+                    fields: { action: 'done', id: orderId },
+                    files: []
+                }).then(function() {
+                    btn.disabled = false;
+                    Swal.fire({ icon: 'info', title: 'Saved Offline', text: 'Job Done will sync automatically when you are back online.', confirmButtonColor: '#16a34a' }).then(function() {
+                        window.location.href = backPage;
+                    });
+                });
+                return;
+            }
+
             var formData = new FormData();
             formData.append('action', 'done');
             formData.append('id', orderId);
@@ -361,15 +445,24 @@ if ($instQ) {
                 btn.disabled = false;
                 if (data.success) {
                     Swal.fire({ icon: 'success', title: 'Job Done!', text: data.success, confirmButtonColor: '#16a34a' }).then(function() {
-                        window.location.href = 'del_dashboard.php';
+                        window.location.href = backPage;
                     });
                 } else {
                     Swal.fire({ icon: 'error', text: data.error || 'Failed.', confirmButtonColor: '#C8102E' });
                 }
             })
             .catch(function() {
-                btn.disabled = false;
-                Swal.fire({ icon: 'error', text: 'Network error.', confirmButtonColor: '#C8102E' });
+                // Network failed, save offline
+                OfflineSync.addPending('job_done', 'Job Done - ' + orderNo, {
+                    url: 'del_work_ajax.php',
+                    fields: { action: 'done', id: orderId },
+                    files: []
+                }).then(function() {
+                    btn.disabled = false;
+                    Swal.fire({ icon: 'info', title: 'Saved Offline', text: 'Job Done will sync automatically when you are back online.', confirmButtonColor: '#16a34a' }).then(function() {
+                        window.location.href = backPage;
+                    });
+                });
             });
         });
     }

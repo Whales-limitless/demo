@@ -168,6 +168,8 @@ if ($ordno === '') { header("Location: del_dashboard.php"); exit; }
         hasDrawn = false;
     }
 
+    var signOrdno = '<?php echo addslashes($ordno); ?>';
+
     function saveSignature() {
         if (!hasDrawn) {
             Swal.fire({ icon: 'warning', text: 'Please draw a signature first.', confirmButtonColor: '#C8102E' });
@@ -178,26 +180,48 @@ if ($ordno === '') { header("Location: del_dashboard.php"); exit; }
         btn.disabled = true;
 
         var imgData = canvas.toDataURL('image/png');
+        var bodyStr = 'action=save&ordno=' + encodeURIComponent(signOrdno) + '&img_data=' + encodeURIComponent(imgData);
+        var returnUrl = 'del_vieworder.php?ordno=' + encodeURIComponent(signOrdno);
+
+        if (!navigator.onLine) {
+            OfflineSync.addPending('signature', 'Signature - ' + signOrdno, {
+                url: 'del_sign_ajax.php',
+                body: bodyStr
+            }).then(function() {
+                btn.disabled = false;
+                Swal.fire({ icon: 'info', title: 'Saved Offline', text: 'Signature will sync automatically when you are back online.', confirmButtonColor: '#C8102E' }).then(function() {
+                    window.location.href = returnUrl;
+                });
+            });
+            return;
+        }
 
         fetch('del_sign_ajax.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=save&ordno=' + encodeURIComponent('<?php echo addslashes($ordno); ?>') + '&img_data=' + encodeURIComponent(imgData)
+            body: bodyStr
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             btn.disabled = false;
             if (data.success) {
                 Swal.fire({ icon: 'success', text: 'Signature saved successfully.', timer: 1500, showConfirmButton: false }).then(function() {
-                    window.location.href = 'del_vieworder.php?ordno=' + encodeURIComponent('<?php echo addslashes($ordno); ?>');
+                    window.location.href = returnUrl;
                 });
             } else {
                 Swal.fire({ icon: 'error', text: data.error || 'Failed to save signature.', confirmButtonColor: '#C8102E' });
             }
         })
         .catch(function() {
-            btn.disabled = false;
-            Swal.fire({ icon: 'error', text: 'Network error.', confirmButtonColor: '#C8102E' });
+            OfflineSync.addPending('signature', 'Signature - ' + signOrdno, {
+                url: 'del_sign_ajax.php',
+                body: bodyStr
+            }).then(function() {
+                btn.disabled = false;
+                Swal.fire({ icon: 'info', title: 'Saved Offline', text: 'Signature will sync automatically when you are back online.', confirmButtonColor: '#C8102E' }).then(function() {
+                    window.location.href = returnUrl;
+                });
+            });
         });
     }
     </script>
