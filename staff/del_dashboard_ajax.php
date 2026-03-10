@@ -28,7 +28,7 @@ if ($action === 'items') {
     }
 
     $ordno = $r['ORDNO'];
-    $stmt = $connect->prepare("SELECT `PDESC`, `QTY`, `UOM` FROM `del_orderlistdesc` WHERE `ORDERNO` = ? ORDER BY `PDESC` ASC");
+    $stmt = $connect->prepare("SELECT `PDESC`, `QTY`, `UOM`, `INSTALL` FROM `del_orderlistdesc` WHERE `ORDERNO` = ? ORDER BY `PDESC` ASC");
     $stmt->bind_param("s", $ordno);
     $stmt->execute();
     $result = $stmt->get_result();

@@ -129,6 +129,7 @@ if ($driverCode !== '') {
         .item-num { color: var(--text-muted); font-weight: 600; min-width: 24px; }
         .item-desc { flex: 1; }
         .item-qty { font-weight: 700; white-space: nowrap; }
+        .item-install-badge { display: inline-block; background: #fef3c7; color: #92400e; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 6px; white-space: nowrap; }
     </style>
 </head>
 <body>
@@ -251,7 +252,8 @@ if ($driverCode !== '') {
             }
             var html = '';
             for (var i = 0; i < items.length; i++) {
-                html += '<div class="item-row"><span class="item-num">' + (i + 1) + '.</span><span class="item-desc">' + escHtml(items[i].PDESC || '') + '</span><span class="item-qty">' + escHtml(items[i].QTY || '') + ' ' + escHtml(items[i].UOM || '') + '</span></div>';
+                var installBadge = (items[i].INSTALL === 'Y') ? '<span class="item-install-badge">Installation</span>' : '';
+                html += '<div class="item-row"><span class="item-num">' + (i + 1) + '.</span><span class="item-desc">' + escHtml(items[i].PDESC || '') + installBadge + '</span><span class="item-qty">' + escHtml(items[i].QTY || '') + ' ' + escHtml(items[i].UOM || '') + '</span></div>';
             }
             document.getElementById('itemsBody').innerHTML = html;
         })
