@@ -9,6 +9,7 @@ include('dbconnection.php');
 $connect->set_charset("utf8mb4");
 
 $orderId = intval($_GET['id'] ?? 0);
+$fromPage = ($_GET['from'] ?? '') === 'history' ? 'del_history.php' : 'del_dashboard.php';
 if ($orderId <= 0) { header("Location: del_dashboard.php"); exit; }
 
 $stmt = $connect->prepare("SELECT o.*, c.NAME AS CUSTNAME FROM `del_orderlist` o LEFT JOIN `del_customer` c ON o.CUSTOMERCODE = c.CODE WHERE o.ID = ? LIMIT 1");
@@ -111,7 +112,7 @@ if ($instQ) {
     <?php include 'navbar.php'; ?>
 
     <header class="page-header">
-        <a href="del_dashboard.php" class="back-btn">
+        <a href="<?php echo $fromPage; ?>" class="back-btn">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
             </svg>
@@ -219,6 +220,7 @@ if ($instQ) {
 
     <script>
     var orderId = <?php echo $orderId; ?>;
+    var backPage = '<?php echo $fromPage; ?>';
 
     function previewImage(num) {
         var input = document.getElementById('file' + num);
@@ -361,7 +363,7 @@ if ($instQ) {
                 btn.disabled = false;
                 if (data.success) {
                     Swal.fire({ icon: 'success', title: 'Job Done!', text: data.success, confirmButtonColor: '#16a34a' }).then(function() {
-                        window.location.href = 'del_dashboard.php';
+                        window.location.href = backPage;
                     });
                 } else {
                     Swal.fire({ icon: 'error', text: data.error || 'Failed.', confirmButtonColor: '#C8102E' });
