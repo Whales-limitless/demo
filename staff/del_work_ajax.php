@@ -89,6 +89,91 @@ if ($action === 'upload') {
         echo json_encode(['error' => 'No valid photos were uploaded.']);
     }
 
+} elseif ($action === 'upload_install') {
+    // Upload installation photos for individual items
+    $updated = false;
+    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+    // Get the order number for this order
+    $stmt = $connect->prepare("SELECT `ORDNO` FROM `del_orderlist` WHERE `ID` = ? LIMIT 1");
+    $stmt->bind_param("i", $orderId);
+    $stmt->execute();
+    $orderRow = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$orderRow) {
+        echo json_encode(['error' => 'Order not found.']);
+        exit;
+    }
+
+    $ordno = $orderRow['ORDNO'];
+
+    // Get all install items for this order
+    $stmt2 = $connect->prepare("SELECT `ID` FROM `del_orderlistdesc` WHERE `ORDERNO` = ? AND `INSTALL` = 'Y'");
+    $stmt2->bind_param("s", $ordno);
+    $stmt2->execute();
+    $instResult = $stmt2->get_result();
+    $validIds = [];
+    while ($ir = $instResult->fetch_assoc()) { $validIds[] = intval($ir['ID']); }
+    $stmt2->close();
+
+    foreach ($_FILES as $fileKey => $fileData) {
+        if (strpos($fileKey, 'install_img_') !== 0) continue;
+        if ($fileData['error'] !== UPLOAD_ERR_OK) continue;
+
+        $itemId = intval(str_replace('install_img_', '', $fileKey));
+        if (!in_array($itemId, $validIds)) continue;
+
+        $tmpName = $fileData['tmp_name'];
+        $mimeType = mime_content_type($tmpName);
+        if (!in_array($mimeType, $allowedTypes)) continue;
+
+        $fileName = 'inst' . $itemId . '_' . uniqid() . '.jpg';
+        $filePath = $uploadDir . $fileName;
+
+        $src = null;
+        switch ($mimeType) {
+            case 'image/jpeg': $src = imagecreatefromjpeg($tmpName); break;
+            case 'image/png': $src = imagecreatefrompng($tmpName); break;
+            case 'image/gif': $src = imagecreatefromgif($tmpName); break;
+            case 'image/webp': $src = imagecreatefromwebp($tmpName); break;
+        }
+
+        if ($src) {
+            $maxDim = 1200;
+            $origW = imagesx($src);
+            $origH = imagesy($src);
+            if ($origW > $maxDim || $origH > $maxDim) {
+                if ($origW >= $origH) {
+                    $newW = $maxDim;
+                    $newH = intval($origH * $maxDim / $origW);
+                } else {
+                    $newH = $maxDim;
+                    $newW = intval($origW * $maxDim / $origH);
+                }
+                $resized = imagecreatetruecolor($newW, $newH);
+                imagecopyresampled($resized, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+                imagedestroy($src);
+                $src = $resized;
+            }
+
+            imagejpeg($src, $filePath, 85);
+            imagedestroy($src);
+
+            $stmtUp = $connect->prepare("UPDATE `del_orderlistdesc` SET `INSTALL_IMG` = ? WHERE `ID` = ?");
+            $stmtUp->bind_param("si", $fileName, $itemId);
+            $stmtUp->execute();
+            $stmtUp->close();
+            $updated = true;
+        }
+    }
+
+    if ($updated) {
+        echo json_encode(['success' => 'Installation photos uploaded successfully.']);
+    } else {
+        echo json_encode(['error' => 'No valid installation photos were uploaded.']);
+    }
+
 } elseif ($action === 'done') {
     // Check at least one image exists
     $stmt = $connect->prepare("SELECT `IMG1`, `IMG2`, `IMG3` FROM `del_orderlist` WHERE `ID` = ? LIMIT 1");
