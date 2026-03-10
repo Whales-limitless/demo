@@ -1,4 +1,17 @@
 <!-- NAVBAR -->
+<!-- PWA Meta Tags -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#C8102E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PWSTAFF">
+<link rel="apple-touch-icon" href="icon-192.svg">
+<script src="offline-sync.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function(e) { console.warn('SW register failed:', e); });
+}
+</script>
 <?php $navUserType = $_SESSION['user_type'] ?? 'S'; ?>
 <nav class="navbar">
   <button class="menu-btn" id="menuBtn" aria-label="Menu">

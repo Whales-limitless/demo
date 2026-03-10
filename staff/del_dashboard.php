@@ -130,6 +130,41 @@ if ($driverCode !== '') {
         .item-desc { flex: 1; }
         .item-qty { font-weight: 700; white-space: nowrap; }
         .item-install-badge { display: inline-block; background: #fef3c7; color: #92400e; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 6px; white-space: nowrap; }
+
+        /* Sync history */
+        .sync-section { margin-top: 20px; margin-bottom: 16px; }
+        .sync-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .sync-header h3 { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+        .sync-header h3 svg { width: 18px; height: 18px; }
+        .sync-badge { font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 12px; }
+        .sync-badge.pending { background: #fef3c7; color: #92400e; }
+        .sync-badge.syncing { background: #dbeafe; color: #2563eb; }
+        .sync-badge.done { background: #dcfce7; color: #16a34a; }
+        .sync-btn { padding: 6px 14px; border: none; border-radius: 8px; background: #3b82f6; color: #fff; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .sync-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .sync-list { background: var(--surface); border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow: hidden; }
+        .sync-item { padding: 10px 14px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+        .sync-item:last-child { border-bottom: none; }
+        .sync-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .sync-icon svg { width: 16px; height: 16px; }
+        .sync-icon.photo { background: #dbeafe; color: #2563eb; }
+        .sync-icon.install { background: #fef3c7; color: #d97706; }
+        .sync-icon.signature { background: #f3e8ff; color: #7c3aed; }
+        .sync-icon.done { background: #dcfce7; color: #16a34a; }
+        .sync-info { flex: 1; min-width: 0; }
+        .sync-desc { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sync-time { font-size: 11px; color: var(--text-muted); }
+        .sync-status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
+        .sync-status.pending { background: #fef3c7; color: #92400e; }
+        .sync-status.synced { background: #dcfce7; color: #16a34a; }
+        .sync-status.error { background: #fee2e2; color: #dc2626; }
+        .sync-empty { text-align: center; padding: 16px; color: var(--text-muted); font-size: 13px; }
+        .online-indicator { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 16px; }
+        .online-indicator.online { background: #dcfce7; color: #16a34a; }
+        .online-indicator.offline { background: #fee2e2; color: #dc2626; }
+        .online-indicator .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .online-indicator.online .dot { background: #16a34a; }
+        .online-indicator.offline .dot { background: #dc2626; }
     </style>
 </head>
 <body>
@@ -213,6 +248,25 @@ if ($driverCode !== '') {
         </div>
         <?php endforeach; ?>
         <?php endif; ?>
+
+        <!-- Sync History Section -->
+        <div class="sync-section" id="syncSection" style="display:none;">
+            <div class="sync-header">
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                    Sync History
+                    <span class="sync-badge pending" id="syncPendingBadge" style="display:none;">0 pending</span>
+                </h3>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <span class="online-indicator" id="onlineIndicator"><span class="dot"></span><span id="onlineText">Online</span></span>
+                    <button class="sync-btn" id="syncNowBtn" onclick="manualSync()">Sync Now</button>
+                </div>
+            </div>
+            <div class="sync-list" id="syncList">
+                <div class="sync-empty">No sync history.</div>
+            </div>
+        </div>
+
     <?php endif; ?>
     </div>
 
@@ -271,6 +325,104 @@ if ($driverCode !== '') {
         d.textContent = s;
         return d.innerHTML;
     }
+
+    // Sync History UI
+    var typeIcons = {
+        photo_upload: { cls: 'photo', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>' },
+        install_upload: { cls: 'install', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>' },
+        signature: { cls: 'signature', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>' },
+        job_done: { cls: 'done', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' }
+    };
+
+    function formatSyncDate(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function renderSyncList(records) {
+        var section = document.getElementById('syncSection');
+        var list = document.getElementById('syncList');
+        var badge = document.getElementById('syncPendingBadge');
+
+        if (!records || records.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+        var pending = records.filter(function(r) { return r.status === 'pending'; });
+
+        if (pending.length > 0) {
+            badge.style.display = 'inline';
+            badge.textContent = pending.length + ' pending';
+        } else {
+            badge.style.display = 'none';
+        }
+
+        // Sort newest first
+        records.sort(function(a, b) { return b.id - a.id; });
+
+        var html = '';
+        var shown = Math.min(records.length, 20);
+        for (var i = 0; i < shown; i++) {
+            var r = records[i];
+            var ti = typeIcons[r.type] || typeIcons.photo_upload;
+            var statusCls = r.status === 'synced' ? 'synced' : (r.error ? 'error' : 'pending');
+            var statusText = r.status === 'synced' ? 'Synced' : (r.error ? 'Error' : 'Pending');
+            var timeStr = r.status === 'synced' ? formatSyncDate(r.synced_at) : formatSyncDate(r.created_at);
+
+            html += '<div class="sync-item">';
+            html += '<div class="sync-icon ' + ti.cls + '">' + ti.icon + '</div>';
+            html += '<div class="sync-info"><div class="sync-desc">' + escHtml(r.description) + '</div><div class="sync-time">' + timeStr + '</div></div>';
+            html += '<span class="sync-status ' + statusCls + '">' + statusText + '</span>';
+            html += '</div>';
+        }
+
+        list.innerHTML = html || '<div class="sync-empty">No sync history.</div>';
+    }
+
+    function updateOnlineIndicator() {
+        var ind = document.getElementById('onlineIndicator');
+        var txt = document.getElementById('onlineText');
+        if (navigator.onLine) {
+            ind.className = 'online-indicator online';
+            txt.textContent = 'Online';
+        } else {
+            ind.className = 'online-indicator offline';
+            txt.textContent = 'Offline';
+        }
+    }
+
+    function manualSync() {
+        var btn = document.getElementById('syncNowBtn');
+        btn.disabled = true;
+        btn.textContent = 'Syncing...';
+        OfflineSync.syncAll().then(function() {
+            btn.disabled = false;
+            btn.textContent = 'Sync Now';
+        }).catch(function() {
+            btn.disabled = false;
+            btn.textContent = 'Sync Now';
+        });
+    }
+
+    // Register sync UI callback
+    if (typeof OfflineSync !== 'undefined') {
+        OfflineSync.onSyncUpdate(function(state, pendingCount, allRecords) {
+            renderSyncList(allRecords);
+        });
+
+        // Initial load
+        OfflineSync.getAll().then(function(records) {
+            renderSyncList(records);
+        });
+    }
+
+    // Online/offline indicator
+    updateOnlineIndicator();
+    window.addEventListener('online', updateOnlineIndicator);
+    window.addEventListener('offline', updateOnlineIndicator);
     </script>
 </body>
 </html>
