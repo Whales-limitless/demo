@@ -72,46 +72,45 @@ var OfflineSync = (function() {
     var total = pages.length;
     var results = { success: 0, failed: 0 };
 
-    // Get cache name from SW, fallback to known name
-    var cacheName = 'pwstaff-v7';
+    // Find the active pwstaff cache
     function getCacheName() {
-      if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
-        return Promise.resolve(cacheName);
-      }
-      // Try to find the active pwstaff cache
       return caches.keys().then(function(names) {
         for (var i = 0; i < names.length; i++) {
           if (names[i].indexOf('pwstaff-') === 0) {
-            cacheName = names[i];
-            break;
+            return names[i];
           }
         }
-        return cacheName;
+        // Fallback - open whatever the SW is using
+        return 'pwstaff-v8';
       });
     }
 
     function fetchOne(url, cache) {
-      return fetch(url, { credentials: 'same-origin' }).then(function(response) {
+      // X-Prefetch header tells the SW to NOT intercept this request
+      // so the fetch goes directly to the network and we cache the response ourselves
+      return fetch(url, {
+        credentials: 'same-origin',
+        headers: { 'X-Prefetch': 'true' }
+      }).then(function(response) {
         completed++;
         if (response.ok && !response.redirected) {
           results.success++;
-          // Directly write to cache - don't rely on SW interception
-          return cache.put(url, response);
+          // Build full URL for consistent cache key matching
+          var fullUrl = new URL(url, location.origin).href;
+          // Cache by full URL string - must match how SW looks up pages
+          return cache.put(fullUrl, response);
         } else {
           results.failed++;
         }
-        if (onProgress) onProgress(completed, total, results);
       }).catch(function() {
         completed++;
         results.failed++;
-        if (onProgress) onProgress(completed, total, results);
       });
     }
 
     return getCacheName().then(function(name) {
       return caches.open(name);
     }).then(function(cache) {
-      // Fetch 2 at a time to avoid overwhelming the server
       var queue = pages.slice();
       function runNext() {
         if (queue.length === 0) return Promise.resolve();
