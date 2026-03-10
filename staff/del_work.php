@@ -240,26 +240,29 @@ if ($instQ) {
     var installBtnHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload Installation Photos';
     var orderNo = <?php echo json_encode($order['ORDNO'] ?? ''); ?>;
 
+    // Save each photo as a SEPARATE pending record (compressed individually)
+    // This ensures: 1) each photo is small (~150-300KB vs 3-10MB raw)
+    //               2) each photo syncs independently (one failure doesn't block others)
+    //               3) POST size never exceeds PHP limits
     function savePhotosOffline() {
-        var files = [];
         var promises = [];
         for (var i = 1; i <= 3; i++) {
             var input = document.getElementById('file' + i);
             if (input.files && input.files[0]) {
                 (function(idx, file) {
-                    promises.push(OfflineSync.fileToBase64(file).then(function(b64) {
-                        files.push({ key: 'image' + idx, data: b64, name: file.name, type: file.type });
-                    }));
+                    promises.push(
+                        OfflineSync.compressImage(file, 1200, 0.75).then(function(compressedB64) {
+                            return OfflineSync.addPending('photo_upload', 'Photo ' + idx + ' - ' + orderNo, {
+                                url: 'del_work_ajax.php',
+                                fields: { action: 'upload_single', id: orderId, image_num: idx },
+                                files: [{ key: 'image', data: compressedB64, name: 'photo' + idx + '.jpg', type: 'image/jpeg' }]
+                            });
+                        })
+                    );
                 })(i, input.files[0]);
             }
         }
-        return Promise.all(promises).then(function() {
-            return OfflineSync.addPending('photo_upload', 'Delivery photos - ' + orderNo, {
-                url: 'del_work_ajax.php',
-                fields: { action: 'upload', id: orderId },
-                files: files
-            });
-        });
+        return Promise.all(promises);
     }
 
     function uploadPhotos() {
@@ -331,27 +334,27 @@ if ($instQ) {
         }
     }
 
+    // Save each install photo as a SEPARATE pending record (compressed individually)
     function saveInstallOffline() {
-        var files = [];
         var promises = [];
         for (var i = 0; i < installItemIds.length; i++) {
             var itemId = installItemIds[i];
             var input = document.getElementById('installFile' + itemId);
             if (input && input.files && input.files[0]) {
                 (function(id, file) {
-                    promises.push(OfflineSync.fileToBase64(file).then(function(b64) {
-                        files.push({ key: 'install_img_' + id, data: b64, name: file.name, type: file.type });
-                    }));
+                    promises.push(
+                        OfflineSync.compressImage(file, 1200, 0.75).then(function(compressedB64) {
+                            return OfflineSync.addPending('install_upload', 'Install photo item ' + id + ' - ' + orderNo, {
+                                url: 'del_work_ajax.php',
+                                fields: { action: 'upload_install_single', id: orderId, item_id: id },
+                                files: [{ key: 'image', data: compressedB64, name: 'install_' + id + '.jpg', type: 'image/jpeg' }]
+                            });
+                        })
+                    );
                 })(itemId, input.files[0]);
             }
         }
-        return Promise.all(promises).then(function() {
-            return OfflineSync.addPending('install_upload', 'Install photos - ' + orderNo, {
-                url: 'del_work_ajax.php',
-                fields: { action: 'upload_install', id: orderId },
-                files: files
-            });
-        });
+        return Promise.all(promises);
     }
 
     function uploadInstallPhotos() {

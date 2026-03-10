@@ -711,13 +711,64 @@ var OfflineSync = (function() {
     });
   }
 
-  // Convert File to base64 for IndexedDB storage
+  // Convert File to base64 for IndexedDB storage (raw, no compression)
   function fileToBase64(file) {
     return new Promise(function(resolve, reject) {
       var reader = new FileReader();
       reader.onload = function() { resolve(reader.result); };
       reader.onerror = function() { reject(reader.error); };
       reader.readAsDataURL(file);
+    });
+  }
+
+  // Compress image file using Canvas before storing in IndexedDB
+  // This is CRITICAL for offline sync stability:
+  // - Camera photos are 3-10MB raw, base64 adds 33% = up to 13MB per photo
+  // - 3 photos in one POST = up to 40MB, exceeds PHP post_max_size (default 8MB)
+  // - Compressing to max 1200px JPEG @ 75% reduces to ~150-300KB per photo
+  // - Also reduces IndexedDB storage usage dramatically
+  function compressImage(file, maxDim, quality) {
+    maxDim = maxDim || 1200;
+    quality = quality || 0.75;
+    return new Promise(function(resolve, reject) {
+      // Create an image element to load the file
+      var img = new Image();
+      img.onload = function() {
+        var w = img.naturalWidth;
+        var h = img.naturalHeight;
+
+        // Calculate new dimensions (maintain aspect ratio)
+        if (w > maxDim || h > maxDim) {
+          if (w >= h) {
+            h = Math.round(h * maxDim / w);
+            w = maxDim;
+          } else {
+            w = Math.round(w * maxDim / h);
+            h = maxDim;
+          }
+        }
+
+        // Draw on canvas at new size
+        var canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+
+        // Export as JPEG base64 data URL
+        var dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+        // Clean up
+        URL.revokeObjectURL(img.src);
+
+        resolve(dataUrl);
+      };
+      img.onerror = function() {
+        URL.revokeObjectURL(img.src);
+        // Fallback: if Image fails to load (rare), use raw file
+        fileToBase64(file).then(resolve).catch(reject);
+      };
+      img.src = URL.createObjectURL(file);
     });
   }
 
@@ -777,6 +828,7 @@ var OfflineSync = (function() {
     retryFailed: retryFailed,
     deleteRecord: deleteRecord,
     fileToBase64: fileToBase64,
+    compressImage: compressImage,
     onSyncUpdate: onSyncUpdate,
     cleanOld: cleanOld,
     getLastError: function() { return lastSyncError; },
