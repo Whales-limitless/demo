@@ -168,7 +168,7 @@ if ($ordno === '') { header("Location: del_dashboard.php"); exit; }
         hasDrawn = false;
     }
 
-    var signOrdno = '<?php echo addslashes($ordno); ?>';
+    var signOrdno = <?php echo json_encode($ordno); ?>;
 
     function saveSignature() {
         if (!hasDrawn) {

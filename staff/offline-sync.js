@@ -38,7 +38,7 @@ var OfflineSync = (function() {
 
   // ==================== OFFLINE DATA STORE ====================
 
-  // Save data to offline store
+  // Save data to offline store (with quota error handling)
   function saveData(key, data) {
     return openDB().then(function(d) {
       return new Promise(function(resolve, reject) {
@@ -46,7 +46,14 @@ var OfflineSync = (function() {
         var store = tx.objectStore(DATA_STORE);
         var req = store.put({ key: key, data: data, saved_at: new Date().toISOString() });
         req.onsuccess = function() { resolve(); };
-        req.onerror = function() { reject(req.error); };
+        req.onerror = function() {
+          var err = req.error;
+          if (err && err.name === 'QuotaExceededError') {
+            reject(new Error('Storage full. Please clear old data or free up device storage.'));
+          } else {
+            reject(err);
+          }
+        };
       });
     });
   }
@@ -80,8 +87,8 @@ var OfflineSync = (function() {
             return names[i];
           }
         }
-        // Fallback - open whatever the SW is using
-        return 'pwstaff-v8';
+        // Fallback - use a default name (SW will adopt it on activate)
+        return 'pwstaff-cache';
       });
     }
 
@@ -94,11 +101,17 @@ var OfflineSync = (function() {
       }).then(function(response) {
         completed++;
         if (response.ok && !response.redirected) {
-          results.success++;
-          // Build full URL for consistent cache key matching
-          var fullUrl = new URL(url, location.origin).href;
-          // Cache by full URL string - must match how SW looks up pages
-          return cache.put(fullUrl, response);
+          // Validate content type - only cache HTML/JSON/JS/CSS responses, not error pages
+          var ct = response.headers.get('content-type') || '';
+          if (ct.indexOf('text/html') !== -1 || ct.indexOf('application/json') !== -1 || ct.indexOf('text/css') !== -1 || ct.indexOf('javascript') !== -1) {
+            results.success++;
+            // Build full URL for consistent cache key matching
+            var fullUrl = new URL(url, location.origin).href;
+            // Cache by full URL string - must match how SW looks up pages
+            return cache.put(fullUrl, response);
+          } else {
+            results.failed++;
+          }
         } else {
           results.failed++;
         }
@@ -150,7 +163,6 @@ var OfflineSync = (function() {
     // ALL PHP files in the staff directory (excluding logout which kills session)
     var pages = [
       '/staff/index.php',
-      '/staff/login.php',
       '/staff/account.php',
       '/staff/category.php',
       '/staff/products.php',
@@ -229,24 +241,48 @@ var OfflineSync = (function() {
 
   // ==================== PENDING ACTIONS ====================
 
-  // Add a pending action to IndexedDB
+  // Check for duplicate pending action (same type + same payload URL + same ID)
+  function hasDuplicate(type, payload) {
+    return getPending().then(function(records) {
+      for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        if (r.type !== type) continue;
+        var rp = r.payload;
+        // Match on URL + action + id (covers job_done, photo_upload, signature, etc.)
+        if (rp.url === payload.url) {
+          if (rp.fields && payload.fields && rp.fields.action === payload.fields.action && rp.fields.id === payload.fields.id) return true;
+          if (rp.body && payload.body && rp.body === payload.body) return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  // Add a pending action to IndexedDB (with deduplication)
   function addPending(type, description, payload) {
-    return openDB().then(function(d) {
-      return new Promise(function(resolve, reject) {
-        var tx = d.transaction(STORE_NAME, 'readwrite');
-        var store = tx.objectStore(STORE_NAME);
-        var record = {
-          type: type,
-          description: description,
-          payload: payload,
-          status: 'pending',
-          created_at: new Date().toISOString(),
-          synced_at: null,
-          error: null
-        };
-        var req = store.add(record);
-        req.onsuccess = function() { resolve(req.result); };
-        req.onerror = function() { reject(req.error); };
+    return hasDuplicate(type, payload).then(function(isDup) {
+      if (isDup) {
+        // Already queued - return existing, don't add duplicate
+        return -1;
+      }
+      return openDB().then(function(d) {
+        return new Promise(function(resolve, reject) {
+          var tx = d.transaction(STORE_NAME, 'readwrite');
+          var store = tx.objectStore(STORE_NAME);
+          var record = {
+            type: type,
+            description: description,
+            payload: payload,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+            synced_at: null,
+            error: null,
+            retries: 0
+          };
+          var req = store.add(record);
+          req.onsuccess = function() { resolve(req.result); };
+          req.onerror = function() { reject(req.error); };
+        });
       });
     });
   }
@@ -373,10 +409,31 @@ var OfflineSync = (function() {
     }).then(function(r) { return r.json(); });
   }
 
+  // Cross-tab lock using localStorage to prevent duplicate syncs
+  var SYNC_LOCK_KEY = 'pwstaff_sync_lock';
+  var SYNC_LOCK_TTL = 60000; // 60s max lock hold time
+
+  function acquireSyncLock() {
+    try {
+      var lock = localStorage.getItem(SYNC_LOCK_KEY);
+      if (lock) {
+        var lockTime = parseInt(lock, 10);
+        if (Date.now() - lockTime < SYNC_LOCK_TTL) return false; // another tab holds lock
+      }
+      localStorage.setItem(SYNC_LOCK_KEY, String(Date.now()));
+      return true;
+    } catch(e) { return true; } // if localStorage unavailable, proceed anyway
+  }
+
+  function releaseSyncLock() {
+    try { localStorage.removeItem(SYNC_LOCK_KEY); } catch(e) {}
+  }
+
   // Sync all pending records one by one
   function syncAll() {
     if (syncing) return Promise.resolve();
     if (!navigator.onLine) return Promise.resolve();
+    if (!acquireSyncLock()) return Promise.resolve();
 
     syncing = true;
     updateSyncUI('syncing');
@@ -384,6 +441,7 @@ var OfflineSync = (function() {
     return getPending().then(function(records) {
       if (records.length === 0) {
         syncing = false;
+        releaseSyncLock();
         updateSyncUI('idle');
         return;
       }
@@ -395,17 +453,27 @@ var OfflineSync = (function() {
             if (response && response.success) {
               return updateRecord(record.id, {
                 status: 'synced',
-                synced_at: new Date().toISOString()
+                synced_at: new Date().toISOString(),
+                error: null
               });
             } else {
-              return updateRecord(record.id, {
-                error: (response && response.error) || 'Sync failed'
-              });
+              var retries = (record.retries || 0) + 1;
+              var updates = {
+                error: (response && response.error) || 'Sync failed',
+                retries: retries
+              };
+              // After 3 retries, mark as failed permanently
+              if (retries >= 3) updates.status = 'failed';
+              return updateRecord(record.id, updates);
             }
           }).catch(function(err) {
-            return updateRecord(record.id, {
-              error: err.message || 'Network error'
-            });
+            var retries = (record.retries || 0) + 1;
+            var updates = {
+              error: err.message || 'Network error',
+              retries: retries
+            };
+            if (retries >= 3) updates.status = 'failed';
+            return updateRecord(record.id, updates);
           }).then(function() {
             updateSyncUI('syncing');
           });
@@ -414,11 +482,13 @@ var OfflineSync = (function() {
 
       return chain.then(function() {
         syncing = false;
+        releaseSyncLock();
         updateSyncUI('done');
         cleanOld();
       });
     }).catch(function() {
       syncing = false;
+      releaseSyncLock();
       updateSyncUI('idle');
     });
   }

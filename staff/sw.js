@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pwstaff-v8';
+const CACHE_NAME = 'pwstaff-v9';
 
 // Pre-cache static assets
 const urlsToCache = [

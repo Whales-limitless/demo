@@ -618,8 +618,8 @@ body {
     for (var i = 0; i < shown; i++) {
       var r = records[i];
       var ti = typeIcons[r.type] || typeIcons.photo_upload;
-      var statusCls = r.status === 'synced' ? 'synced' : (r.error ? 'error' : 'pending');
-      var statusText = r.status === 'synced' ? 'Synced' : (r.error ? 'Error' : 'Pending');
+      var statusCls = r.status === 'synced' ? 'synced' : (r.status === 'failed' ? 'error' : (r.error ? 'error' : 'pending'));
+      var statusText = r.status === 'synced' ? 'Synced' : (r.status === 'failed' ? 'Failed' : (r.error ? 'Retrying' : 'Pending'));
       var timeStr = r.status === 'synced' ? formatSyncDate(r.synced_at) : formatSyncDate(r.created_at);
 
       html += '<div class="sync-item">';
