@@ -1,0 +1,53 @@
+{
+  "name": "AsyncTech HRMS",
+  "short_name": "HRMS",
+  "description": "AsyncTech Human Resource Management System",
+  "start_url": "/hrmsweb/index.php",
+  "scope": "/hrmsweb/",
+  "display": "standalone",
+  "background_color": "#233446",
+  "theme_color": "#233446",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://placehold.co/72x72/233446/ffffff?text=HR",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "https://placehold.co/96x96/233446/ffffff?text=HR",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "https://placehold.co/128x128/233446/ffffff?text=HR",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "https://placehold.co/144x144/233446/ffffff?text=HR",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "https://placehold.co/152x152/233446/ffffff?text=HR",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "https://placehold.co/192x192/233446/ffffff?text=HR",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://placehold.co/384x384/233446/ffffff?text=HR",
+      "sizes": "384x384",
+      "type": "image/png"
+    },
+    {
+      "src": "https://placehold.co/512x512/233446/ffffff?text=HR",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
