@@ -200,6 +200,7 @@ var OfflineSync = (function() {
             var ordno = data.orders[i].ORDNO;
             pages.push('/staff/del_work.php?id=' + orderId);
             pages.push('/staff/del_vieworder.php?ordno=' + encodeURIComponent(ordno));
+            pages.push('/staff/del_sign.php?ordno=' + encodeURIComponent(ordno) + '&id=' + orderId);
           }
           totalSteps = pages.length + 1;
         }
