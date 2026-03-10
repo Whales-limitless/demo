@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pwstaff-v5';
+const CACHE_NAME = 'pwstaff-v6';
 
 // Only pre-cache static assets (no PHP pages - they redirect when not logged in)
 const urlsToCache = [
