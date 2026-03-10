@@ -740,15 +740,24 @@ body {
   };
 
   // Auto-download on first visit (if no data cached yet)
+  // Wait for SW to be ready so cache writes work properly
+  function waitForSWReady() {
+    if (!('serviceWorker' in navigator)) return Promise.resolve();
+    return navigator.serviceWorker.ready.then(function() {
+      // Give SW a moment to claim the client
+      return new Promise(function(resolve) { setTimeout(resolve, 500); });
+    });
+  }
+
   if (typeof OfflineSync !== 'undefined' && navigator.onLine) {
-    setTimeout(function() {
-      OfflineSync.getData('delivery_data').then(function(record) {
-        if (!record) {
-          // First visit - auto-download
-          window.startDownload();
-        }
-      });
-    }, 2000);
+    waitForSWReady().then(function() {
+      return OfflineSync.getData('delivery_data');
+    }).then(function(record) {
+      if (!record) {
+        // First visit - auto-download
+        window.startDownload();
+      }
+    });
   }
 })();
 </script>

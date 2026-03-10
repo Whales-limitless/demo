@@ -66,17 +66,37 @@ var OfflineSync = (function() {
 
   // ==================== PAGE PREFETCH ====================
 
-  // Prefetch pages for offline use (SW will cache them)
+  // Prefetch pages for offline use - writes directly to Cache API
   function prefetchPages(pages, onProgress) {
     var completed = 0;
     var total = pages.length;
     var results = { success: 0, failed: 0 };
 
-    function fetchOne(url) {
+    // Get cache name from SW, fallback to known name
+    var cacheName = 'pwstaff-v7';
+    function getCacheName() {
+      if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+        return Promise.resolve(cacheName);
+      }
+      // Try to find the active pwstaff cache
+      return caches.keys().then(function(names) {
+        for (var i = 0; i < names.length; i++) {
+          if (names[i].indexOf('pwstaff-') === 0) {
+            cacheName = names[i];
+            break;
+          }
+        }
+        return cacheName;
+      });
+    }
+
+    function fetchOne(url, cache) {
       return fetch(url, { credentials: 'same-origin' }).then(function(response) {
         completed++;
         if (response.ok && !response.redirected) {
           results.success++;
+          // Directly write to cache - don't rely on SW interception
+          return cache.put(url, response);
         } else {
           results.failed++;
         }
@@ -88,17 +108,24 @@ var OfflineSync = (function() {
       });
     }
 
-    // Fetch 2 at a time to avoid overwhelming the server
-    var queue = pages.slice();
-    function runNext() {
-      if (queue.length === 0) return Promise.resolve();
-      var url = queue.shift();
-      return fetchOne(url).then(runNext);
-    }
+    return getCacheName().then(function(name) {
+      return caches.open(name);
+    }).then(function(cache) {
+      // Fetch 2 at a time to avoid overwhelming the server
+      var queue = pages.slice();
+      function runNext() {
+        if (queue.length === 0) return Promise.resolve();
+        var url = queue.shift();
+        return fetchOne(url, cache).then(function() {
+          if (onProgress) onProgress(completed, total, results);
+          return runNext();
+        });
+      }
 
-    // Start 2 parallel chains
-    return Promise.all([runNext(), runNext()]).then(function() {
-      return results;
+      // Start 2 parallel chains
+      return Promise.all([runNext(), runNext()]).then(function() {
+        return results;
+      });
     });
   }
 
