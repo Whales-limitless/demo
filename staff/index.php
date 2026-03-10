@@ -370,6 +370,56 @@ body {
   font-size: 13px;
 }
 
+.sync-error-banner {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  display: none;
+}
+.sync-error-banner.visible { display: block; }
+.sync-error-banner .error-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #dc2626;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sync-error-banner .error-title svg { width: 16px; height: 16px; flex-shrink: 0; }
+.sync-error-banner .error-msg {
+  font-size: 12px;
+  color: #991b1b;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.sync-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.retry-failed-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #f59e0b;
+  color: #fff;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: none;
+}
+.retry-failed-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.retry-failed-btn.visible { display: inline-block; }
+
+.sync-badge.failed { background: #fee2e2; color: #dc2626; }
+
 @media (max-width: 480px) {
   .welcome-card { padding: 32px 20px; }
   .welcome-card h1 { font-size: 22px; }
@@ -448,10 +498,19 @@ body {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
         Sync Activity
         <span class="sync-badge pending" id="syncPendingBadge" style="display:none;">0 pending</span>
+        <span class="sync-badge failed" id="syncFailedBadge" style="display:none;">0 failed</span>
       </h3>
-      <div style="display:flex;gap:8px;align-items:center;">
+      <div class="sync-actions">
+        <button class="retry-failed-btn" id="retryFailedBtn" onclick="retryFailed()">Retry Failed</button>
         <button class="sync-btn" id="syncNowBtn" onclick="manualSync()">Sync Now</button>
       </div>
+    </div>
+    <div class="sync-error-banner" id="syncErrorBanner">
+      <div class="error-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="syncErrorTitle">Sync Error</span>
+      </div>
+      <div class="error-msg" id="syncErrorMsg"></div>
     </div>
     <div class="sync-list" id="syncList">
       <div class="sync-empty">No sync activity yet. Actions performed offline (photo uploads, signatures, job completions) will appear here.</div>
@@ -643,15 +702,59 @@ body {
     list.innerHTML = html;
   }
 
+  // Show/hide sync error banner
+  function showSyncError(errorMsg) {
+    var banner = document.getElementById('syncErrorBanner');
+    var msgEl = document.getElementById('syncErrorMsg');
+    if (errorMsg) {
+      msgEl.textContent = errorMsg;
+      banner.classList.add('visible');
+    } else {
+      banner.classList.remove('visible');
+      msgEl.textContent = '';
+    }
+  }
+
   // Register sync UI callback
   if (typeof OfflineSync !== 'undefined') {
-    OfflineSync.onSyncUpdate(function(state, pendingCount, allRecords) {
+    OfflineSync.onSyncUpdate(function(state, pendingCount, allRecords, syncError, failedCount) {
       renderSyncList(allRecords);
+
+      // Show/hide failed badge and retry button
+      var failedBadge = document.getElementById('syncFailedBadge');
+      var retryBtn = document.getElementById('retryFailedBtn');
+      if (failedCount > 0) {
+        failedBadge.style.display = 'inline';
+        failedBadge.textContent = failedCount + ' failed';
+        retryBtn.classList.add('visible');
+      } else {
+        failedBadge.style.display = 'none';
+        retryBtn.classList.remove('visible');
+      }
+
+      // Show sync error banner
+      if (state === 'error' && syncError) {
+        showSyncError(syncError);
+      } else if (state === 'done') {
+        showSyncError(null);
+      }
     });
 
     // Initial load
     OfflineSync.getAll().then(function(records) {
       renderSyncList(records);
+      // Check for failed records on initial load
+      var failedCount = records.filter(function(r) { return r.status === 'failed'; }).length;
+      var failedBadge = document.getElementById('syncFailedBadge');
+      var retryBtn = document.getElementById('retryFailedBtn');
+      if (failedCount > 0) {
+        failedBadge.style.display = 'inline';
+        failedBadge.textContent = failedCount + ' failed';
+        retryBtn.classList.add('visible');
+      }
+      // Show last error if any
+      var lastErr = OfflineSync.getLastError();
+      if (lastErr) showSyncError(lastErr);
     });
   }
 
@@ -661,12 +764,33 @@ body {
     var btn = document.getElementById('syncNowBtn');
     btn.disabled = true;
     btn.textContent = 'Syncing...';
+    showSyncError(null); // Clear previous errors
     OfflineSync.syncAll().then(function() {
       btn.disabled = false;
       btn.textContent = 'Sync Now';
     }).catch(function() {
       btn.disabled = false;
       btn.textContent = 'Sync Now';
+    });
+  };
+
+  // Retry failed records
+  window.retryFailed = function() {
+    if (typeof OfflineSync === 'undefined') return;
+    var btn = document.getElementById('retryFailedBtn');
+    btn.disabled = true;
+    btn.textContent = 'Retrying...';
+    showSyncError(null);
+    OfflineSync.retryFailed().then(function(count) {
+      btn.disabled = false;
+      btn.textContent = 'Retry Failed';
+      if (count > 0) {
+        // Immediately trigger sync after resetting failed records
+        OfflineSync.syncAll();
+      }
+    }).catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Retry Failed';
     });
   };
 
@@ -734,13 +858,23 @@ body {
       btn.disabled = false;
       btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download All for Offline';
 
-      result.className = 'download-result success';
       var totalPhp = res.totalPages || 0;
-      var msg = 'Downloaded ' + totalPhp + ' PHP files';
+      var failedPages = res.failedPages || 0;
+      if (failedPages > 0 && totalPhp === 0) {
+        result.className = 'download-result error';
+      } else if (failedPages > 0) {
+        result.className = 'download-result error';
+      } else {
+        result.className = 'download-result success';
+      }
+      var msg = 'Downloaded ' + totalPhp + ' pages';
       if (res.data && res.data.order_count !== undefined) {
         msg += ', ' + res.data.order_count + ' delivery orders with items';
       }
       msg += ' for offline use.';
+      if (failedPages > 0) {
+        msg += ' WARNING: ' + failedPages + ' pages failed to cache (session may have expired or pages returned errors). Try downloading again.';
+      }
       result.textContent = msg;
 
       // Refresh cache stats

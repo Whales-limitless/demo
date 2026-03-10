@@ -50,22 +50,7 @@ self.addEventListener('fetch', event => {
         return response;
       }).catch(() => {
         // Offline - try multiple lookup strategies before giving up
-        return caches.open(CACHE_NAME).then(cache => {
-          // 1. Exact URL match
-          return cache.match(event.request.url).then(cached => {
-            if (cached) return cached;
-            // 2. Try without query string (prefetch may have cached base URL)
-            const url = new URL(event.request.url);
-            if (url.search) {
-              return cache.match(url.origin + url.pathname);
-            }
-            return null;
-          }).then(cached => {
-            if (cached) return cached;
-            // 3. Search ALL caches as last resort (covers edge cases)
-            return caches.match(event.request.url);
-          });
-        }).then(cached => {
+        return findCachedPage(event.request.url).then(cached => {
           return cached || caches.match('/staff/offline.html');
         });
       })
@@ -90,11 +75,59 @@ self.addEventListener('fetch', event => {
   );
 });
 
+// Robust page lookup across all caches with multiple strategies
+async function findCachedPage(urlStr) {
+  try {
+    const url = new URL(urlStr);
+    const cache = await caches.open(CACHE_NAME);
+
+    // Strategy 1: Exact URL match in our cache
+    let cached = await cache.match(urlStr);
+    if (cached) return cached;
+
+    // Strategy 2: Try without query string (base page may have been prefetched)
+    if (url.search) {
+      cached = await cache.match(url.origin + url.pathname);
+      if (cached) return cached;
+    }
+
+    // Strategy 3: Search ALL caches for exact URL (covers race conditions with cache migration)
+    cached = await caches.match(urlStr);
+    if (cached) return cached;
+
+    // Strategy 4: Search ALL caches without query string
+    if (url.search) {
+      cached = await caches.match(url.origin + url.pathname);
+      if (cached) return cached;
+    }
+
+    // Strategy 5: Search all caches by iterating keys for partial pathname match
+    const allCacheNames = await caches.keys();
+    for (const name of allCacheNames) {
+      const c = await caches.open(name);
+      const keys = await c.keys();
+      for (const request of keys) {
+        const cachedUrl = new URL(request.url);
+        // Match on pathname (ignoring query string differences and origin)
+        if (cachedUrl.pathname === url.pathname) {
+          const match = await c.match(request);
+          if (match) return match;
+        }
+      }
+    }
+
+    return null;
+  } catch(e) {
+    console.error('findCachedPage error:', e);
+    return null;
+  }
+}
+
 // Activate event - migrate old caches then clean up, and claim clients
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
-      // Find old pwstaff caches to migrate from
+      // Find old pwstaff caches to migrate from (including the fallback 'pwstaff-cache')
       const oldCaches = cacheNames.filter(n => n !== CACHE_NAME && n.indexOf('pwstaff') === 0);
       if (oldCaches.length === 0) return Promise.resolve();
 

@@ -7,12 +7,25 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', -apple-system, sans-serif; background: #f3f4f6; color: #1a1a1a; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
-  .offline-card { background: #fff; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); padding: 40px 32px; text-align: center; max-width: 400px; width: 100%; }
+  .offline-card { background: #fff; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); padding: 40px 32px; text-align: center; max-width: 440px; width: 100%; }
   .offline-icon { width: 64px; height: 64px; margin: 0 auto 16px; color: #C8102E; }
   h1 { font-size: 22px; margin-bottom: 8px; color: #C8102E; }
   p { font-size: 14px; color: #6b7280; line-height: 1.5; margin-bottom: 20px; }
-  .btn-retry { display: inline-block; padding: 12px 28px; background: #C8102E; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; }
+  .btn-retry { display: inline-block; padding: 12px 28px; background: #C8102E; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; margin: 4px; }
   .btn-retry:hover { background: #a00d24; }
+  .btn-home { display: inline-block; padding: 12px 28px; background: #374151; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; margin: 4px; }
+  .btn-home:hover { background: #1f2937; }
+  .diag { margin-top: 20px; background: #f9fafb; border-radius: 10px; padding: 14px; text-align: left; font-size: 12px; color: #6b7280; display: none; }
+  .diag h4 { font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .diag-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #f3f4f6; }
+  .diag-label { font-weight: 600; color: #374151; }
+  .diag-val { color: #6b7280; }
+  .diag-pages { margin-top: 8px; }
+  .diag-pages .page-link { display: inline-block; background: #dbeafe; color: #2563eb; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 8px; margin: 2px; text-decoration: none; cursor: pointer; }
+  .diag-pages .page-link:hover { background: #bfdbfe; }
+  .pending-info { margin-top: 16px; background: #fef3c7; border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #92400e; display: none; }
+  .pending-info strong { color: #78350f; }
+  .toggle-diag { background: none; border: none; color: #6b7280; font-size: 12px; cursor: pointer; text-decoration: underline; margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -27,8 +40,111 @@
       <line x1="12" y1="20" x2="12.01" y2="20"/>
     </svg>
     <h1>You're Offline</h1>
-    <p>This page isn't available offline yet. Any photos or data you've captured will sync automatically when you're back online.</p>
-    <button class="btn-retry" onclick="location.reload()">Try Again</button>
+    <p>This page isn't available offline yet. Go to the Home page and tap <strong>"Download All for Offline"</strong> while connected to make pages available offline.</p>
+
+    <div class="pending-info" id="pendingInfo">
+      <strong id="pendingCount">0</strong> pending action(s) will sync automatically when you're back online.
+    </div>
+
+    <div style="margin-top: 16px;">
+      <button class="btn-retry" onclick="location.reload()">Try Again</button>
+      <a href="/staff/index.php" class="btn-home">Go Home</a>
+    </div>
+
+    <button class="toggle-diag" onclick="toggleDiag()">Show diagnostic info</button>
+
+    <div class="diag" id="diagPanel">
+      <h4>Diagnostic Info</h4>
+      <div class="diag-row">
+        <span class="diag-label">Requested page</span>
+        <span class="diag-val" id="diagUrl">-</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Network status</span>
+        <span class="diag-val" id="diagOnline">-</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">SW status</span>
+        <span class="diag-val" id="diagSW">-</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Cached pages</span>
+        <span class="diag-val" id="diagCacheCount">-</span>
+      </div>
+      <div class="diag-pages" id="diagPages"></div>
+    </div>
   </div>
+
+  <script>
+  // Show the requested URL that failed
+  var url = window.location.href;
+  document.getElementById('diagUrl').textContent = url.split('/').pop() || url;
+  document.getElementById('diagOnline').textContent = navigator.onLine ? 'Online' : 'Offline';
+  document.getElementById('diagSW').textContent = ('serviceWorker' in navigator && navigator.serviceWorker.controller) ? 'Active' : 'Not active';
+
+  function toggleDiag() {
+    var panel = document.getElementById('diagPanel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : (panel.style.display ? 'none' : 'block');
+  }
+
+  // Check for cached pages
+  if ('caches' in window) {
+    caches.keys().then(function(names) {
+      var pwCache = null;
+      for (var i = 0; i < names.length; i++) {
+        if (names[i].indexOf('pwstaff') === 0) { pwCache = names[i]; break; }
+      }
+      if (!pwCache) {
+        document.getElementById('diagCacheCount').textContent = 'No cache found';
+        return;
+      }
+      return caches.open(pwCache).then(function(cache) {
+        return cache.keys().then(function(keys) {
+          var pages = [];
+          for (var j = 0; j < keys.length; j++) {
+            var u = new URL(keys[j].url);
+            if (u.pathname.endsWith('.php') || u.pathname.endsWith('.html')) {
+              pages.push(u.pathname.split('/').pop());
+            }
+          }
+          document.getElementById('diagCacheCount').textContent = pages.length + ' pages in cache';
+          if (pages.length > 0) {
+            var html = '<div style="margin-top:4px;font-weight:600;color:#374151;">Available pages:</div>';
+            var seen = {};
+            for (var k = 0; k < pages.length; k++) {
+              if (seen[pages[k]]) continue;
+              seen[pages[k]] = true;
+              html += '<a class="page-link" href="/staff/' + pages[k] + '">' + pages[k] + '</a>';
+            }
+            document.getElementById('diagPages').innerHTML = html;
+          }
+        });
+      });
+    }).catch(function() {
+      document.getElementById('diagCacheCount').textContent = 'Error reading cache';
+    });
+  }
+
+  // Check for pending sync items
+  if ('indexedDB' in window) {
+    var req = indexedDB.open('pwstaff_sync', 2);
+    req.onsuccess = function(e) {
+      var idb = e.target.result;
+      try {
+        var tx = idb.transaction('pending_actions', 'readonly');
+        var store = tx.objectStore('pending_actions');
+        var idx = store.index('status');
+        var getReq = idx.getAll('pending');
+        getReq.onsuccess = function() {
+          var records = getReq.result || [];
+          if (records.length > 0) {
+            document.getElementById('pendingCount').textContent = records.length;
+            document.getElementById('pendingInfo').style.display = 'block';
+          }
+        };
+      } catch(ex) { /* db might not have stores yet */ }
+    };
+  }
+  </script>
 </body>
 </html>

@@ -9,13 +9,30 @@ var OfflineSync = (function() {
   var DB_VERSION = 2;
   var STORE_NAME = 'pending_actions';
   var DATA_STORE = 'offline_data';
+  var EXPECTED_CACHE = 'pwstaff-v9';
   var db = null;
   var syncing = false;
+  var lastSyncError = null;
 
-  // Open IndexedDB
+  // Open IndexedDB - resets stale connections automatically
   function openDB() {
     return new Promise(function(resolve, reject) {
-      if (db) { resolve(db); return; }
+      // Validate existing connection is still usable
+      if (db) {
+        try {
+          // Test if connection is still alive by checking objectStoreNames
+          // A closed connection will throw InvalidStateError
+          var names = db.objectStoreNames;
+          if (names.contains(STORE_NAME)) {
+            resolve(db);
+            return;
+          }
+        } catch(e) {
+          // Connection is stale/closed - reset and reopen
+          console.warn('IndexedDB connection stale, reopening...', e.message);
+          db = null;
+        }
+      }
       var request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = function(e) {
         var d = e.target.result;
@@ -30,9 +47,18 @@ var OfflineSync = (function() {
       };
       request.onsuccess = function(e) {
         db = e.target.result;
+        // Listen for unexpected close (mobile browser kills connection in background)
+        db.onclose = function() {
+          console.warn('IndexedDB connection closed unexpectedly');
+          db = null;
+        };
+        db.onversionchange = function() {
+          db.close();
+          db = null;
+        };
         resolve(db);
       };
-      request.onerror = function(e) { reject(e.target.error); };
+      request.onerror = function(e) { reject(new Error('IndexedDB open failed: ' + (e.target.error ? e.target.error.message : 'unknown'))); };
     });
   }
 
@@ -54,6 +80,12 @@ var OfflineSync = (function() {
             reject(err);
           }
         };
+        // Handle transaction errors (connection may have dropped)
+        tx.onerror = function() { reject(new Error('DB transaction failed: ' + (tx.error ? tx.error.message : 'unknown'))); };
+        tx.onabort = function() {
+          db = null; // Reset connection on abort
+          reject(new Error('DB transaction aborted - will retry on next attempt'));
+        };
       });
     });
   }
@@ -67,30 +99,40 @@ var OfflineSync = (function() {
         var req = store.get(key);
         req.onsuccess = function() { resolve(req.result || null); };
         req.onerror = function() { reject(req.error); };
+        tx.onerror = function() { reject(new Error('DB read failed')); };
+        tx.onabort = function() { db = null; reject(new Error('DB read aborted')); };
       });
     });
   }
 
   // ==================== PAGE PREFETCH ====================
 
+  // Get the correct SW cache name - MUST match what the service worker uses
+  function getCacheName() {
+    return caches.keys().then(function(names) {
+      // Look for the exact expected cache first
+      for (var i = 0; i < names.length; i++) {
+        if (names[i] === EXPECTED_CACHE) {
+          return EXPECTED_CACHE;
+        }
+      }
+      // Then look for any pwstaff-v* cache
+      for (var i = 0; i < names.length; i++) {
+        if (names[i].indexOf('pwstaff-v') === 0) {
+          return names[i];
+        }
+      }
+      // Fallback: use the expected cache name (SW will create it)
+      // IMPORTANT: Must match SW's CACHE_NAME to avoid being deleted on activate
+      return EXPECTED_CACHE;
+    });
+  }
+
   // Prefetch pages for offline use - writes directly to Cache API
   function prefetchPages(pages, onProgress) {
     var completed = 0;
     var total = pages.length;
-    var results = { success: 0, failed: 0 };
-
-    // Find the active pwstaff cache
-    function getCacheName() {
-      return caches.keys().then(function(names) {
-        for (var i = 0; i < names.length; i++) {
-          if (names[i].indexOf('pwstaff-') === 0) {
-            return names[i];
-          }
-        }
-        // Fallback - use a default name (SW will adopt it on activate)
-        return 'pwstaff-cache';
-      });
-    }
+    var results = { success: 0, failed: 0, failedUrls: [] };
 
     function fetchOne(url, cache) {
       // X-Prefetch header tells the SW to NOT intercept this request
@@ -111,13 +153,16 @@ var OfflineSync = (function() {
             return cache.put(fullUrl, response);
           } else {
             results.failed++;
+            results.failedUrls.push(url + ' (bad content-type: ' + ct + ')');
           }
         } else {
           results.failed++;
+          results.failedUrls.push(url + ' (status: ' + response.status + (response.redirected ? ', redirected' : '') + ')');
         }
-      }).catch(function() {
+      }).catch(function(err) {
         completed++;
         results.failed++;
+        results.failedUrls.push(url + ' (' + (err.message || 'network error') + ')');
       });
     }
 
@@ -145,7 +190,14 @@ var OfflineSync = (function() {
   function downloadOfflineData(onProgress) {
     if (onProgress) onProgress('downloading', 'Downloading delivery data...');
     return fetch('offline_download.php', { credentials: 'same-origin' })
-      .then(function(r) { return r.json(); })
+      .then(function(r) {
+        if (!r.ok) throw new Error('Server returned ' + r.status + ' ' + r.statusText);
+        var ct = r.headers.get('content-type') || '';
+        if (ct.indexOf('application/json') === -1) {
+          throw new Error('Server returned non-JSON response (session may have expired). Please refresh and try again.');
+        }
+        return r.json();
+      })
       .then(function(data) {
         if (data.error) throw new Error(data.error);
         return saveData('delivery_data', data).then(function() {
@@ -230,6 +282,8 @@ var OfflineSync = (function() {
           data: deliveryData,
           pages: pageResults,
           totalPages: pageResults ? pageResults.success : 0,
+          failedPages: pageResults ? pageResults.failed : 0,
+          failedUrls: pageResults ? pageResults.failedUrls : [],
           totalSteps: totalSteps
         };
       })
@@ -282,6 +336,8 @@ var OfflineSync = (function() {
           var req = store.add(record);
           req.onsuccess = function() { resolve(req.result); };
           req.onerror = function() { reject(req.error); };
+          tx.onerror = function() { reject(new Error('DB write failed')); };
+          tx.onabort = function() { db = null; reject(new Error('DB write aborted')); };
         });
       });
     });
@@ -296,6 +352,8 @@ var OfflineSync = (function() {
         var req = store.getAll();
         req.onsuccess = function() { resolve(req.result || []); };
         req.onerror = function() { reject(req.error); };
+        tx.onerror = function() { reject(new Error('DB read failed')); };
+        tx.onabort = function() { db = null; reject(new Error('DB read aborted')); };
       });
     });
   }
@@ -308,6 +366,22 @@ var OfflineSync = (function() {
         var store = tx.objectStore(STORE_NAME);
         var idx = store.index('status');
         var req = idx.getAll('pending');
+        req.onsuccess = function() { resolve(req.result || []); };
+        req.onerror = function() { reject(req.error); };
+        tx.onerror = function() { reject(new Error('DB query failed')); };
+        tx.onabort = function() { db = null; reject(new Error('DB query aborted')); };
+      });
+    });
+  }
+
+  // Get failed records
+  function getFailed() {
+    return openDB().then(function(d) {
+      return new Promise(function(resolve, reject) {
+        var tx = d.transaction(STORE_NAME, 'readonly');
+        var store = tx.objectStore(STORE_NAME);
+        var idx = store.index('status');
+        var req = idx.getAll('failed');
         req.onsuccess = function() { resolve(req.result || []); };
         req.onerror = function() { reject(req.error); };
       });
@@ -323,13 +397,15 @@ var OfflineSync = (function() {
         var getReq = store.get(id);
         getReq.onsuccess = function() {
           var record = getReq.result;
-          if (!record) { reject(new Error('Record not found')); return; }
+          if (!record) { reject(new Error('Record #' + id + ' not found in DB')); return; }
           for (var k in updates) { record[k] = updates[k]; }
           var putReq = store.put(record);
           putReq.onsuccess = function() { resolve(record); };
-          putReq.onerror = function() { reject(putReq.error); };
+          putReq.onerror = function() { reject(new Error('DB update failed for record #' + id)); };
         };
-        getReq.onerror = function() { reject(getReq.error); };
+        getReq.onerror = function() { reject(new Error('DB get failed for record #' + id)); };
+        tx.onerror = function() { reject(new Error('DB transaction error updating #' + id)); };
+        tx.onabort = function() { db = null; reject(new Error('DB transaction aborted updating #' + id)); };
       });
     });
   }
@@ -370,6 +446,44 @@ var OfflineSync = (function() {
     return new Blob([ab], { type: mimeType || 'image/jpeg' });
   }
 
+  // Check if the server is truly reachable (not just navigator.onLine)
+  function checkConnectivity() {
+    if (!navigator.onLine) return Promise.resolve(false);
+    return fetch('offline_download.php', {
+      method: 'HEAD',
+      credentials: 'same-origin',
+      cache: 'no-store'
+    }).then(function(r) {
+      return r.ok || r.status === 401 || r.status === 403;
+    }).catch(function() {
+      return false;
+    });
+  }
+
+  // Parse server response safely - handles non-JSON and session expiry
+  function parseResponse(response) {
+    if (!response.ok) {
+      return Promise.reject(new Error('Server error: HTTP ' + response.status + ' ' + response.statusText));
+    }
+    var ct = response.headers.get('content-type') || '';
+    if (ct.indexOf('application/json') === -1 && ct.indexOf('text/html') !== -1) {
+      // Server returned HTML - likely session expired and redirected to login page
+      return Promise.reject(new Error('Session expired - please open the app and log in again, then sync will resume'));
+    }
+    return response.text().then(function(text) {
+      try {
+        return JSON.parse(text);
+      } catch(e) {
+        // Response was not valid JSON
+        var preview = text.substring(0, 100);
+        if (preview.indexOf('login') !== -1 || preview.indexOf('Login') !== -1) {
+          return Promise.reject(new Error('Session expired - please log in again and retry sync'));
+        }
+        return Promise.reject(new Error('Server returned invalid response: ' + preview));
+      }
+    });
+  }
+
   // Sync a single record
   function syncOne(record) {
     var payload = record.payload;
@@ -381,7 +495,7 @@ var OfflineSync = (function() {
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: payload.body
-      }).then(function(r) { return r.json(); });
+      }).then(parseResponse);
     }
 
     var formData = new FormData();
@@ -406,7 +520,7 @@ var OfflineSync = (function() {
       method: 'POST',
       credentials: 'same-origin',
       body: formData
-    }).then(function(r) { return r.json(); });
+    }).then(parseResponse);
   }
 
   // Cross-tab lock using localStorage to prevent duplicate syncs
@@ -436,60 +550,160 @@ var OfflineSync = (function() {
     if (!acquireSyncLock()) return Promise.resolve();
 
     syncing = true;
+    lastSyncError = null;
     updateSyncUI('syncing');
 
-    return getPending().then(function(records) {
-      if (records.length === 0) {
+    return checkConnectivity().then(function(isReachable) {
+      if (!isReachable) {
         syncing = false;
         releaseSyncLock();
-        updateSyncUI('idle');
+        lastSyncError = 'Server not reachable. Check your internet connection.';
+        updateSyncUI('error');
         return;
       }
 
+      return getPending().then(function(records) {
+        if (records.length === 0) {
+          syncing = false;
+          releaseSyncLock();
+          updateSyncUI('idle');
+          return;
+        }
+
+        // Sort: photo_upload and install_upload first, then signature, then job_done last
+        // This ensures photos are uploaded before job_done checks for them
+        var typeOrder = { photo_upload: 0, install_upload: 1, signature: 2, job_done: 3 };
+        records.sort(function(a, b) {
+          var orderA = typeOrder[a.type] !== undefined ? typeOrder[a.type] : 2;
+          var orderB = typeOrder[b.type] !== undefined ? typeOrder[b.type] : 2;
+          if (orderA !== orderB) return orderA - orderB;
+          return a.id - b.id; // Within same type, process oldest first
+        });
+
+        var chain = Promise.resolve();
+        var sessionExpired = false;
+
+        records.forEach(function(record) {
+          chain = chain.then(function() {
+            // If session expired on a previous record, stop trying
+            if (sessionExpired) return Promise.resolve();
+
+            return syncOne(record).then(function(response) {
+              if (response && response.success) {
+                return updateRecord(record.id, {
+                  status: 'synced',
+                  synced_at: new Date().toISOString(),
+                  error: null
+                });
+              } else {
+                var errorMsg = (response && response.error) || 'Server returned no success status';
+                // Re-read the current retries from DB to avoid stale count
+                return openDB().then(function(d) {
+                  return new Promise(function(resolve, reject) {
+                    var tx = d.transaction(STORE_NAME, 'readonly');
+                    var req = tx.objectStore(STORE_NAME).get(record.id);
+                    req.onsuccess = function() { resolve(req.result); };
+                    req.onerror = function() { resolve(record); }; // fallback to in-memory
+                  });
+                }).then(function(freshRecord) {
+                  var retries = ((freshRecord && freshRecord.retries) || 0) + 1;
+                  var updates = {
+                    error: errorMsg,
+                    retries: retries
+                  };
+                  if (retries >= 3) updates.status = 'failed';
+                  return updateRecord(record.id, updates);
+                });
+              }
+            }).catch(function(err) {
+              var errorMsg = err.message || 'Network error';
+              // Detect session expiry - stop trying other records too
+              if (errorMsg.indexOf('Session expired') !== -1 || errorMsg.indexOf('session expired') !== -1) {
+                sessionExpired = true;
+                lastSyncError = errorMsg;
+                // Don't increment retries for session errors - it's not the record's fault
+                return updateRecord(record.id, {
+                  error: errorMsg
+                });
+              }
+              return openDB().then(function(d) {
+                return new Promise(function(resolve, reject) {
+                  var tx = d.transaction(STORE_NAME, 'readonly');
+                  var req = tx.objectStore(STORE_NAME).get(record.id);
+                  req.onsuccess = function() { resolve(req.result); };
+                  req.onerror = function() { resolve(record); };
+                });
+              }).then(function(freshRecord) {
+                var retries = ((freshRecord && freshRecord.retries) || 0) + 1;
+                var updates = {
+                  error: errorMsg,
+                  retries: retries
+                };
+                if (retries >= 3) updates.status = 'failed';
+                return updateRecord(record.id, updates);
+              });
+            }).then(function() {
+              updateSyncUI('syncing');
+            });
+          });
+        });
+
+        return chain.then(function() {
+          syncing = false;
+          releaseSyncLock();
+          if (sessionExpired) {
+            updateSyncUI('error');
+          } else {
+            updateSyncUI('done');
+          }
+          cleanOld();
+        });
+      });
+    }).catch(function(err) {
+      syncing = false;
+      releaseSyncLock();
+      lastSyncError = 'Sync error: ' + (err.message || 'Unknown error');
+      console.error('OfflineSync.syncAll failed:', err);
+      // Reset stale DB connection if that was the cause
+      if (err.message && (err.message.indexOf('DB') !== -1 || err.message.indexOf('IndexedDB') !== -1 || err.message.indexOf('aborted') !== -1)) {
+        db = null;
+      }
+      updateSyncUI('error');
+    });
+  }
+
+  // Retry all failed records - resets them to pending so syncAll can pick them up
+  function retryFailed() {
+    return getFailed().then(function(records) {
+      if (records.length === 0) return 0;
       var chain = Promise.resolve();
+      var count = records.length;
       records.forEach(function(record) {
         chain = chain.then(function() {
-          return syncOne(record).then(function(response) {
-            if (response && response.success) {
-              return updateRecord(record.id, {
-                status: 'synced',
-                synced_at: new Date().toISOString(),
-                error: null
-              });
-            } else {
-              var retries = (record.retries || 0) + 1;
-              var updates = {
-                error: (response && response.error) || 'Sync failed',
-                retries: retries
-              };
-              // After 3 retries, mark as failed permanently
-              if (retries >= 3) updates.status = 'failed';
-              return updateRecord(record.id, updates);
-            }
-          }).catch(function(err) {
-            var retries = (record.retries || 0) + 1;
-            var updates = {
-              error: err.message || 'Network error',
-              retries: retries
-            };
-            if (retries >= 3) updates.status = 'failed';
-            return updateRecord(record.id, updates);
-          }).then(function() {
-            updateSyncUI('syncing');
+          return updateRecord(record.id, {
+            status: 'pending',
+            retries: 0,
+            error: null
           });
         });
       });
-
       return chain.then(function() {
-        syncing = false;
-        releaseSyncLock();
-        updateSyncUI('done');
-        cleanOld();
+        updateSyncUI('idle');
+        return count;
       });
-    }).catch(function() {
-      syncing = false;
-      releaseSyncLock();
-      updateSyncUI('idle');
+    });
+  }
+
+  // Delete a specific failed record
+  function deleteRecord(id) {
+    return openDB().then(function(d) {
+      return new Promise(function(resolve, reject) {
+        var tx = d.transaction(STORE_NAME, 'readwrite');
+        var store = tx.objectStore(STORE_NAME);
+        var req = store.delete(id);
+        req.onsuccess = function() { resolve(); };
+        req.onerror = function() { reject(req.error); };
+      });
     });
   }
 
@@ -508,10 +722,14 @@ var OfflineSync = (function() {
   function onSyncUpdate(cb) { uiCallback = cb; }
   function updateSyncUI(state) {
     if (uiCallback) {
-      getPending().then(function(pending) {
-        getAll().then(function(all) {
-          uiCallback(state, pending.length, all);
-        });
+      getAll().then(function(all) {
+        var pending = all.filter(function(r) { return r.status === 'pending'; });
+        var failed = all.filter(function(r) { return r.status === 'failed'; });
+        uiCallback(state, pending.length, all, lastSyncError, failed.length);
+      }).catch(function(err) {
+        // If even getAll fails, still notify UI about the error
+        console.error('updateSyncUI failed:', err);
+        uiCallback(state, 0, [], 'Database error: ' + err.message, 0);
       });
     }
   }
@@ -522,10 +740,13 @@ var OfflineSync = (function() {
       if (navigator.onLine) {
         setTimeout(function() { syncAll(); }, 2000);
       }
+    }).catch(function(err) {
+      console.error('OfflineSync init DB failed:', err);
     });
 
     window.addEventListener('online', function() {
-      syncAll();
+      // Small delay to let the network stabilize
+      setTimeout(function() { syncAll(); }, 1000);
     });
 
     // Periodic check every 30s when online
@@ -533,6 +754,10 @@ var OfflineSync = (function() {
       if (navigator.onLine && !syncing) {
         getPending().then(function(records) {
           if (records.length > 0) syncAll();
+        }).catch(function(err) {
+          // DB connection may be stale - reset it
+          console.warn('Periodic sync check failed, resetting DB connection:', err.message);
+          db = null;
         });
       }
     }, 30000);
@@ -543,10 +768,14 @@ var OfflineSync = (function() {
     addPending: addPending,
     getAll: getAll,
     getPending: getPending,
+    getFailed: getFailed,
     syncAll: syncAll,
+    retryFailed: retryFailed,
+    deleteRecord: deleteRecord,
     fileToBase64: fileToBase64,
     onSyncUpdate: onSyncUpdate,
     cleanOld: cleanOld,
+    getLastError: function() { return lastSyncError; },
     // Offline data methods
     saveData: saveData,
     getData: getData,
