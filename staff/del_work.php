@@ -18,6 +18,17 @@ $order = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$order) { header("Location: del_dashboard.php"); exit; }
+
+// Ensure INSTALL_IMG column exists
+$connect->query("ALTER TABLE `del_orderlistdesc` ADD COLUMN `INSTALL_IMG` VARCHAR(200) NOT NULL DEFAULT '' AFTER `INSTALL`");
+
+// Fetch items that require installation
+$ordno = $connect->real_escape_string($order['ORDNO'] ?? '');
+$installItems = [];
+$instQ = $connect->query("SELECT * FROM `del_orderlistdesc` WHERE ORDERNO = '$ordno' AND INSTALL = 'Y'");
+if ($instQ) {
+    while ($ir = $instQ->fetch_assoc()) { $installItems[] = $ir; }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -68,6 +79,28 @@ if (!$order) { header("Location: del_dashboard.php"); exit; }
         .btn-done { background: #16a34a; color: #fff; }
         .btn-done:hover { background: #15803d; }
         .btn-upload:disabled, .btn-done:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Installation section */
+        .install-section { margin-bottom: 20px; }
+        .install-header { background: #f59e0b; color: #fff; padding: 10px 16px; border-radius: 12px 12px 0 0; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .install-header svg { width: 20px; height: 20px; }
+        .install-list { background: var(--surface); border-radius: 0 0 12px 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow: hidden; }
+        .install-item { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; }
+        .install-item:last-child { border-bottom: none; }
+        .install-item-name { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+        .install-item-qty { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+        .install-photo-area { display: flex; align-items: center; gap: 12px; }
+        .install-preview { width: 80px; height: 60px; background: #f9fafb; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 1px dashed #d1d5db; flex-shrink: 0; }
+        .install-preview img { width: 100%; height: 100%; object-fit: cover; display: none; }
+        .install-preview .placeholder svg { width: 24px; height: 24px; color: var(--text-muted); }
+        .install-photo-input { flex: 1; }
+        .install-photo-input input[type="file"] { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 12px; }
+        .install-existing-badge { display: inline-block; background: #16a34a; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+        .install-upload-bar { padding: 12px 16px; background: var(--surface); border-radius: 0 0 12px 12px; }
+        .btn-install-upload { width: 100%; padding: 12px 20px; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; background: #f59e0b; color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
+        .btn-install-upload:hover { background: #d97706; }
+        .btn-install-upload:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-install-upload svg { width: 18px; height: 18px; }
     </style>
 </head>
 <body>
@@ -126,6 +159,52 @@ if (!$order) { header("Location: del_dashboard.php"); exit; }
                 Job Done
             </button>
         </div>
+
+        <?php if (count($installItems) > 0): ?>
+        <!-- Installation Section -->
+        <div class="install-section" style="margin-top: 20px;">
+            <div class="install-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+                Installation (<?php echo count($installItems); ?> item<?php echo count($installItems) > 1 ? 's' : ''; ?>)
+            </div>
+            <div class="install-list">
+                <?php foreach ($installItems as $idx => $instItem):
+                    $hasInstImg = !empty($instItem['INSTALL_IMG']);
+                ?>
+                <div class="install-item">
+                    <div class="install-item-name">
+                        <?php echo htmlspecialchars($instItem['PDESC'] ?? ''); ?>
+                        <?php if ($hasInstImg): ?>
+                        <span class="install-existing-badge">Uploaded</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="install-item-qty">Qty: <?php echo htmlspecialchars(($instItem['QTY'] ?? '') . ' ' . ($instItem['UOM'] ?? '')); ?></div>
+                    <div class="install-photo-area">
+                        <div class="install-preview" id="installPreview<?php echo $instItem['ID']; ?>">
+                            <?php if ($hasInstImg): ?>
+                            <img src="uploads/<?php echo htmlspecialchars($instItem['INSTALL_IMG']); ?>" style="display:block;" alt="Install photo">
+                            <?php else: ?>
+                            <div class="placeholder">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        <div class="install-photo-input">
+                            <input type="file" accept="image/*" capture="environment" id="installFile<?php echo $instItem['ID']; ?>" onchange="previewInstallImage(<?php echo $instItem['ID']; ?>)">
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <div style="margin-top: 12px;">
+                <button class="btn-install-upload" onclick="uploadInstallPhotos()" id="btnInstallUpload">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Upload Installation Photos
+                </button>
+            </div>
+        </div>
+        <?php endif; ?>
+
     </div>
 
     <?php include 'mobile-bottombar.php'; ?>
@@ -186,6 +265,66 @@ if (!$order) { header("Location: del_dashboard.php"); exit; }
         .catch(function() {
             btn.disabled = false;
             btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload';
+            Swal.fire({ icon: 'error', text: 'Network error. Please try again.', confirmButtonColor: '#C8102E' });
+        });
+    }
+
+    var installItemIds = <?php echo json_encode(array_map(function($item) { return $item['ID']; }, $installItems)); ?>;
+
+    function previewInstallImage(itemId) {
+        var input = document.getElementById('installFile' + itemId);
+        var preview = document.getElementById('installPreview' + itemId);
+        if (input.files && input.files[0]) {
+            var img = preview.querySelector('img');
+            if (!img) {
+                preview.innerHTML = '<img style="display:block;" alt="Install photo">';
+                img = preview.querySelector('img');
+            }
+            img.src = URL.createObjectURL(input.files[0]);
+            img.style.display = 'block';
+        }
+    }
+
+    function uploadInstallPhotos() {
+        var formData = new FormData();
+        formData.append('action', 'upload_install');
+        formData.append('id', orderId);
+
+        var hasFile = false;
+        for (var i = 0; i < installItemIds.length; i++) {
+            var itemId = installItemIds[i];
+            var input = document.getElementById('installFile' + itemId);
+            if (input && input.files && input.files[0]) {
+                formData.append('install_img_' + itemId, input.files[0]);
+                hasFile = true;
+            }
+        }
+
+        if (!hasFile) {
+            Swal.fire({ icon: 'warning', text: 'Please select at least one installation photo to upload.', confirmButtonColor: '#f59e0b' });
+            return;
+        }
+
+        var btn = document.getElementById('btnInstallUpload');
+        btn.disabled = true;
+        btn.innerHTML = '<span>Uploading...</span>';
+
+        fetch('del_work_ajax.php', { method: 'POST', body: formData })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload Installation Photos';
+            if (data.success) {
+                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
+                    location.reload();
+                });
+            } else {
+                Swal.fire({ icon: 'error', text: data.error || 'Upload failed.', confirmButtonColor: '#C8102E' });
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload Installation Photos';
             Swal.fire({ icon: 'error', text: 'Network error. Please try again.', confirmButtonColor: '#C8102E' });
         });
     }
