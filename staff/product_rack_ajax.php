@@ -17,14 +17,50 @@ if ($action === 'update_rack') {
         echo json_encode(['success' => false, 'error' => 'Invalid product ID']);
         exit;
     }
+
+    // Get the product's barcode for rack_product mapping
+    $barcodeStmt = $connect->prepare("SELECT `barcode` FROM `PRODUCTS` WHERE `id` = ?");
+    $barcodeStmt->bind_param("i", $id);
+    $barcodeStmt->execute();
+    $barcodeResult = $barcodeStmt->get_result()->fetch_assoc();
+    $barcodeStmt->close();
+    $barcode = $barcodeResult['barcode'] ?? '';
+
+    // Update the PRODUCTS.rack field
     $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ? WHERE `id` = ?");
     $stmt->bind_param("si", $rack, $id);
-    if ($stmt->execute()) {
+    $updated = $stmt->execute();
+    $stmt->close();
+
+    if ($updated && $barcode !== '') {
+        // Sync rack_product table: remove old mappings for this product
+        $delStmt = $connect->prepare("DELETE FROM `rack_product` WHERE `barcode` = ?");
+        $delStmt->bind_param("s", $barcode);
+        $delStmt->execute();
+        $delStmt->close();
+
+        // If a rack code was selected, insert new mapping
+        if ($rack !== '') {
+            $rackStmt = $connect->prepare("SELECT `id` FROM `rack` WHERE `code` = ? AND `status` = 'ACTIVE' LIMIT 1");
+            $rackStmt->bind_param("s", $rack);
+            $rackStmt->execute();
+            $rackRow = $rackStmt->get_result()->fetch_assoc();
+            $rackStmt->close();
+
+            if ($rackRow) {
+                $insStmt = $connect->prepare("INSERT INTO `rack_product` (`rack_id`, `barcode`, `assigned_at`) VALUES (?, ?, NOW())");
+                $insStmt->bind_param("is", $rackRow['id'], $barcode);
+                $insStmt->execute();
+                $insStmt->close();
+            }
+        }
+    }
+
+    if ($updated) {
         echo json_encode(['success' => true, 'rack' => $rack]);
     } else {
         echo json_encode(['success' => false, 'error' => 'Update failed']);
     }
-    $stmt->close();
 
 } elseif ($action === 'rack_list') {
     $result = $connect->query("SELECT `id`, `code`, `description` FROM `rack` WHERE `status`='ACTIVE' ORDER BY `code` ASC");

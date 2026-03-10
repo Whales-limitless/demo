@@ -643,6 +643,29 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             }
         }
 
+        /* Rack tags */
+        .rack-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+        .rack-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
+        .rack-tag:hover { opacity: 0.8; }
+        .rack-tag-select { background: #fef3c7; color: #92400e; }
+        .rack-tag-select.unset { background: #f3f4f6; color: var(--text-muted); }
+        .rack-tag-remark { background: #e0f2fe; color: #0369a1; }
+
+        /* Rack modal */
+        .rack-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 600; justify-content: center; align-items: center; padding: 16px; }
+        .rack-modal-overlay.active { display: flex; }
+        .rack-modal { background: var(--surface); border-radius: 14px; width: 100%; max-width: 360px; padding: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
+        .rack-modal h3 { font-family: 'Outfit', sans-serif; font-size: 17px; font-weight: 700; margin-bottom: 14px; }
+        .rack-modal label { font-size: 13px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px; }
+        .rack-modal select, .rack-modal input[type="text"] { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; transition: border-color 0.2s; margin-bottom: 16px; }
+        .rack-modal select:focus, .rack-modal input[type="text"]:focus { border-color: var(--primary); }
+        .rack-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+        .rack-modal-actions button { padding: 9px 20px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .rack-modal-actions .btn-cancel { background: #f3f4f6; color: var(--text); }
+        .rack-modal-actions .btn-cancel:hover { background: #e5e7eb; }
+        .rack-modal-actions .btn-save { background: var(--primary); color: #fff; }
+        .rack-modal-actions .btn-save:hover { background: var(--primary-dark); }
+
         /* Adjust padding when save bar visible */
         body.count-active {
             padding-bottom: 140px;
@@ -735,6 +758,32 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     </div>
 
     <?php include 'mobile-bottombar.php'; ?>
+
+    <!-- Rack Select Modal -->
+    <div class="rack-modal-overlay" id="rackModalOverlay">
+        <div class="rack-modal">
+            <h3>Rack Management</h3>
+            <label>Select Rack</label>
+            <select id="rackModalSelect"><option value="">-- No Rack --</option></select>
+            <div class="rack-modal-actions">
+                <button class="btn-cancel" onclick="closeRackModal()">Cancel</button>
+                <button class="btn-save" onclick="saveRackSelection()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rack Remark Modal -->
+    <div class="rack-modal-overlay" id="rackRemarkModalOverlay">
+        <div class="rack-modal">
+            <h3>Edit Rack Remark</h3>
+            <label>Rack Remark</label>
+            <input type="text" id="rackRemarkInput" placeholder="Enter rack remark...">
+            <div class="rack-modal-actions">
+                <button class="btn-cancel" onclick="closeRackRemarkModal()">Cancel</button>
+                <button class="btn-save" onclick="saveRackRemark()">Save</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         let currentSessionId = null;
@@ -914,9 +963,21 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
                 const isSubmittedItem = item.item_status === 'COUNTED';
 
-                html += '<div class="item-card" data-barcode="' + escapeAttr(item.barcode || '') + '" data-description="' + escapeAttr(item.description || '') + '" data-item-id="' + escapeAttr(item.id) + '">' +
+                const rackLoc = item.rack_location || '';
+                const prodId = item.product_id || 0;
+                const rackSelectLabel = rackLoc ? 'Rack: ' + rackLoc : 'No Rack';
+                const rackSelectClass = rackLoc ? 'rack-tag rack-tag-select' : 'rack-tag rack-tag-select unset';
+                let rackTagsHtml = '<div class="rack-tags">' +
+                    '<span class="' + rackSelectClass + '" onclick="openRackModal(' + prodId + ', \'' + escapeAttr(rackLoc).replace(/'/g, "\\'") + '\', ' + escapeAttr(item.id) + ')">&#9881; ' + escapeHtml(rackSelectLabel) + '</span>';
+                if (!rackLoc) {
+                    rackTagsHtml += '<span class="rack-tag rack-tag-remark" onclick="openRackRemarkModal(' + prodId + ', \'' + escapeAttr(rackLoc).replace(/'/g, "\\'") + '\', ' + escapeAttr(item.id) + ')">&#9998; Rack Remark</span>';
+                }
+                rackTagsHtml += '</div>';
+
+                html += '<div class="item-card" data-barcode="' + escapeAttr(item.barcode || '') + '" data-description="' + escapeAttr(item.description || '') + '" data-item-id="' + escapeAttr(item.id) + '" data-product-id="' + prodId + '">' +
                     '<div class="item-card-header">' +
                         '<span class="item-barcode">' + escapeHtml(item.barcode || 'N/A') + '</span>' +
+                        rackTagsHtml +
                     '</div>' +
                     '<div class="item-description">' + escapeHtml(item.description || 'No description') + '</div>' +
                     (isSubmittedItem && item.counted_at ? '<div class="submitted-date">Submitted: ' + escapeHtml(item.counted_at) + '</div>' : '') +
@@ -1140,6 +1201,123 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                       .replace(/</g, '&lt;')
                       .replace(/>/g, '&gt;');
         }
+
+        // ---- Rack Management ----
+        let rackEditProductId = null;
+        let rackEditItemId = null;
+        let rackListCache = null;
+
+        function openRackModal(productId, currentRack, itemId) {
+            if (!productId) { Swal.fire({ icon: 'warning', text: 'Product not found for this item.' }); return; }
+            rackEditProductId = productId;
+            rackEditItemId = itemId;
+            document.getElementById('rackModalSelect').value = currentRack || '';
+            document.getElementById('rackModalOverlay').classList.add('active');
+
+            if (rackListCache === null) {
+                fetch('product_rack_ajax.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'action=rack_list' })
+                .then(r => r.json())
+                .then(data => { rackListCache = data; populateRackSelect(currentRack); })
+                .catch(() => { rackListCache = []; });
+            } else {
+                populateRackSelect(currentRack);
+            }
+        }
+
+        function populateRackSelect(currentVal) {
+            const sel = document.getElementById('rackModalSelect');
+            sel.innerHTML = '<option value="">-- No Rack --</option>';
+            (rackListCache || []).forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.code;
+                opt.textContent = r.code + (r.description ? ' - ' + r.description : '');
+                if (r.code === currentVal) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+
+        function closeRackModal() {
+            document.getElementById('rackModalOverlay').classList.remove('active');
+            rackEditProductId = null;
+            rackEditItemId = null;
+        }
+
+        function saveRackSelection() {
+            if (!rackEditProductId) return;
+            const val = document.getElementById('rackModalSelect').value.trim();
+            fetch('product_rack_ajax.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'action=update_rack&id=' + rackEditProductId + '&rack=' + encodeURIComponent(val) })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp.success) {
+                    updateItemRack(rackEditProductId, rackEditItemId, resp.rack);
+                    closeRackModal();
+                } else {
+                    Swal.fire({ icon: 'error', text: resp.error || 'Failed to update rack.' });
+                }
+            })
+            .catch(() => { Swal.fire({ icon: 'error', text: 'Failed to update rack.' }); });
+        }
+
+        function openRackRemarkModal(productId, currentRack, itemId) {
+            if (!productId) { Swal.fire({ icon: 'warning', text: 'Product not found for this item.' }); return; }
+            rackEditProductId = productId;
+            rackEditItemId = itemId;
+            document.getElementById('rackRemarkInput').value = currentRack || '';
+            document.getElementById('rackRemarkModalOverlay').classList.add('active');
+            document.getElementById('rackRemarkInput').focus();
+        }
+
+        function closeRackRemarkModal() {
+            document.getElementById('rackRemarkModalOverlay').classList.remove('active');
+            rackEditProductId = null;
+            rackEditItemId = null;
+        }
+
+        function saveRackRemark() {
+            if (!rackEditProductId) return;
+            const val = document.getElementById('rackRemarkInput').value.trim();
+            fetch('product_rack_ajax.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'action=update_rack&id=' + rackEditProductId + '&rack=' + encodeURIComponent(val) })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp.success) {
+                    updateItemRack(rackEditProductId, rackEditItemId, resp.rack);
+                    closeRackRemarkModal();
+                } else {
+                    Swal.fire({ icon: 'error', text: resp.error || 'Failed to update rack.' });
+                }
+            })
+            .catch(() => { Swal.fire({ icon: 'error', text: 'Failed to update rack.' }); });
+        }
+
+        function updateItemRack(productId, itemId, newRack) {
+            // Update data model
+            currentItems.forEach(item => {
+                if (item.product_id == productId) {
+                    item.rack_location = newRack || '';
+                }
+            });
+            // Re-render rack tags for the specific card
+            const card = document.querySelector('.item-card[data-item-id="' + itemId + '"]');
+            if (card) {
+                const header = card.querySelector('.item-card-header');
+                const oldTags = header.querySelector('.rack-tags');
+                if (oldTags) oldTags.remove();
+
+                const rackLoc = newRack || '';
+                const rackSelectLabel = rackLoc ? 'Rack: ' + rackLoc : 'No Rack';
+                const rackSelectClass = rackLoc ? 'rack-tag rack-tag-select' : 'rack-tag rack-tag-select unset';
+                let tagsHtml = '<div class="rack-tags"><span class="' + rackSelectClass + '" onclick="openRackModal(' + productId + ', \'' + escapeAttr(rackLoc).replace(/'/g, "\\'") + '\', ' + itemId + ')">&#9881; ' + escapeHtml(rackSelectLabel) + '</span>';
+                if (!rackLoc) {
+                    tagsHtml += '<span class="rack-tag rack-tag-remark" onclick="openRackRemarkModal(' + productId + ', \'' + escapeAttr(rackLoc).replace(/'/g, "\\'") + '\', ' + itemId + ')">&#9998; Rack Remark</span>';
+                }
+                tagsHtml += '</div>';
+                header.insertAdjacentHTML('beforeend', tagsHtml);
+            }
+        }
+
+        // Close rack modals on overlay click
+        document.getElementById('rackModalOverlay').addEventListener('click', function(e) { if (e.target === this) closeRackModal(); });
+        document.getElementById('rackRemarkModalOverlay').addEventListener('click', function(e) { if (e.target === this) closeRackRemarkModal(); });
 
         // ---- Init ----
         document.addEventListener('DOMContentLoaded', function() {

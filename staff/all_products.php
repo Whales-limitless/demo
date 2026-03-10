@@ -317,7 +317,9 @@ function renderProductCard(p, index) {
   var rackLabel = p.rack_location ? 'Rack: ' + p.rack_location : 'No Rack';
   var rackClass = p.rack_location ? 'tag tag-rack tag-btn' : 'tag tag-rack unset tag-btn';
   tags += '<span class="' + rackClass + '" onclick="openRackModal(' + p.id + ', \'' + (p.rack_location || '').replace(/'/g, "\\'") + '\')">&#9881; ' + rackLabel + '</span>';
-  tags += '<span class="tag tag-rack-remark tag-btn" onclick="openRackRemarkModal(' + p.id + ', \'' + (p.rack_location || '').replace(/'/g, "\\'") + '\')">&#9998; Rack Remark</span>';
+  if (!p.rack_location) {
+    tags += '<span class="tag tag-rack-remark tag-btn" onclick="openRackRemarkModal(' + p.id + ', \'' + (p.rack_location || '').replace(/'/g, "\\'") + '\')">&#9998; Rack Remark</span>';
+  }
 
   return '<div class="product-card" data-id="' + p.id + '" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" data-barcode="' + (p.barcode || '').toLowerCase() + '" style="animation-delay:' + (index+1)*0.03 + 's">' +
     '<div class="product-img-wrap">' + imgHtml + badgeHtml + '</div>' +
@@ -643,8 +645,11 @@ function updateProductRackInData(productId, newRack) {
     if (tagsEl) {
       var rackLabel = newRack ? 'Rack: ' + newRack : 'No Rack';
       var rackClass = newRack ? 'tag tag-rack tag-btn' : 'tag tag-rack unset tag-btn';
-      tagsEl.innerHTML = '<span class="' + rackClass + '" onclick="openRackModal(' + productId + ', \'' + (newRack || '').replace(/'/g, "\\'") + '\')">&#9881; ' + rackLabel + '</span>' +
-        '<span class="tag tag-rack-remark tag-btn" onclick="openRackRemarkModal(' + productId + ', \'' + (newRack || '').replace(/'/g, "\\'") + '\')">&#9998; Rack Remark</span>';
+      var tagsInner = '<span class="' + rackClass + '" onclick="openRackModal(' + productId + ', \'' + (newRack || '').replace(/'/g, "\\'") + '\')">&#9881; ' + rackLabel + '</span>';
+      if (!newRack) {
+        tagsInner += '<span class="tag tag-rack-remark tag-btn" onclick="openRackRemarkModal(' + productId + ', \'' + (newRack || '').replace(/'/g, "\\'") + '\')">&#9998; Rack Remark</span>';
+      }
+      tagsEl.innerHTML = tagsInner;
     }
   }
 }

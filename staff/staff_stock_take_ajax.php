@@ -81,11 +81,13 @@ if ($action === 'list_sessions') {
     }
 
     $items = [];
-    $result = $connect->query("SELECT `id`, `barcode`, `product_desc`, `system_qty`, `counted_qty`, `variance`, `remark`, `counted_by`, `counted_at`, `adj_applied`, `status` FROM `stock_take_item` WHERE `stock_take_id` = " . intval($sessionId) . " ORDER BY `id` ASC");
+    $result = $connect->query("SELECT sti.`id`, sti.`barcode`, sti.`product_desc`, sti.`system_qty`, sti.`counted_qty`, sti.`variance`, sti.`remark`, sti.`counted_by`, sti.`counted_at`, sti.`adj_applied`, sti.`status`, p.`id` AS product_id, p.`rack` AS rack_location FROM `stock_take_item` sti LEFT JOIN `PRODUCTS` p ON p.`barcode` = sti.`barcode` WHERE sti.`stock_take_id` = " . intval($sessionId) . " ORDER BY sti.`id` ASC");
     if ($result) {
         while ($r = $result->fetch_assoc()) {
             $r['description'] = $r['product_desc'];
             $r['item_status'] = $r['status'];
+            $r['product_id'] = $r['product_id'] ? intval($r['product_id']) : null;
+            $r['rack_location'] = $r['rack_location'] ?? '';
             if ($r['counted_at']) {
                 $r['counted_at'] = date('d/m/Y H:i', strtotime($r['counted_at']));
             }

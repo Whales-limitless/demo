@@ -329,6 +329,7 @@ function renderTable(data) {
         } else {
             html += ' <button class="btn-action btn-activate" onclick="activateRack(' + r.id + ');"><i class="fas fa-check"></i></button>';
         }
+        html += ' <button class="btn-action" style="background:#7f1d1d;" onclick="deleteRack(' + r.id + ',\'' + escHtml(r.code).replace(/'/g, "\\'") + '\');"><i class="fas fa-trash"></i></button>';
         html += '</td>';
         html += '</tr>';
     }
@@ -474,6 +475,55 @@ function activateRack(id) {
             Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
         }
     }, 'json');
+}
+
+function deleteRack(id, code) {
+    // First fetch product count to show in confirmation
+    $.ajax({
+        type: 'POST', url: 'rack_ajax.php', data: { action: 'rack_product_count', id: id }, dataType: 'json',
+        success: function(data) {
+            var count = data.count || 0;
+            var msg = 'This will permanently delete rack "' + code + '".';
+            if (count > 0) {
+                msg += '\n\nThis will unlink ' + count + ' product(s) currently assigned to this rack.';
+            }
+
+            Swal.fire({
+                title: 'Delete rack permanently?',
+                text: msg,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#7f1d1d',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Yes, Delete',
+                focusCancel: true
+            }).then(function(result) {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        type: 'POST', url: 'rack_ajax.php', data: { action: 'destroy', id: id }, dataType: 'json',
+                        success: function(data) {
+                            if (data.success) {
+                                // If deleted rack was selected, hide product panel
+                                if (selectedRackId == id) {
+                                    selectedRackId = 0;
+                                    selectedRackCode = '';
+                                    document.getElementById('productListCard').style.display = 'none';
+                                }
+                                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
+                                    fetchRacks(currentPage);
+                                });
+                            } else {
+                                Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
+                            }
+                        }
+                    });
+                }
+            });
+        },
+        error: function() {
+            Swal.fire({ icon: 'error', text: 'Failed to fetch rack details.' });
+        }
+    });
 }
 
 // ===================== RACK PRODUCTS =====================
