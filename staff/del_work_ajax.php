@@ -223,6 +223,82 @@ if ($action === 'upload') {
         echo json_encode(['error' => $errMsg]);
     }
 
+} elseif ($action === 'upload_single') {
+    // Upload a SINGLE delivery photo (used by offline sync for stability)
+    // Each photo is synced individually to avoid exceeding POST size limits
+    $imgNum = intval($_POST['image_num'] ?? 0);
+    if ($imgNum < 1 || $imgNum > 3) {
+        echo json_encode(['error' => 'Invalid image number. Must be 1, 2, or 3.']);
+        exit;
+    }
+
+    $imageData = getImageData('image', 'image_base64');
+    if ($imageData === null) {
+        echo json_encode(['error' => 'No image data received. [image_base64 len=' . strlen($_POST['image_base64'] ?? '') . ', FILES=' . (isset($_FILES['image']) ? 'yes,err=' . $_FILES['image']['error'] : 'no') . ']']);
+        exit;
+    }
+
+    $fileName = processImageData($imageData, 'n' . $imgNum, $uploadDir);
+    if ($fileName) {
+        $imgCol = 'IMG' . $imgNum;
+        $stmt = $connect->prepare("UPDATE `del_orderlist` SET `$imgCol` = ? WHERE `ID` = ?");
+        $stmt->bind_param("si", $fileName, $orderId);
+        $stmt->execute();
+        $stmt->close();
+        echo json_encode(['success' => 'Photo ' . $imgNum . ' uploaded successfully.']);
+    } else {
+        echo json_encode(['error' => 'Photo ' . $imgNum . ': invalid image format or corrupted data (size=' . strlen($imageData) . ' bytes)']);
+    }
+
+} elseif ($action === 'upload_install_single') {
+    // Upload a SINGLE installation photo (used by offline sync for stability)
+    $itemId = intval($_POST['item_id'] ?? 0);
+    if ($itemId <= 0) {
+        echo json_encode(['error' => 'Invalid item ID.']);
+        exit;
+    }
+
+    // Verify the item belongs to this order
+    $stmt = $connect->prepare("SELECT `ORDNO` FROM `del_orderlist` WHERE `ID` = ? LIMIT 1");
+    $stmt->bind_param("i", $orderId);
+    $stmt->execute();
+    $orderRow = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$orderRow) {
+        echo json_encode(['error' => 'Order not found.']);
+        exit;
+    }
+
+    $ordno = $orderRow['ORDNO'];
+    $stmt2 = $connect->prepare("SELECT `ID` FROM `del_orderlistdesc` WHERE `ORDERNO` = ? AND `ID` = ? AND `INSTALL` = 'Y' LIMIT 1");
+    $stmt2->bind_param("si", $ordno, $itemId);
+    $stmt2->execute();
+    $validItem = $stmt2->get_result()->fetch_assoc();
+    $stmt2->close();
+
+    if (!$validItem) {
+        echo json_encode(['error' => 'Installation item not found or does not belong to this order.']);
+        exit;
+    }
+
+    $imageData = getImageData('image', 'image_base64');
+    if ($imageData === null) {
+        echo json_encode(['error' => 'No image data received for install item ' . $itemId . '.']);
+        exit;
+    }
+
+    $fileName = processImageData($imageData, 'inst' . $itemId . '_', $uploadDir);
+    if ($fileName) {
+        $stmtUp = $connect->prepare("UPDATE `del_orderlistdesc` SET `INSTALL_IMG` = ? WHERE `ID` = ?");
+        $stmtUp->bind_param("si", $fileName, $itemId);
+        $stmtUp->execute();
+        $stmtUp->close();
+        echo json_encode(['success' => 'Installation photo uploaded for item ' . $itemId . '.']);
+    } else {
+        echo json_encode(['error' => 'Install item ' . $itemId . ': invalid image format or corrupted data.']);
+    }
+
 } elseif ($action === 'done') {
     // Check at least one image exists
     $stmt = $connect->prepare("SELECT `IMG1`, `IMG2`, `IMG3` FROM `del_orderlist` WHERE `ID` = ? LIMIT 1");
