@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pwstaff-v6';
+const CACHE_NAME = 'pwstaff-v7';
 
 // Only pre-cache static assets (no PHP pages - they redirect when not logged in)
 const urlsToCache = [
@@ -36,7 +36,10 @@ self.addEventListener('fetch', event => {
         // Only cache non-redirect, successful responses
         if (response.ok && !response.redirected) {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, clone);
+            notifyClients('cache-updated');
+          });
         }
         return response;
       }).catch(() => {
@@ -65,7 +68,7 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches and claim clients
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
@@ -77,6 +80,70 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
+
+// Message handler - respond to cache info requests
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'GET_CACHE_STATS') {
+    getCacheStats().then(stats => {
+      event.ports[0].postMessage(stats);
+    });
+  }
+});
+
+// Get cache statistics
+async function getCacheStats() {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    const keys = await cache.keys();
+
+    let pages = 0;
+    let assets = 0;
+    let totalSize = 0;
+    const pageList = [];
+
+    for (const request of keys) {
+      const response = await cache.match(request);
+      const url = new URL(request.url);
+      const pathname = url.pathname;
+
+      // Estimate size from content-length header or blob
+      let size = 0;
+      const cl = response.headers.get('content-length');
+      if (cl) {
+        size = parseInt(cl, 10);
+      } else {
+        try {
+          const blob = await response.clone().blob();
+          size = blob.size;
+        } catch(e) { /* ignore */ }
+      }
+      totalSize += size;
+
+      // Categorize
+      if (pathname.endsWith('.php') || request.mode === 'navigate' || response.headers.get('content-type')?.includes('text/html')) {
+        pages++;
+        // Extract a friendly page name
+        const name = pathname.split('/').pop() || 'index';
+        pageList.push(name);
+      } else {
+        assets++;
+      }
+    }
+
+    return { pages, assets, totalSize, total: keys.length, pageList };
+  } catch(e) {
+    return { pages: 0, assets: 0, totalSize: 0, total: 0, pageList: [] };
+  }
+}
+
+// Notify all clients of cache changes
+function notifyClients(type) {
+  self.clients.matchAll().then(clients => {
+    clients.forEach(client => {
+      client.postMessage({ type: type });
+    });
+  });
+}
