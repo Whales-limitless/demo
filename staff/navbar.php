@@ -5,11 +5,30 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PWSTAFF">
-<link rel="apple-touch-icon" href="icon-192.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
 <script src="offline-sync.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(function(e) { console.warn('SW register failed:', e); });
+  navigator.serviceWorker.register('sw.js').then(function(reg) {
+    // Pre-cache delivery pages for offline use
+    if (reg.active) {
+      reg.active.postMessage({
+        type: 'CACHE_PAGES',
+        urls: ['del_dashboard.php','del_history.php','del_work.php','del_vieworder.php','del_sign.php','del_report.php','account.php','index.php']
+      });
+    }
+    reg.addEventListener('updatefound', function() {
+      var nw = reg.installing;
+      nw.addEventListener('statechange', function() {
+        if (nw.state === 'activated') {
+          nw.postMessage({
+            type: 'CACHE_PAGES',
+            urls: ['del_dashboard.php','del_history.php','del_work.php','del_vieworder.php','del_sign.php','del_report.php','account.php','index.php']
+          });
+        }
+      });
+    });
+  }).catch(function(e) { console.warn('SW register failed:', e); });
 }
 </script>
 <?php $navUserType = $_SESSION['user_type'] ?? 'S'; ?>
