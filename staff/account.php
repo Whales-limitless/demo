@@ -260,6 +260,22 @@ if ($stResult && $row = $stResult->fetch_assoc()) {
                         </svg>
                     </div>
                 </a>
+                <a href="staff_history.php" class="menu-item">
+                    <div class="menu-icon blue">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div class="menu-text">
+                        <h3>Stock In History</h3>
+                        <p>View stock receiving records</p>
+                    </div>
+                    <div class="menu-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                        </svg>
+                    </div>
+                </a>
                 <a href="staff_stock_loss.php" class="menu-item">
                     <div class="menu-icon orange">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
