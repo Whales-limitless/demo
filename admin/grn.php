@@ -296,6 +296,10 @@ function submitGRN() {
                 dataType: 'json',
                 success: function(data) {
                     if (data.success) {
+                        // Open print page in new window for auto-print
+                        if (data.grn_id) {
+                            window.open('grn_detail.php?id=' + data.grn_id + '&auto_print=1', '_blank');
+                        }
                         Swal.fire({ icon: 'success', text: data.success, showConfirmButton: true }).then(function() {
                             window.location.href = 'po_detail.php?id=<?php echo $poId; ?>';
                         });
