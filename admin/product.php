@@ -98,6 +98,21 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .product-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 1px solid #e5e7eb; }
 .product-thumb-placeholder { width: 40px; height: 40px; border-radius: 6px; background: #f3f4f6; display: inline-flex; align-items: center; justify-content: center; color: #d1d5db; font-size: 16px; }
 
+/* Inline rack select in table */
+.inline-rack-select { padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; outline: none; background: #fff; transition: border-color var(--transition); max-width: 160px; width: 100%; }
+.inline-rack-select:focus { border-color: var(--primary); }
+.inline-rack-select.changed { border-color: #f59e0b; background: #fffbeb; }
+
+/* Floating bulk save bar */
+.bulk-rack-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; color: #fff; padding: 12px 24px; display: flex; align-items: center; justify-content: center; gap: 16px; z-index: 999; transform: translateY(100%); transition: transform 0.3s ease; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); }
+.bulk-rack-bar.visible { transform: translateY(0); }
+.bulk-rack-bar .bar-text { font-size: 14px; font-weight: 500; }
+.bulk-rack-bar .bar-count { background: #f59e0b; color: #1a1a1a; font-weight: 700; padding: 2px 10px; border-radius: 10px; font-size: 12px; }
+.bulk-rack-bar .btn-save-racks { background: #16a34a; color: #fff; border: none; padding: 8px 24px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: background var(--transition); }
+.bulk-rack-bar .btn-save-racks:hover { background: #15803d; }
+.bulk-rack-bar .btn-cancel-racks { background: none; color: #9ca3af; border: 1px solid #4b5563; padding: 8px 16px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all var(--transition); }
+.bulk-rack-bar .btn-cancel-racks:hover { color: #fff; border-color: #fff; }
+
 @media (max-width: 768px) {
     .page-content { padding: 16px; }
     .table-card { padding: 12px; }
@@ -161,12 +176,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>Category</th>
                         <th>QOH</th>
                         <th>Rack</th>
+                        <th>Rack Remark</th>
                         <th>Status</th>
                         <th style="width:1%">Action</th>
                     </tr>
                 </thead>
                 <tbody id="dataBody">
-                    <tr class="no-results"><td colspan="9" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
+                    <tr class="no-results"><td colspan="10" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -176,6 +192,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             <div class="pagination-btns" id="paginationBtns"></div>
         </div>
     </div>
+</div>
+
+<!-- Bulk Rack Save Bar -->
+<div class="bulk-rack-bar" id="bulkRackBar">
+    <span class="bar-text">Rack changes: <span class="bar-count" id="rackChangeCount">0</span></span>
+    <button class="btn-save-racks" onclick="saveBulkRacks();"><i class="fas fa-check"></i> Save All Racks</button>
+    <button class="btn-cancel-racks" onclick="cancelRackChanges();">Cancel</button>
 </div>
 
 <!-- Create/Edit Product Modal -->
@@ -354,13 +377,16 @@ function debouncedFetch() {
     debounceTimer = setTimeout(function() { fetchProducts(1); }, 300);
 }
 
-function fetchProducts(page) {
+function fetchProducts(page, restoreScrollY) {
     currentPage = page;
     var search = document.getElementById('searchInput').value.trim();
     var cat = document.getElementById('filterCategory').value;
     var status = document.getElementById('filterStatus').value;
 
-    document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="9" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
+    // Skip loading indicator when restoring scroll position (e.g. after save)
+    if (restoreScrollY === undefined) {
+        document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
+    }
 
     $.ajax({
         type: 'POST', url: 'product_ajax.php',
@@ -369,9 +395,12 @@ function fetchProducts(page) {
         success: function(data) {
             renderTable(data);
             renderPagination(data);
+            if (restoreScrollY !== undefined) {
+                window.scrollTo(0, restoreScrollY);
+            }
         },
         error: function() {
-            document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
+            document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
         }
     });
 }
@@ -382,7 +411,7 @@ function renderTable(data) {
     var offset = (data.page - 1) * data.per_page;
 
     if (products.length === 0) {
-        tbody.innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-boxes-stacked" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products found</td></tr>';
+        tbody.innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-boxes-stacked" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products found</td></tr>';
         document.getElementById('itemCount').textContent = '0 product(s)';
         return;
     }
@@ -404,7 +433,17 @@ function renderTable(data) {
         html += '<td>' + escHtml(p.name || '') + '</td>';
         html += '<td>' + escHtml(p.cat || '') + '</td>';
         html += '<td>' + Math.round(qoh) + '</td>';
-        html += '<td>' + escHtml(p.rack || '') + '</td>';
+        // Inline rack dropdown
+        html += '<td>';
+        html += '<select class="inline-rack-select" data-product-id="' + p.id + '" data-original="' + escHtml(p.rack || '') + '" onchange="onInlineRackChange(this);">';
+        html += '<option value="">--</option>';
+        racksCache.forEach(function(r) {
+            var sel = (r.code === (p.rack || '')) ? ' selected' : '';
+            html += '<option value="' + escHtml(r.code) + '"' + sel + '>' + escHtml(r.code) + '</option>';
+        });
+        html += '</select>';
+        html += '</td>';
+        html += '<td style="font-size:12px;color:var(--text-muted);">' + escHtml(p.rack_remark || '') + '</td>';
         html += '<td><span class="badge-status ' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? 'Active' : 'Inactive') + '</span></td>';
         html += '<td style="white-space:nowrap">';
         html += '<button class="btn-action btn-edit" onclick="openEditModal(' + p.id + ');"><i class="fas fa-pen"></i> Edit</button>';
@@ -604,10 +643,8 @@ function openEditModal(id) {
             document.getElementById('fDescription').value = data.description || '';
             document.getElementById('fUom').value = data.uom || '';
             document.getElementById('fQoh').value = data.qoh || '0';
-            // Try to match rack text to a rack code in the select
-            var rackVal = data.rack || '';
-            document.getElementById('fRackSelect').value = rackVal;
-            document.getElementById('fRack').value = rackVal;
+            document.getElementById('fRackSelect').value = data.rack || '';
+            document.getElementById('fRack').value = data.rack_remark || '';
             document.getElementById('fChecked').value = data.checked || 'Y';
 
             // Set category by cat_code, then load sub-cats and set by sub_code
@@ -645,8 +682,6 @@ function saveProduct() {
 
     var rackSelect = document.getElementById('fRackSelect').value.trim();
     var rackRemark = document.getElementById('fRack').value.trim();
-    // Use rack select value if chosen, otherwise fall back to rack remark
-    var rackValue = rackSelect || rackRemark;
 
     // Resolve cat_code / sub_code and text names
     var catSel = document.getElementById('fCat');
@@ -670,7 +705,8 @@ function saveProduct() {
     formData.append('sub_code', subCode);
     formData.append('uom', document.getElementById('fUom').value.trim());
     formData.append('qoh', document.getElementById('fQoh').value);
-    formData.append('rack', rackValue);
+    formData.append('rack', rackSelect);
+    formData.append('rack_remark', rackRemark);
     formData.append('checked', document.getElementById('fChecked').value);
     if (editId) formData.append('id', editId);
 
@@ -688,8 +724,9 @@ function saveProduct() {
         success: function(data) {
             if (data.success) {
                 productModal.hide();
+                var scrollY = window.scrollY;
                 Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
-                    fetchProducts(currentPage);
+                    fetchProducts(currentPage, scrollY);
                     loadCategoryFilter();
                 });
             } else {
@@ -921,6 +958,75 @@ function showExistingImage(imageName) {
         document.getElementById('btnRemoveImg').style.display = 'flex';
         document.getElementById('imgUploadArea').classList.add('has-image');
     }
+}
+
+// ===================== INLINE RACK EDITING =====================
+
+var pendingRackChanges = {}; // { productId: newRackValue }
+
+function onInlineRackChange(sel) {
+    var productId = sel.getAttribute('data-product-id');
+    var original = sel.getAttribute('data-original') || '';
+    var newVal = sel.value;
+
+    if (newVal !== original) {
+        pendingRackChanges[productId] = newVal;
+        sel.classList.add('changed');
+    } else {
+        delete pendingRackChanges[productId];
+        sel.classList.remove('changed');
+    }
+    updateBulkRackBar();
+}
+
+function updateBulkRackBar() {
+    var count = Object.keys(pendingRackChanges).length;
+    document.getElementById('rackChangeCount').textContent = count;
+    var bar = document.getElementById('bulkRackBar');
+    if (count > 0) {
+        bar.classList.add('visible');
+    } else {
+        bar.classList.remove('visible');
+    }
+}
+
+function cancelRackChanges() {
+    // Reset all selects to original value
+    document.querySelectorAll('.inline-rack-select.changed').forEach(function(sel) {
+        sel.value = sel.getAttribute('data-original') || '';
+        sel.classList.remove('changed');
+    });
+    pendingRackChanges = {};
+    updateBulkRackBar();
+}
+
+function saveBulkRacks() {
+    var items = [];
+    for (var pid in pendingRackChanges) {
+        items.push({ id: parseInt(pid), rack: pendingRackChanges[pid] });
+    }
+    if (items.length === 0) return;
+
+    var scrollY = window.scrollY;
+    $.ajax({
+        type: 'POST', url: 'product_ajax.php',
+        data: { action: 'bulk_update_rack', items: JSON.stringify(items) },
+        dataType: 'json',
+        success: function(data) {
+            if (data.success) {
+                pendingRackChanges = {};
+                updateBulkRackBar();
+                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
+                    fetchProducts(currentPage, scrollY);
+                });
+            } else {
+                Swal.fire({ icon: 'error', text: data.error || 'Failed to save.' });
+            }
+        },
+        error: function() {
+            Swal.fire({ icon: 'error', text: 'Network error. Please try again.' });
+        }
+    });
 }
 
 // Modal autofocus
