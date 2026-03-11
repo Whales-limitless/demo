@@ -701,18 +701,20 @@ function updateProductRackInData(productId, newRack) {
   }
 }
 
-// Close modals on overlay click
-document.getElementById('rackModalOverlay').addEventListener('click', function(e) {
-  if (e.target === this) closeRackModal();
-});
-document.getElementById('rackRemarkModalOverlay').addEventListener('click', function(e) {
-  if (e.target === this) closeRackRemarkModal();
-});
-
 // Render
 renderSections();
 updateFilterCount();
 renderFilterTags();
+
+// Close modals on overlay click (deferred until DOM ready)
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('rackModalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeRackModal();
+  });
+  document.getElementById('rackRemarkModalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeRackRemarkModal();
+  });
+});
 </script>
 
 <!-- Rack Edit Modal -->
