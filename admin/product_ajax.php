@@ -653,6 +653,19 @@ if ($action === 'list') {
     }
     echo json_encode($racks);
 
+} elseif ($action === 'update_rack') {
+    $id = intval($_POST['id'] ?? 0);
+    $rack = trim($_POST['rack'] ?? '');
+    if ($id <= 0) {
+        echo json_encode(['error' => 'Invalid product ID.']);
+        exit;
+    }
+    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ? WHERE `id` = ?");
+    $stmt->bind_param("si", $rack, $id);
+    $stmt->execute();
+    $stmt->close();
+    echo json_encode(['success' => true, 'rack' => $rack]);
+
 } else {
     echo json_encode(['error' => 'Invalid action.']);
 }
