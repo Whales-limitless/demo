@@ -460,13 +460,25 @@ document.getElementById('applyFilter').addEventListener('click', applySubcatFilt
 document.getElementById('clearAll').addEventListener('click', function() { selectedSubcats = {}; renderModalList(modalSearch.value); });
 document.getElementById('selectAll').addEventListener('click', function() { subcategories.forEach(function(sc) { selectedSubcats[sc.id] = true; }); renderModalList(modalSearch.value); });
 
+// Normalize quotes: treat " and '' as interchangeable, normalize smart quotes
+function normalizeQuotes(s) {
+  s = s.replace(/[\u201C\u201D\u2033\uFF02]/g, '"');
+  s = s.replace(/[\u2018\u2019\u2032\uFF07]/g, "'");
+  return s;
+}
+
 // Product search (filters by name, SKU, or barcode)
 function filterProducts(query) {
-  var q = query.toLowerCase();
+  var q = normalizeQuotes(query.toLowerCase());
+  var qAlt = q.replace(/"/g, "''");
+  var qAlt2 = q.replace(/''/g, '"');
   document.querySelectorAll('.product-card').forEach(function(card) {
-    var nameMatch = card.getAttribute('data-name').indexOf(q) !== -1;
-    var skuMatch = card.getAttribute('data-sku').indexOf(q) !== -1;
-    var barcodeMatch = card.getAttribute('data-barcode').indexOf(q) !== -1;
+    var name = normalizeQuotes(card.getAttribute('data-name'));
+    var sku = normalizeQuotes(card.getAttribute('data-sku'));
+    var barcode = normalizeQuotes(card.getAttribute('data-barcode'));
+    var nameMatch = name.indexOf(q) !== -1 || name.indexOf(qAlt) !== -1 || name.indexOf(qAlt2) !== -1;
+    var skuMatch = sku.indexOf(q) !== -1 || sku.indexOf(qAlt) !== -1 || sku.indexOf(qAlt2) !== -1;
+    var barcodeMatch = barcode.indexOf(q) !== -1 || barcode.indexOf(qAlt) !== -1 || barcode.indexOf(qAlt2) !== -1;
     card.style.display = (nameMatch || skuMatch || barcodeMatch) ? '' : 'none';
   });
   document.querySelectorAll('.subcat-section, .oos-section').forEach(function(sec) {

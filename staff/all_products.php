@@ -231,21 +231,32 @@ function getUrlParam(name) {
   return params.get(name) || '';
 }
 
+// Normalize quotes: treat " and '' as interchangeable, normalize smart quotes
+function normalizeQuotes(s) {
+  // Normalize smart/curly quotes and prime symbols to ASCII
+  s = s.replace(/[\u201C\u201D\u2033\uFF02]/g, '"');
+  s = s.replace(/[\u2018\u2019\u2032\uFF07]/g, "'");
+  return s;
+}
+
 // Relevance scoring: higher = better match (search by product name only)
 function scoreProduct(p, q) {
-  var ql = q.toLowerCase();
-  var name = (p.name || '').toLowerCase();
+  var ql = normalizeQuotes(q.toLowerCase());
+  var name = normalizeQuotes((p.name || '').toLowerCase());
+  // Also check with " swapped to '' and vice versa
+  var qlAlt = ql.replace(/"/g, "''");
+  var qlAlt2 = ql.replace(/''/g, '"');
 
   var score = 0;
 
   // Exact name match (highest priority)
-  if (name === ql) score += 800;
+  if (name === ql || name === qlAlt || name === qlAlt2) score += 800;
 
   // Starts with (high priority)
-  if (name.indexOf(ql) === 0) score += 300;
+  if (name.indexOf(ql) === 0 || name.indexOf(qlAlt) === 0 || name.indexOf(qlAlt2) === 0) score += 300;
 
   // Contains (lower priority)
-  if (name.indexOf(ql) !== -1) score += 60;
+  if (name.indexOf(ql) !== -1 || name.indexOf(qlAlt) !== -1 || name.indexOf(qlAlt2) !== -1) score += 60;
 
   return score;
 }
