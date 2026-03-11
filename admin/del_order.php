@@ -64,6 +64,8 @@ $currentPage = 'del_order';
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; }
 :root { --primary: #C8102E; --primary-dark: #a00d24; --surface: #ffffff; --bg: #f3f4f6; --text: #1a1a1a; --text-muted: #6b7280; --radius: 12px; --shadow-md: 0 4px 16px rgba(0,0,0,0.08); --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -160,7 +162,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <div><dt>Address</dt><dd><?php echo htmlspecialchars($viewOrder['CUST_ADDRESS'] ?? ''); ?></dd></div>
         <div><dt>Phone</dt><dd><?php echo htmlspecialchars($viewOrder['CUST_PHONE'] ?? ''); ?></dd></div>
         <div><dt>Location</dt><dd><?php echo htmlspecialchars($viewOrder['LOCATION'] ?? ''); ?></dd></div>
-        <div><dt>Distance / Commission</dt><dd><?php echo htmlspecialchars($viewOrder['DISTANT'] ?? ''); ?> km / RM <?php echo htmlspecialchars($viewOrder['RETAIL'] ?? ''); ?></dd></div>
         <?php if ($viewOrder['REMARK']): ?><div style="grid-column:1/-1"><dt>Remark</dt><dd><?php echo htmlspecialchars($viewOrder['REMARK']); ?></dd></div><?php endif; ?>
     </div>
     <div class="do-items">
@@ -220,9 +221,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="table-card">
     <div style="overflow-x:auto;">
         <table class="data-table">
-            <thead><tr><th style="width:40px">No</th><th>Del. Date</th><th>Order No</th><th>Driver</th><th>Customer</th><th>Location</th><th>Distance</th><th>Commission</th><th>Status</th><th style="width:1%">Action</th></tr></thead>
+            <thead><tr><th style="width:40px">No</th><th>Del. Date</th><th>Order No</th><th>Driver</th><th>Customer</th><th>Location</th><th>Status</th><th style="width:1%">Action</th></tr></thead>
             <tbody id="dataBody">
-                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+                <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
             </tbody>
         </table>
     </div>
@@ -242,7 +243,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     <div class="col-md-4 mb-3"><label class="form-label fw-semibold">Order No <span class="text-danger">*</span></label><input type="text" id="fOrdno" class="form-control" placeholder="e.g. DO-001"></div>
                     <div class="col-md-4 mb-3"><label class="form-label fw-semibold">Delivery Date <span class="text-danger">*</span></label><input type="date" id="fDeldate" class="form-control" value="<?php echo date('Y-m-d'); ?>"></div>
                     <div class="col-md-4 mb-3"><label class="form-label fw-semibold">Customer <span class="text-danger">*</span></label>
-                        <select id="fCustomer" class="form-select" onchange="onCustomerChange();">
+                        <select id="fCustomer" class="form-select">
                             <option value="">-- Select Customer --</option>
                             <?php foreach ($customers as $c): ?>
                             <option value="<?php echo htmlspecialchars($c['CODE']); ?>" data-name="<?php echo htmlspecialchars($c['NAME']); ?>" data-location="<?php echo htmlspecialchars($c['LOCATION']); ?>" data-address="<?php echo htmlspecialchars($c['ADDRESS'] ?? ''); ?>"><?php echo htmlspecialchars($c['NAME']); ?></option>
@@ -251,9 +252,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     </div>
                 </div>
                 <div class="row">
-                    <div class="col-md-4 mb-3"><label class="form-label fw-semibold">Location</label><input type="text" id="fLocation" class="form-control" readonly></div>
-                    <div class="col-md-4 mb-3"><label class="form-label fw-semibold">Distance (km)</label><input type="text" id="fDistant" class="form-control" readonly></div>
-                    <div class="col-md-4 mb-3"><label class="form-label fw-semibold">Commission (RM)</label><input type="text" id="fRetail" class="form-control" readonly></div>
+                    <div class="col-md-12 mb-3"><label class="form-label fw-semibold">Location</label><input type="text" id="fLocation" class="form-control" readonly></div>
                 </div>
                 <div class="mb-3"><label class="form-label fw-semibold">Remark</label><textarea id="fRemark" class="form-control" rows="2" placeholder="Delivery notes..."></textarea></div>
 
@@ -298,6 +297,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 <?php if (!$viewOrder): ?>
 var modal = null;
@@ -311,6 +311,13 @@ var locationData = <?php
 
 document.addEventListener('DOMContentLoaded', function() {
     modal = new bootstrap.Modal(document.getElementById('orderModal'));
+    $('#fCustomer').select2({
+        theme: 'bootstrap-5',
+        placeholder: '-- Select Customer --',
+        allowClear: true,
+        dropdownParent: $('#orderModal'),
+        width: '100%'
+    }).on('change', function() { onCustomerChange(); });
     loadOrders();
     <?php if ($editId > 0): ?>
     openEditModal(<?php echo $editId; ?>);
@@ -324,13 +331,7 @@ function onCustomerChange() {
     var opt = sel.options[sel.selectedIndex];
     var loc = opt.getAttribute('data-location') || '';
     document.getElementById('fLocation').value = loc;
-    if (loc && locationData[loc]) {
-        document.getElementById('fDistant').value = locationData[loc].DISTANT || '';
-        document.getElementById('fRetail').value = locationData[loc].RETAIL || '';
-    } else {
-        document.getElementById('fDistant').value = '';
-        document.getElementById('fRetail').value = '';
-    }
+    // Location data loaded, distance/commission no longer displayed
 }
 
 function addItem() {
@@ -361,10 +362,8 @@ function openCreateModal() {
     document.getElementById('fOrdno').value = '';
     document.getElementById('fOrdno').disabled = false;
     document.getElementById('fDeldate').value = '<?php echo date("Y-m-d"); ?>';
-    document.getElementById('fCustomer').value = '';
+    $('#fCustomer').val('').trigger('change');
     document.getElementById('fLocation').value = '';
-    document.getElementById('fDistant').value = '';
-    document.getElementById('fRetail').value = '';
     document.getElementById('fRemark').value = '';
     orderItems = [];
     renderItems();
@@ -383,10 +382,8 @@ function openEditModal(id) {
             document.getElementById('fOrdno').value = o.ORDNO || '';
             document.getElementById('fOrdno').disabled = false;
             document.getElementById('fDeldate').value = o.DELDATE || '';
-            document.getElementById('fCustomer').value = o.CUSTOMERCODE || '';
+            $('#fCustomer').val(o.CUSTOMERCODE || '').trigger('change');
             document.getElementById('fLocation').value = o.LOCATION || '';
-            document.getElementById('fDistant').value = o.DISTANT || '';
-            document.getElementById('fRetail').value = o.RETAIL || '';
             document.getElementById('fRemark').value = o.REMARK || '';
             orderItems = (data.items || []).map(function(item) {
                 return { desc: item.PDESC || '', qty: item.QTY || '', uom: item.UOM || '', install: item.INSTALL || 'N' };
@@ -406,11 +403,11 @@ function loadOrders() {
             if (data.error) return;
             var orders = data.orders || [];
             var tbody = document.getElementById('dataBody');
-            if (orders.length === 0) { tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-file-invoice" style="font-size:24px;display:block;margin-bottom:8px;"></i>No orders found</td></tr>'; return; }
+            if (orders.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-file-invoice" style="font-size:24px;display:block;margin-bottom:8px;"></i>No orders found</td></tr>'; return; }
             var statusMap = { '': 'Order', 'A': 'Assigned', 'D': 'Done', 'C': 'Completed' };
             var badgeMap = { '': 'badge-order', 'A': 'badge-assigned', 'D': 'badge-done', 'C': 'badge-completed' };
             tbody.innerHTML = orders.map(function(o, i) {
-                return '<tr><td>' + (i+1) + '</td><td>' + escHtml(o.DELDATE||'') + '</td><td><strong>' + escHtml(o.ORDNO||'') + '</strong></td><td>' + escHtml(o.DRIVER||'-') + '</td><td>' + escHtml(o.CUSTOMER||'') + '</td><td>' + escHtml(o.LOCATION||'') + '</td><td>' + escHtml(o.DISTANT||'') + '</td><td>' + escHtml(o.RETAIL||'') + '</td><td><span class="badge-status ' + (badgeMap[o.STATUS]||'') + '">' + (statusMap[o.STATUS]||o.STATUS) + '</span></td><td style="white-space:nowrap"><button class="btn-action btn-edit" onclick="openEditModal(' + o.ID + ')"><i class="fas fa-pen"></i></button> <button class="btn-action btn-view" onclick="window.open(\'del_order.php?view=' + o.ID + '\')"><i class="fas fa-eye"></i></button> <button class="btn-action btn-delete" onclick="deleteOrder(' + o.ID + ',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+                return '<tr><td>' + (i+1) + '</td><td>' + escHtml(o.DELDATE||'') + '</td><td><strong>' + escHtml(o.ORDNO||'') + '</strong></td><td>' + escHtml(o.DRIVER||'-') + '</td><td>' + escHtml(o.CUSTOMER||'') + '</td><td>' + escHtml(o.LOCATION||'') + '</td><td><span class="badge-status ' + (badgeMap[o.STATUS]||'') + '">' + (statusMap[o.STATUS]||o.STATUS) + '</span></td><td style="white-space:nowrap"><button class="btn-action btn-edit" onclick="openEditModal(' + o.ID + ')"><i class="fas fa-pen"></i></button> <button class="btn-action btn-view" onclick="window.open(\'del_order.php?view=' + o.ID + '\')"><i class="fas fa-eye"></i></button> <button class="btn-action btn-delete" onclick="deleteOrder(' + o.ID + ',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas fa-trash"></i></button></td></tr>';
             }).join('');
         }
     });
@@ -428,8 +425,7 @@ function saveOrder() {
     var payload = {
         action: editId ? 'update' : 'create',
         ordno: ordno, deldate: deldate, customercode: customerCode, customer: customerName,
-        location: document.getElementById('fLocation').value, distant: document.getElementById('fDistant').value,
-        retail: document.getElementById('fRetail').value, remark: document.getElementById('fRemark').value, items: orderItems
+        location: document.getElementById('fLocation').value, remark: document.getElementById('fRemark').value, items: orderItems
     };
     if (editId) { payload.id = editId; }
 

@@ -135,10 +135,27 @@ if ($action === 'list') {
     $types = "";
 
     if ($search !== '') {
-        $where .= " AND (LOWER(`barcode`) LIKE ? OR LOWER(`code`) LIKE ? OR LOWER(`name`) LIKE ? OR LOWER(`cat`) LIKE ? OR LOWER(`sub_cat`) LIKE ? OR LOWER(`rack`) LIKE ?)";
-        $like = '%' . strtolower($search) . '%';
-        $params = array_merge($params, [$like, $like, $like, $like, $like, $like]);
-        $types .= "ssssss";
+        // Normalize curly/smart quotes and prime symbols to ASCII equivalents
+        $normalizedSearch = $search;
+        $normalizedSearch = str_replace(["\u{201C}", "\u{201D}", "\u{2033}", "\u{FF02}"], '"', $normalizedSearch);
+        $normalizedSearch = str_replace(["\u{2018}", "\u{2019}", "\u{2032}", "\u{FF07}"], "'", $normalizedSearch);
+
+        // Build alternate search terms: swap " ↔ '' so both forms match
+        $altSearch = str_replace('"', "''", $normalizedSearch);
+        $altSearch2 = str_replace("''", '"', $normalizedSearch);
+        $like = '%' . strtolower($normalizedSearch) . '%';
+        $altLike = '%' . strtolower($altSearch) . '%';
+        $altLike2 = '%' . strtolower($altSearch2) . '%';
+
+        $where .= " AND ((LOWER(`barcode`) LIKE ? OR LOWER(`code`) LIKE ? OR LOWER(`name`) LIKE ? OR LOWER(`cat`) LIKE ? OR LOWER(`sub_cat`) LIKE ? OR LOWER(`rack`) LIKE ?)";
+        $where .= " OR (LOWER(`barcode`) LIKE ? OR LOWER(`code`) LIKE ? OR LOWER(`name`) LIKE ? OR LOWER(`cat`) LIKE ? OR LOWER(`sub_cat`) LIKE ? OR LOWER(`rack`) LIKE ?)";
+        $where .= " OR (LOWER(`barcode`) LIKE ? OR LOWER(`code`) LIKE ? OR LOWER(`name`) LIKE ? OR LOWER(`cat`) LIKE ? OR LOWER(`sub_cat`) LIKE ? OR LOWER(`rack`) LIKE ?))";
+        $params = array_merge($params,
+            [$like, $like, $like, $like, $like, $like],
+            [$altLike, $altLike, $altLike, $altLike, $altLike, $altLike],
+            [$altLike2, $altLike2, $altLike2, $altLike2, $altLike2, $altLike2]
+        );
+        $types .= "ssssssssssssssssss";
     }
     if ($catFilter !== '') {
         $where .= " AND `cat` = ?";

@@ -192,10 +192,6 @@ $hasSigFile = file_exists(__DIR__ . '/' . $sigPath);
                     <div class="do-footer-label">Location</div>
                     <div class="do-footer-value"><?php echo htmlspecialchars($order['LOCATION'] ?? ''); ?></div>
                 </div>
-                <div class="do-footer-item">
-                    <div class="do-footer-label">Distance</div>
-                    <div class="do-footer-value"><?php echo htmlspecialchars($order['DISTANT'] ?? '0'); ?> km</div>
-                </div>
             </div>
         </div>
     </div>
