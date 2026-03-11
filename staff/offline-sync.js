@@ -295,17 +295,29 @@ var OfflineSync = (function() {
 
   // ==================== PENDING ACTIONS ====================
 
-  // Check for duplicate pending action (same type + same payload URL + same ID)
+  // Check for duplicate pending action (same type + same payload URL + same fields)
   function hasDuplicate(type, payload) {
     return getPending().then(function(records) {
       for (var i = 0; i < records.length; i++) {
         var r = records[i];
         if (r.type !== type) continue;
         var rp = r.payload;
-        // Match on URL + action + id (covers job_done, photo_upload, signature, etc.)
         if (rp.url === payload.url) {
-          if (rp.fields && payload.fields && rp.fields.action === payload.fields.action && rp.fields.id === payload.fields.id) return true;
-          if (rp.body && payload.body && rp.body === payload.body) return true;
+          // Compare ALL fields (action, id, image_num, item_id, etc.) to avoid
+          // falsely treating Photo 2 as a duplicate of Photo 1 for the same order
+          if (rp.fields && payload.fields) {
+            var rpKeys = Object.keys(rp.fields).sort();
+            var pKeys = Object.keys(payload.fields).sort();
+            if (rpKeys.length === pKeys.length && JSON.stringify(rpKeys) === JSON.stringify(pKeys)) {
+              var allMatch = true;
+              for (var k = 0; k < rpKeys.length; k++) {
+                if (String(rp.fields[rpKeys[k]]) !== String(payload.fields[pKeys[k]])) { allMatch = false; break; }
+              }
+              if (allMatch) return true;
+            }
+          } else if (rp.body && payload.body && rp.body === payload.body) {
+            return true;
+          }
         }
       }
       return false;
@@ -594,10 +606,20 @@ var OfflineSync = (function() {
 
             return syncOne(record).then(function(response) {
               if (response && response.success) {
+                // Strip heavy payload data (base64 photos) from synced records
+                // to prevent IndexedDB storage bloat over time
+                var cleanPayload = { url: record.payload.url };
+                if (record.payload.fields) {
+                  cleanPayload.fields = record.payload.fields; // keep metadata only
+                }
+                if (record.payload.body) {
+                  cleanPayload.body = '(synced)'; // replace signature data
+                }
                 return updateRecord(record.id, {
                   status: 'synced',
                   synced_at: new Date().toISOString(),
-                  error: null
+                  error: null,
+                  payload: cleanPayload
                 });
               } else {
                 var errorMsg = (response && response.error) || 'Server returned no success status';
