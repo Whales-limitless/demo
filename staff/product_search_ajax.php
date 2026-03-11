@@ -19,6 +19,19 @@ if ($search === '') {
 
 $like = '%' . $search . '%';
 
+// Normalize quote variants: replace " (double quote) with '' (two single quotes)
+// so that searching 7" also matches 7'' and vice versa.
+// Also normalize curly/smart quotes and prime symbols to their ASCII equivalents.
+$normalizedSearch = $search;
+$normalizedSearch = str_replace(["\u{201C}", "\u{201D}", "\u{2033}", "\u{FF02}"], '"', $normalizedSearch); // smart double quotes, double prime, fullwidth
+$normalizedSearch = str_replace(["\u{2018}", "\u{2019}", "\u{2032}", "\u{FF07}"], "'", $normalizedSearch); // smart single quotes, prime, fullwidth
+// Build alternate search: swap " ↔ '' so both forms match
+$altSearch = str_replace('"', "''", $normalizedSearch);
+$altSearch2 = str_replace("''", '"', $normalizedSearch);
+$normalizedLike = '%' . $normalizedSearch . '%';
+$altLike = '%' . $altSearch . '%';
+$altLike2 = '%' . $altSearch2 . '%';
+
 // Search by product name only.
 // No LOWER() wrapping — relies on utf8mb4_unicode_ci collation for case-insensitive matching.
 // LEFT JOIN directly on category table with indexed cat_code for fast lookups.
@@ -28,12 +41,12 @@ $stmt = $connect->prepare("
            c.`cat_name` AS category_name
     FROM `PRODUCTS` p
     LEFT JOIN `category` c ON p.`cat_code` = c.`cat_code`
-    WHERE p.`name` LIKE ?
+    WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?)
       AND (p.`checked` != 'N' OR p.`checked` IS NULL)
     ORDER BY p.`name` ASC
     LIMIT 20
 ");
-$stmt->bind_param("s", $like);
+$stmt->bind_param("sss", $normalizedLike, $altLike, $altLike2);
 $stmt->execute();
 $result = $stmt->get_result();
 
