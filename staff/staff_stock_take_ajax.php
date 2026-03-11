@@ -75,8 +75,8 @@ if ($action === 'list_sessions') {
     }
     $row = $chk->fetch_assoc();
     $chk->free();
-    if (!in_array($row['status'], ['DRAFT'])) {
-        echo json_encode(['error' => 'Session is not available for counting.']);
+    if (!in_array($row['status'], ['DRAFT', 'SUBMITTED'])) {
+        echo json_encode(['error' => 'Session is not available.']);
         exit;
     }
 
