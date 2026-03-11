@@ -285,6 +285,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <?php include('mobile-bottombar.php'); ?>
 
 <script>
+function escHtml(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+function escAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 var subcategories = <?php echo json_encode($subcategories); ?>;
 
 // All subcategories selected by default
@@ -301,9 +310,9 @@ var trendLabels = { green: 'Hot', yellow: 'Moderate', red: 'Slow', black: 'Dead'
 function renderProductCard(p, index) {
   var imgHtml;
   if (p.image) {
-    imgHtml = '<img class="product-img" src="/img/' + p.image + '" alt="' + p.name + '">';
+    imgHtml = '<img class="product-img" src="/img/' + escAttr(p.image) + '" alt="' + escAttr(p.name) + '">';
   } else {
-    imgHtml = '<div class="no-img-product">' + (p.sku || 'NO IMAGE') + '</div>';
+    imgHtml = '<div class="no-img-product">' + escHtml(p.sku || 'NO IMAGE') + '</div>';
   }
 
   // Trend indicator badge (replaces stock badge when trend config is active)
@@ -319,10 +328,10 @@ function renderProductCard(p, index) {
   }
 
   var tags = '';
-  if (p.sku) tags += '<span class="tag tag-sku">SKU: ' + p.sku + '</span>';
-  if (p.barcode) tags += '<span class="tag tag-barcode">BC: ' + p.barcode + '</span>';
+  if (p.sku) tags += '<span class="tag tag-sku">SKU: ' + escHtml(p.sku) + '</span>';
+  if (p.barcode) tags += '<span class="tag tag-barcode">BC: ' + escHtml(p.barcode) + '</span>';
   if (p.rack_location) {
-    tags += '<span class="tag tag-rack">Rack: ' + p.rack_location + '</span>';
+    tags += '<span class="tag tag-rack">Rack: ' + escHtml(p.rack_location) + '</span>';
   } else {
     tags += '<span class="tag tag-rack unset">No Rack</span>';
   }
@@ -330,10 +339,10 @@ function renderProductCard(p, index) {
   var bc = p.inStock ? 'active' : 'disabled';
   var bt = p.inStock ? 'Add to Cart' : 'Out of Stock';
 
-  return '<div class="product-card" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" data-barcode="' + (p.barcode || '').toLowerCase() + '">' +
+  return '<div class="product-card" data-name="' + escAttr(p.name.toLowerCase()) + '" data-sku="' + escAttr((p.sku || '').toLowerCase()) + '" data-barcode="' + escAttr((p.barcode || '').toLowerCase()) + '">' +
     '<div class="product-img-wrap">' + imgHtml + badgeHtml + '</div>' +
     '<div class="product-info">' +
-      '<div class="product-name">' + p.name + '</div>' +
+      '<div class="product-name">' + escHtml(p.name) + '</div>' +
       '<div class="product-tags">' + tags + '</div>' +
       '<div class="qty-label">Qty: <span>' + p.quantity + '</span></div>' +
       '<div class="product-actions">' +
@@ -366,7 +375,7 @@ function renderSections(filteredSubs) {
     });
     if (inStock.length === 0) return '';
     return '<div class="subcat-section" id="sub_' + sc.id + '">' +
-      '<h3 class="subcat-heading">' + sc.name + '</h3>' +
+      '<h3 class="subcat-heading">' + escHtml(sc.name) + '</h3>' +
       '<div class="product-grid">' + inStock.map(function(p, i) { return renderProductCard(p, i); }).join('') + '</div>' +
     '</div>';
   }).join('');
