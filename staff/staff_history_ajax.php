@@ -13,21 +13,19 @@ $connect->set_charset("utf8mb4");
 $action = $_POST['action'] ?? '';
 
 if ($action === 'items') {
-    $grnId = intval($_POST['grn_id'] ?? 0);
-    if ($grnId <= 0) {
-        echo json_encode(['error' => 'Invalid GRN ID']);
+    $salnum = $connect->real_escape_string($_POST['salnum'] ?? '');
+    if (empty($salnum)) {
+        echo json_encode(['error' => 'Invalid order number']);
         exit;
     }
 
     $items = [];
-    $stmt = $connect->prepare("SELECT `barcode`, `product_desc`, `qty_received`, `qty_rejected`, `batch_no`, `rack_location`, `remark` FROM `grn_item` WHERE `grn_id` = ? ORDER BY `id` ASC");
-    $stmt->bind_param("i", $grnId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $items[] = $row;
+    $result = $connect->query("SELECT `BARCODE`, `PDESC`, `QTY` FROM `orderlist` WHERE `SALNUM` = '$salnum' AND `PTYPE` = 'STOCKIN' AND `BARCODE` <> 'PT' ORDER BY `ID` ASC");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $items[] = $row;
+        }
     }
-    $stmt->close();
 
     echo json_encode(['items' => $items]);
     exit;
