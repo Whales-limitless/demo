@@ -64,6 +64,8 @@ $currentPage = 'del_order';
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; }
 :root { --primary: #C8102E; --primary-dark: #a00d24; --surface: #ffffff; --bg: #f3f4f6; --text: #1a1a1a; --text-muted: #6b7280; --radius: 12px; --shadow-md: 0 4px 16px rgba(0,0,0,0.08); --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -241,7 +243,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     <div class="col-md-4 mb-3"><label class="form-label fw-semibold">Order No <span class="text-danger">*</span></label><input type="text" id="fOrdno" class="form-control" placeholder="e.g. DO-001"></div>
                     <div class="col-md-4 mb-3"><label class="form-label fw-semibold">Delivery Date <span class="text-danger">*</span></label><input type="date" id="fDeldate" class="form-control" value="<?php echo date('Y-m-d'); ?>"></div>
                     <div class="col-md-4 mb-3"><label class="form-label fw-semibold">Customer <span class="text-danger">*</span></label>
-                        <select id="fCustomer" class="form-select" onchange="onCustomerChange();">
+                        <select id="fCustomer" class="form-select">
                             <option value="">-- Select Customer --</option>
                             <?php foreach ($customers as $c): ?>
                             <option value="<?php echo htmlspecialchars($c['CODE']); ?>" data-name="<?php echo htmlspecialchars($c['NAME']); ?>" data-location="<?php echo htmlspecialchars($c['LOCATION']); ?>" data-address="<?php echo htmlspecialchars($c['ADDRESS'] ?? ''); ?>"><?php echo htmlspecialchars($c['NAME']); ?></option>
@@ -295,6 +297,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 <?php if (!$viewOrder): ?>
 var modal = null;
@@ -308,6 +311,13 @@ var locationData = <?php
 
 document.addEventListener('DOMContentLoaded', function() {
     modal = new bootstrap.Modal(document.getElementById('orderModal'));
+    $('#fCustomer').select2({
+        theme: 'bootstrap-5',
+        placeholder: '-- Select Customer --',
+        allowClear: true,
+        dropdownParent: $('#orderModal'),
+        width: '100%'
+    }).on('change', function() { onCustomerChange(); });
     loadOrders();
     <?php if ($editId > 0): ?>
     openEditModal(<?php echo $editId; ?>);
@@ -352,7 +362,7 @@ function openCreateModal() {
     document.getElementById('fOrdno').value = '';
     document.getElementById('fOrdno').disabled = false;
     document.getElementById('fDeldate').value = '<?php echo date("Y-m-d"); ?>';
-    document.getElementById('fCustomer').value = '';
+    $('#fCustomer').val('').trigger('change');
     document.getElementById('fLocation').value = '';
     document.getElementById('fRemark').value = '';
     orderItems = [];
@@ -372,7 +382,7 @@ function openEditModal(id) {
             document.getElementById('fOrdno').value = o.ORDNO || '';
             document.getElementById('fOrdno').disabled = false;
             document.getElementById('fDeldate').value = o.DELDATE || '';
-            document.getElementById('fCustomer').value = o.CUSTOMERCODE || '';
+            $('#fCustomer').val(o.CUSTOMERCODE || '').trigger('change');
             document.getElementById('fLocation').value = o.LOCATION || '';
             document.getElementById('fRemark').value = o.REMARK || '';
             orderItems = (data.items || []).map(function(item) {
