@@ -85,13 +85,14 @@ if ($action === 'list') {
 
     // Insert items
     if (is_array($items) && count($items) > 0) {
-        $istmt = $connect->prepare("INSERT INTO `del_orderlistdesc` (`ORDERNO`,`PDESC`,`QTY`,`UOM`) VALUES (?,?,?,?)");
+        $istmt = $connect->prepare("INSERT INTO `del_orderlistdesc` (`ORDERNO`,`PDESC`,`QTY`,`UOM`,`INSTALL`) VALUES (?,?,?,?,?)");
         foreach ($items as $item) {
             $pdesc = trim($item['desc'] ?? '');
             $qty = trim($item['qty'] ?? '');
             $uom = trim($item['uom'] ?? '');
+            $install = trim($item['install'] ?? 'N');
             if ($pdesc !== '') {
-                $istmt->bind_param("ssss", $ordno, $pdesc, $qty, $uom);
+                $istmt->bind_param("sssss", $ordno, $pdesc, $qty, $uom, $install);
                 $istmt->execute();
             }
         }
@@ -99,6 +100,107 @@ if ($action === 'list') {
     }
 
     echo json_encode(['success' => 'Order created successfully.']);
+
+} elseif ($action === 'get') {
+    $id = intval($_POST['id'] ?? 0);
+    if ($id <= 0) { echo json_encode(['error' => 'Invalid ID.']); exit; }
+
+    $stmt = $connect->prepare("SELECT o.*, c.HP AS CUST_PHONE, c.ADDRESS AS CUST_ADDRESS FROM `del_orderlist` o LEFT JOIN `del_customer` c ON o.CUSTOMERCODE = c.CODE WHERE o.ID = ? LIMIT 1");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $r = $stmt->get_result();
+    if ($r->num_rows > 0) {
+        $order = $r->fetch_assoc();
+        $stmt->close();
+        // Get items
+        $istmt = $connect->prepare("SELECT * FROM `del_orderlistdesc` WHERE `ORDERNO` = ?");
+        $istmt->bind_param("s", $order['ORDNO']);
+        $istmt->execute();
+        $ir = $istmt->get_result();
+        $items = [];
+        while ($row = $ir->fetch_assoc()) { $items[] = $row; }
+        $istmt->close();
+        echo json_encode(['order' => $order, 'items' => $items]);
+    } else {
+        $stmt->close();
+        echo json_encode(['error' => 'Order not found.']);
+    }
+
+} elseif ($action === 'update') {
+    $id = intval($_POST['id'] ?? 0);
+    $ordno = trim($_POST['ordno'] ?? '');
+    $deldate = trim($_POST['deldate'] ?? '');
+    $customercode = trim($_POST['customercode'] ?? '');
+    $customer = trim($_POST['customer'] ?? '');
+    $location = trim($_POST['location'] ?? '');
+    $distant = trim($_POST['distant'] ?? '');
+    $retail = trim($_POST['retail'] ?? '');
+    $remark = trim($_POST['remark'] ?? '');
+    $items = $_POST['items'] ?? [];
+
+    if ($id <= 0 || $ordno === '' || $deldate === '' || $customercode === '') {
+        echo json_encode(['error' => 'Order No, Date and Customer are required.']);
+        exit;
+    }
+
+    // Get current ordno for the record
+    $chk = $connect->prepare("SELECT ORDNO FROM `del_orderlist` WHERE `ID` = ? LIMIT 1");
+    $chk->bind_param("i", $id);
+    $chk->execute();
+    $cr = $chk->get_result();
+    if ($cr->num_rows === 0) {
+        echo json_encode(['error' => 'Order not found.']);
+        $chk->close();
+        exit;
+    }
+    $oldOrdno = $cr->fetch_assoc()['ORDNO'];
+    $chk->close();
+
+    // Check duplicate ordno if changed
+    if ($ordno !== $oldOrdno) {
+        $dup = $connect->prepare("SELECT ID FROM `del_orderlist` WHERE `ORDNO` = ? AND `ID` != ? LIMIT 1");
+        $dup->bind_param("si", $ordno, $id);
+        $dup->execute();
+        if ($dup->get_result()->num_rows > 0) {
+            echo json_encode(['error' => 'Order number already exists.']);
+            $dup->close();
+            exit;
+        }
+        $dup->close();
+    }
+
+    // Update order
+    $stmt = $connect->prepare("UPDATE `del_orderlist` SET `ORDNO`=?, `DELDATE`=?, `CUSTOMERCODE`=?, `CUSTOMER`=?, `LOCATION`=?, `DISTANT`=?, `RETAIL`=?, `REMARK`=? WHERE `ID`=?");
+    $stmt->bind_param("ssssssssi", $ordno, $deldate, $customercode, $customer, $location, $distant, $retail, $remark, $id);
+    if (!$stmt->execute()) {
+        echo json_encode(['error' => 'Failed to update order: ' . $connect->error]);
+        $stmt->close();
+        exit;
+    }
+    $stmt->close();
+
+    // Delete old items and re-insert
+    $ds = $connect->prepare("DELETE FROM `del_orderlistdesc` WHERE `ORDERNO` = ?");
+    $ds->bind_param("s", $oldOrdno);
+    $ds->execute();
+    $ds->close();
+
+    if (is_array($items) && count($items) > 0) {
+        $istmt = $connect->prepare("INSERT INTO `del_orderlistdesc` (`ORDERNO`,`PDESC`,`QTY`,`UOM`,`INSTALL`) VALUES (?,?,?,?,?)");
+        foreach ($items as $item) {
+            $pdesc = trim($item['desc'] ?? '');
+            $qty = trim($item['qty'] ?? '');
+            $uom = trim($item['uom'] ?? '');
+            $install = trim($item['install'] ?? 'N');
+            if ($pdesc !== '') {
+                $istmt->bind_param("sssss", $ordno, $pdesc, $qty, $uom, $install);
+                $istmt->execute();
+            }
+        }
+        $istmt->close();
+    }
+
+    echo json_encode(['success' => 'Order updated successfully.']);
 
 } elseif ($action === 'delete') {
     $id = intval($_POST['id'] ?? 0);

@@ -52,6 +52,7 @@ $uoms = [];
 $ur = $connect->query("SELECT * FROM `del_uom` ORDER BY `PDESC` ASC");
 if ($ur) { while ($row = $ur->fetch_assoc()) { $uoms[] = $row; } }
 
+$editId = intval($_GET['edit'] ?? 0);
 $currentPage = 'del_order';
 ?>
 <!DOCTYPE html>
@@ -139,6 +140,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <h1><i class="fas fa-file-invoice" style="color:var(--primary);margin-right:8px;"></i>Delivery Order</h1>
     <div>
         <a href="del_order.php" class="btn-back"><i class="fas fa-arrow-left"></i> Back</a>
+        <a href="del_order.php?edit=<?php echo $viewOrder['ID']; ?>" class="btn-print" style="background:#3b82f6;text-decoration:none;"><i class="fas fa-pen"></i> Edit</a>
         <button class="btn-print" onclick="window.print();"><i class="fas fa-print"></i> Print</button>
     </div>
 </div>
@@ -270,6 +272,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <option value="SET">SET</option>
                         <option value="PKT">PKT</option>
                     </select>
+                    <select id="itemInstall" class="form-select" style="max-width:140px;">
+                        <option value="N">No Install</option>
+                        <option value="Y">Install</option>
+                    </select>
                     <button class="btn btn-sm btn-success" onclick="addItem();"><i class="fas fa-plus"></i></button>
                 </div>
                 <div class="item-list">
@@ -306,6 +312,9 @@ var locationData = <?php
 document.addEventListener('DOMContentLoaded', function() {
     modal = new bootstrap.Modal(document.getElementById('orderModal'));
     loadOrders();
+    <?php if ($editId > 0): ?>
+    openEditModal(<?php echo $editId; ?>);
+    <?php endif; ?>
 });
 
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -328,10 +337,12 @@ function addItem() {
     var desc = document.getElementById('itemDesc').value.trim();
     var qty = document.getElementById('itemQty').value.trim();
     var uom = document.getElementById('itemUom').value;
+    var install = document.getElementById('itemInstall').value;
     if (desc === '') return;
-    orderItems.push({ desc: desc, qty: qty, uom: uom });
+    orderItems.push({ desc: desc, qty: qty, uom: uom, install: install });
     document.getElementById('itemDesc').value = '';
     document.getElementById('itemQty').value = '';
+    document.getElementById('itemInstall').value = 'N';
     renderItems();
 }
 
@@ -339,9 +350,10 @@ function removeItem(idx) { orderItems.splice(idx, 1); renderItems(); }
 
 function renderItems() {
     var html = orderItems.map(function(item, i) {
-        return '<tr><td>' + (i+1) + '</td><td>' + escHtml(item.desc) + '</td><td>' + escHtml(item.qty) + '</td><td>' + escHtml(item.uom) + '</td><td><button class="btn-remove-item" onclick="removeItem(' + i + ')">X</button></td></tr>';
+        var installLabel = (item.install === 'Y') ? '<span style="color:#f59e0b;font-weight:600;">Yes</span>' : 'No';
+        return '<tr><td>' + (i+1) + '</td><td>' + escHtml(item.desc) + '</td><td>' + escHtml(item.qty) + '</td><td>' + escHtml(item.uom) + '</td><td>' + installLabel + '</td><td><button class="btn-remove-item" onclick="removeItem(' + i + ')">X</button></td></tr>';
     }).join('');
-    document.getElementById('itemBody').innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#999;">No items added</td></tr>';
+    document.getElementById('itemBody').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#999;">No items added</td></tr>';
 }
 
 function openCreateModal() {
@@ -360,6 +372,32 @@ function openCreateModal() {
     modal.show();
 }
 
+function openEditModal(id) {
+    $.ajax({
+        type: 'POST', url: 'del_order_ajax.php', dataType: 'json',
+        data: { action: 'get', id: id },
+        success: function(data) {
+            if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
+            var o = data.order;
+            document.getElementById('editId').value = o.ID;
+            document.getElementById('fOrdno').value = o.ORDNO || '';
+            document.getElementById('fOrdno').disabled = false;
+            document.getElementById('fDeldate').value = o.DELDATE || '';
+            document.getElementById('fCustomer').value = o.CUSTOMERCODE || '';
+            document.getElementById('fLocation').value = o.LOCATION || '';
+            document.getElementById('fDistant').value = o.DISTANT || '';
+            document.getElementById('fRetail').value = o.RETAIL || '';
+            document.getElementById('fRemark').value = o.REMARK || '';
+            orderItems = (data.items || []).map(function(item) {
+                return { desc: item.PDESC || '', qty: item.QTY || '', uom: item.UOM || '', install: item.INSTALL || 'N' };
+            });
+            renderItems();
+            document.getElementById('modalTitle').innerHTML = '<i class="fas fa-pen"></i> Edit Delivery Order';
+            modal.show();
+        }
+    });
+}
+
 function loadOrders() {
     $.ajax({
         type: 'POST', url: 'del_order_ajax.php', dataType: 'json',
@@ -372,13 +410,14 @@ function loadOrders() {
             var statusMap = { '': 'Order', 'A': 'Assigned', 'D': 'Done', 'C': 'Completed' };
             var badgeMap = { '': 'badge-order', 'A': 'badge-assigned', 'D': 'badge-done', 'C': 'badge-completed' };
             tbody.innerHTML = orders.map(function(o, i) {
-                return '<tr><td>' + (i+1) + '</td><td>' + escHtml(o.DELDATE||'') + '</td><td><strong>' + escHtml(o.ORDNO||'') + '</strong></td><td>' + escHtml(o.DRIVER||'-') + '</td><td>' + escHtml(o.CUSTOMER||'') + '</td><td>' + escHtml(o.LOCATION||'') + '</td><td>' + escHtml(o.DISTANT||'') + '</td><td>' + escHtml(o.RETAIL||'') + '</td><td><span class="badge-status ' + (badgeMap[o.STATUS]||'') + '">' + (statusMap[o.STATUS]||o.STATUS) + '</span></td><td style="white-space:nowrap"><button class="btn-action btn-view" onclick="window.open(\'del_order.php?view=' + o.ID + '\')"><i class="fas fa-eye"></i></button> <button class="btn-action btn-delete" onclick="deleteOrder(' + o.ID + ',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+                return '<tr><td>' + (i+1) + '</td><td>' + escHtml(o.DELDATE||'') + '</td><td><strong>' + escHtml(o.ORDNO||'') + '</strong></td><td>' + escHtml(o.DRIVER||'-') + '</td><td>' + escHtml(o.CUSTOMER||'') + '</td><td>' + escHtml(o.LOCATION||'') + '</td><td>' + escHtml(o.DISTANT||'') + '</td><td>' + escHtml(o.RETAIL||'') + '</td><td><span class="badge-status ' + (badgeMap[o.STATUS]||'') + '">' + (statusMap[o.STATUS]||o.STATUS) + '</span></td><td style="white-space:nowrap"><button class="btn-action btn-edit" onclick="openEditModal(' + o.ID + ')"><i class="fas fa-pen"></i></button> <button class="btn-action btn-view" onclick="window.open(\'del_order.php?view=' + o.ID + '\')"><i class="fas fa-eye"></i></button> <button class="btn-action btn-delete" onclick="deleteOrder(' + o.ID + ',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas fa-trash"></i></button></td></tr>';
             }).join('');
         }
     });
 }
 
 function saveOrder() {
+    var editId = document.getElementById('editId').value;
     var ordno = document.getElementById('fOrdno').value.trim();
     var deldate = document.getElementById('fDeldate').value;
     var customerCode = document.getElementById('fCustomer').value;
@@ -386,13 +425,17 @@ function saveOrder() {
     var sel = document.getElementById('fCustomer');
     var customerName = sel.options[sel.selectedIndex].getAttribute('data-name') || '';
 
+    var payload = {
+        action: editId ? 'update' : 'create',
+        ordno: ordno, deldate: deldate, customercode: customerCode, customer: customerName,
+        location: document.getElementById('fLocation').value, distant: document.getElementById('fDistant').value,
+        retail: document.getElementById('fRetail').value, remark: document.getElementById('fRemark').value, items: orderItems
+    };
+    if (editId) { payload.id = editId; }
+
     $.ajax({
         type: 'POST', url: 'del_order_ajax.php', dataType: 'json', contentType: 'application/json',
-        data: JSON.stringify({
-            action: 'create', ordno: ordno, deldate: deldate, customercode: customerCode, customer: customerName,
-            location: document.getElementById('fLocation').value, distant: document.getElementById('fDistant').value,
-            retail: document.getElementById('fRetail').value, remark: document.getElementById('fRemark').value, items: orderItems
-        }),
+        data: JSON.stringify(payload),
         success: function(data) {
             if (data.success) { modal.hide(); Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadOrders(); }); }
             else { Swal.fire({ icon: 'error', text: data.error || 'Failed.' }); }

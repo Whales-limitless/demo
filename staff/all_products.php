@@ -186,6 +186,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <?php include('mobile-bottombar.php'); ?>
 
 <script>
+function escHtml(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+function escAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 var allCategories = [];
 
 var trendLabels = { green: 'Hot', yellow: 'Moderate', red: 'Slow', black: 'Dead' };
@@ -265,7 +274,7 @@ function doRelevanceSearch(query) {
   var matchCount = scored.length;
 
   var headerHtml = '<div class="search-results-header">' +
-    '<h2>Search: "' + q.replace(/</g, '&lt;') + '" (' + matchCount + ' found)</h2>' +
+    '<h2>Search: "' + escHtml(q) + '" (' + matchCount + ' found)</h2>' +
     '<button class="clear-search" onclick="clearSearch()">Clear Search</button>' +
   '</div>';
 
@@ -298,9 +307,9 @@ function clearSearch() {
 function renderProductCard(p, index) {
   var imgHtml;
   if (p.image) {
-    imgHtml = '<img class="product-img" src="/img/' + p.image + '" alt="' + p.name + '" loading="lazy">';
+    imgHtml = '<img class="product-img" src="/img/' + escAttr(p.image) + '" alt="' + escAttr(p.name) + '" loading="lazy">';
   } else {
-    imgHtml = '<div class="no-img-product">' + (p.sku || 'NO IMAGE') + '</div>';
+    imgHtml = '<div class="no-img-product">' + escHtml(p.sku || 'NO IMAGE') + '</div>';
   }
 
   var badgeHtml;
@@ -314,17 +323,17 @@ function renderProductCard(p, index) {
   }
 
   var tags = '';
-  var rackLabel = p.rack_location ? 'Rack: ' + p.rack_location : 'No Rack';
+  var rackLabel = p.rack_location ? 'Rack: ' + escHtml(p.rack_location) : 'No Rack';
   var rackClass = p.rack_location ? 'tag tag-rack tag-btn' : 'tag tag-rack unset tag-btn';
-  tags += '<span class="' + rackClass + '" onclick="openRackModal(' + p.id + ', \'' + (p.rack_location || '').replace(/'/g, "\\'") + '\')">&#9881; ' + rackLabel + '</span>';
+  tags += '<span class="' + rackClass + '" onclick="openRackModal(' + p.id + ', \'' + escAttr((p.rack_location || '').replace(/'/g, "\\'")) + '\')">&#9881; ' + rackLabel + '</span>';
   if (!p.rack_location) {
-    tags += '<span class="tag tag-rack-remark tag-btn" onclick="openRackRemarkModal(' + p.id + ', \'' + (p.rack_location || '').replace(/'/g, "\\'") + '\')">&#9998; Rack Remark</span>';
+    tags += '<span class="tag tag-rack-remark tag-btn" onclick="openRackRemarkModal(' + p.id + ', \'' + escAttr((p.rack_location || '').replace(/'/g, "\\'")) + '\')">&#9998; Rack Remark</span>';
   }
 
-  return '<div class="product-card" data-id="' + p.id + '" data-name="' + p.name.toLowerCase() + '" data-sku="' + (p.sku || '').toLowerCase() + '" data-barcode="' + (p.barcode || '').toLowerCase() + '" style="animation-delay:' + (index+1)*0.03 + 's">' +
+  return '<div class="product-card" data-id="' + p.id + '" data-name="' + escAttr(p.name.toLowerCase()) + '" data-sku="' + escAttr((p.sku || '').toLowerCase()) + '" data-barcode="' + escAttr((p.barcode || '').toLowerCase()) + '" style="animation-delay:' + (index+1)*0.03 + 's">' +
     '<div class="product-img-wrap">' + imgHtml + badgeHtml + '</div>' +
     '<div class="product-info">' +
-      '<div class="product-name">' + p.name + '</div>' +
+      '<div class="product-name">' + escHtml(p.name) + '</div>' +
       '<div class="product-tags">' + tags + '</div>' +
       '<div class="qty-label">Qty: <span>' + p.quantity + '</span></div>' +
       '<div class="product-actions">' +
@@ -346,7 +355,7 @@ function renderCategoryHtml(cat) {
     catProducts += sc.products.length;
     if (sc.products.length === 0) return '';
     return '<div class="subcat-section">' +
-      '<h3 class="subcat-heading">' + sc.name + '</h3>' +
+      '<h3 class="subcat-heading">' + escHtml(sc.name) + '</h3>' +
       '<div class="product-grid">' + sc.products.map(function(p, i) { return renderProductCard(p, i); }).join('') + '</div>' +
     '</div>';
   }).join('');
@@ -355,7 +364,7 @@ function renderCategoryHtml(cat) {
 
   return '<div class="category-section" id="cat_' + cat.id + '">' +
     '<div class="category-header">' +
-      '<h2>' + cat.name + '</h2>' +
+      '<h2>' + escHtml(cat.name) + '</h2>' +
       '<span class="cat-product-count">' + catProducts + '</span>' +
       '<a href="products.php?cat=' + encodeURIComponent(cat.id) + '">View Category →</a>' +
     '</div>' +
