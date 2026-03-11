@@ -474,6 +474,21 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                             <label class="form-label fw-semibold mb-0">Select Products</label>
                             <span class="text-muted" style="font-size:12px;" id="productSelCount">0 selected</span>
                         </div>
+                        <!-- Smart Selection Bar -->
+                        <div id="smartSelectBar" style="display:none;margin-bottom:8px;padding:10px 12px;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;">
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                <span style="font-size:12px;font-weight:600;color:#4338ca;">Quick Select:</span>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="smartSelect('all')" style="font-size:12px;padding:3px 12px;">Select All</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="smartSelect('never')" style="font-size:12px;padding:3px 12px;">Never Stocked</button>
+                                <div style="display:flex;align-items:center;gap:4px;">
+                                    <button type="button" class="btn btn-sm btn-primary" onclick="smartSelect('topN')" style="font-size:12px;padding:3px 12px;">Top</button>
+                                    <input type="number" id="smartSelectN" value="50" min="1" style="width:60px;padding:3px 6px;border:1px solid #c7d2fe;border-radius:6px;font-size:12px;text-align:center;" onkeydown="if(event.key==='Enter'){event.preventDefault();smartSelect('topN');}">
+                                    <span style="font-size:11px;color:#6366f1;">oldest first</span>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="smartSelect('none')" style="font-size:12px;padding:3px 12px;">Deselect All</button>
+                            </div>
+                            <div id="smartSelectInfo" style="font-size:11px;color:#6b7280;margin-top:6px;display:none;"></div>
+                        </div>
                         <div style="position:relative;margin-bottom:8px;">
                             <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px;"></i>
                             <input type="text" id="productSearch" class="form-control" style="padding-left:36px;font-size:13px;" placeholder="Search by product name..." oninput="filterProductTable();">
@@ -482,14 +497,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                             <table class="data-table" id="productTable" style="margin:0;">
                                 <thead>
                                     <tr>
-                                        <th style="width:40px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this);"></th>
+                                        <th style="width:36px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this);"></th>
                                         <th>Barcode</th>
                                         <th>Name</th>
                                         <th>QOH</th>
+                                        <th style="width:100px;">Last Count</th>
                                     </tr>
                                 </thead>
                                 <tbody id="productBody">
-                                    <tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">Select a category or sub category to load products</td></tr>
+                                    <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Select a category or sub category to load products</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -596,10 +612,13 @@ function openCreateModal() {
     document.getElementById('fCategory').value = '';
     document.getElementById('fSubCategory').innerHTML = '<option value="">-- All Sub Categories --</option>';
     document.getElementById('filterFields').style.display = 'none';
-    document.getElementById('productBody').innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">Select a category or sub category to load products</td></tr>';
+    document.getElementById('productBody').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Select a category or sub category to load products</td></tr>';
     document.getElementById('productSearch').value = '';
     document.getElementById('productSelCount').textContent = '0 selected';
     document.getElementById('selectAll').checked = false;
+    document.getElementById('smartSelectBar').style.display = 'none';
+    document.getElementById('smartSelectN').value = '50';
+    loadedProducts = [];
     createModal.show();
 }
 
@@ -630,12 +649,13 @@ function loadProducts() {
     var subCat = document.getElementById('fSubCategory').value;
 
     if (cat === '' && subCat === '') {
-        document.getElementById('productBody').innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">Select a category or sub category to load products</td></tr>';
+        document.getElementById('productBody').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Select a category or sub category to load products</td></tr>';
+        document.getElementById('smartSelectBar').style.display = 'none';
         updateSelectionCount();
         return;
     }
 
-    document.getElementById('productBody').innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+    document.getElementById('productBody').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
 
     $.ajax({
         type: 'POST', url: 'stock_take_ajax.php',
@@ -645,30 +665,91 @@ function loadProducts() {
             if (data.success && data.products) {
                 renderProductTable(data.products);
             } else {
-                document.getElementById('productBody').innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">No products found</td></tr>';
+                document.getElementById('productBody').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">No products found</td></tr>';
             }
             updateSelectionCount();
         }
     });
 }
 
+// Store loaded products globally for smart selection
+var loadedProducts = [];
+
 function renderProductTable(products) {
+    loadedProducts = products;
     var body = document.getElementById('productBody');
+    var smartBar = document.getElementById('smartSelectBar');
+
     if (products.length === 0) {
-        body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">No products found</td></tr>';
+        body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">No products found</td></tr>';
+        smartBar.style.display = 'none';
         return;
     }
+
+    // Products are already sorted by last_stock_take ASC (NULL first) from server
     var html = '';
     products.forEach(function(p) {
-        html += '<tr data-name="' + (p.name || '').toLowerCase() + '">' +
+        var lastCount = p.last_stock_take ? formatDate(p.last_stock_take) : '';
+        var lastCountLabel = p.last_stock_take ? lastCount : '<span style="color:#dc2626;font-size:11px;">Never</span>';
+        html += '<tr data-name="' + (p.name || '').toLowerCase() + '" data-barcode="' + escapeAttr(p.barcode) + '" data-last="' + (p.last_stock_take || '') + '">' +
             '<td><input type="checkbox" class="product-cb" value="' + escapeAttr(p.barcode) + '" checked onchange="updateSelectionCount();"></td>' +
             '<td>' + escapeHtml(p.barcode) + '</td>' +
             '<td>' + escapeHtml(p.name) + '</td>' +
             '<td>' + parseFloat(p.qoh || 0) + '</td>' +
+            '<td>' + lastCountLabel + '</td>' +
         '</tr>';
     });
     body.innerHTML = html;
     document.getElementById('selectAll').checked = true;
+    smartBar.style.display = 'block';
+
+    // Auto-apply smart select with default N
+    var neverCount = products.filter(function(p) { return !p.last_stock_take; }).length;
+    var infoHtml = '<i class="fas fa-info-circle"></i> ' + products.length + ' total items';
+    if (neverCount > 0) infoHtml += ', <b>' + neverCount + ' never counted</b>';
+    document.getElementById('smartSelectInfo').innerHTML = infoHtml;
+    document.getElementById('smartSelectInfo').style.display = 'block';
+
+    updateSelectionCount();
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    var dd = String(d.getDate()).padStart(2, '0');
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var yy = d.getFullYear();
+    return dd + '/' + mm + '/' + yy;
+}
+
+function smartSelect(mode) {
+    var checkboxes = document.querySelectorAll('#productBody .product-cb');
+    if (checkboxes.length === 0) return;
+
+    if (mode === 'all') {
+        checkboxes.forEach(function(cb) { cb.checked = true; });
+        document.getElementById('selectAll').checked = true;
+    } else if (mode === 'none') {
+        checkboxes.forEach(function(cb) { cb.checked = false; });
+        document.getElementById('selectAll').checked = false;
+    } else if (mode === 'never') {
+        // Select only items that have never been stock taken
+        checkboxes.forEach(function(cb) {
+            var row = cb.closest('tr');
+            var lastDate = row.getAttribute('data-last') || '';
+            cb.checked = (lastDate === '');
+        });
+        document.getElementById('selectAll').checked = false;
+    } else if (mode === 'topN') {
+        // Select top N items sorted by: never first, then oldest date
+        var n = parseInt(document.getElementById('smartSelectN').value) || 50;
+        // Products are already sorted from server (NULL/never first, then oldest)
+        // Just select first N
+        checkboxes.forEach(function(cb, idx) { cb.checked = (idx < n); });
+        document.getElementById('selectAll').checked = false;
+    }
+
     updateSelectionCount();
 }
 
