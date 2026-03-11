@@ -388,20 +388,27 @@ function fetchProducts(page, restoreScrollY) {
         document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
     }
 
-    $.ajax({
+    // Ensure racks are loaded before fetching products (needed for inline dropdowns)
+    var racksReady = racksCache.length > 0 ? $.Deferred().resolve().promise() : $.post('product_ajax.php', { action: 'rack_list' }, function(racks) {
+        racksCache = racks || [];
+        refreshRackSelect();
+    }, 'json');
+
+    var productsReq = $.ajax({
         type: 'POST', url: 'product_ajax.php',
         data: { action: 'list', page: page, per_page: 50, search: search, cat: cat, status: status },
-        dataType: 'json',
-        success: function(data) {
-            renderTable(data);
-            renderPagination(data);
-            if (restoreScrollY !== undefined) {
-                window.scrollTo(0, restoreScrollY);
-            }
-        },
-        error: function() {
-            document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
+        dataType: 'json'
+    });
+
+    $.when(racksReady, productsReq).then(function(_, prodResult) {
+        var data = prodResult[0];
+        renderTable(data);
+        renderPagination(data);
+        if (restoreScrollY !== undefined) {
+            window.scrollTo(0, restoreScrollY);
         }
+    }, function() {
+        document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
     });
 }
 
