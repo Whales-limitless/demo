@@ -354,13 +354,16 @@ function debouncedFetch() {
     debounceTimer = setTimeout(function() { fetchProducts(1); }, 300);
 }
 
-function fetchProducts(page) {
+function fetchProducts(page, restoreScrollY) {
     currentPage = page;
     var search = document.getElementById('searchInput').value.trim();
     var cat = document.getElementById('filterCategory').value;
     var status = document.getElementById('filterStatus').value;
 
-    document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="9" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
+    // Skip loading indicator when restoring scroll position (e.g. after save)
+    if (restoreScrollY === undefined) {
+        document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="9" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
+    }
 
     $.ajax({
         type: 'POST', url: 'product_ajax.php',
@@ -369,6 +372,9 @@ function fetchProducts(page) {
         success: function(data) {
             renderTable(data);
             renderPagination(data);
+            if (restoreScrollY !== undefined) {
+                window.scrollTo(0, restoreScrollY);
+            }
         },
         error: function() {
             document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
@@ -688,8 +694,9 @@ function saveProduct() {
         success: function(data) {
             if (data.success) {
                 productModal.hide();
+                var scrollY = window.scrollY;
                 Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
-                    fetchProducts(currentPage);
+                    fetchProducts(currentPage, scrollY);
                     loadCategoryFilter();
                 });
             } else {
