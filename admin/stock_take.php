@@ -173,7 +173,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <!-- DETAIL VIEW -->
     <div class="page-header">
         <h1><i class="fas fa-clipboard-check" style="color:var(--primary);margin-right:8px;"></i><?php echo htmlspecialchars($viewSession['session_code']); ?></h1>
-        <a href="stock_take.php" class="btn-outline"><i class="fas fa-arrow-left"></i> Back to List</a>
+        <div style="display:flex;gap:8px;">
+            <a href="stock_take_print.php?id=<?php echo $viewId; ?>" target="_blank" class="btn-outline"><i class="fas fa-print"></i> Print</a>
+            <a href="stock_take.php" class="btn-outline"><i class="fas fa-arrow-left"></i> Back to List</a>
+        </div>
     </div>
 
     <?php
@@ -839,6 +842,10 @@ function createSession() {
                 success: function(data) {
                     if (data.success) {
                         createModal.hide();
+                        // Open print page in new window
+                        if (data.session_id) {
+                            window.open('stock_take_print.php?id=' + data.session_id + '&auto_print=1', '_blank');
+                        }
                         Swal.fire({ icon: 'success', text: data.success, timer: 2000, showConfirmButton: false }).then(function() { location.reload(); });
                     } else {
                         Swal.fire({ icon: 'error', text: data.error });
