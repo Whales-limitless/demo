@@ -251,7 +251,7 @@ if ($instQ) {
             if (input.files && input.files[0]) {
                 (function(idx, file) {
                     promises.push(
-                        OfflineSync.compressImage(file, 1200, 0.75).then(function(compressedB64) {
+                        OfflineSync.compressImage(file, 800, 0.60).then(function(compressedB64) {
                             return OfflineSync.addPending('photo_upload', 'Photo ' + idx + ' - ' + orderNo, {
                                 url: 'del_work_ajax.php',
                                 fields: { action: 'upload_single', id: orderId, image_num: idx },
@@ -343,7 +343,7 @@ if ($instQ) {
             if (input && input.files && input.files[0]) {
                 (function(id, file) {
                     promises.push(
-                        OfflineSync.compressImage(file, 1200, 0.75).then(function(compressedB64) {
+                        OfflineSync.compressImage(file, 800, 0.60).then(function(compressedB64) {
                             return OfflineSync.addPending('install_upload', 'Install photo item ' + id + ' - ' + orderNo, {
                                 url: 'del_work_ajax.php',
                                 fields: { action: 'upload_install_single', id: orderId, item_id: id },

@@ -44,8 +44,8 @@ function processImageData($imageData, $prefix, $uploadDir) {
         return null;
     }
 
-    // Resize if too large (max 1200px on longest side)
-    $maxDim = 1200;
+    // Resize if too large (max 800px on longest side)
+    $maxDim = 800;
     $origW = imagesx($src);
     $origH = imagesy($src);
     if ($origW > $maxDim || $origH > $maxDim) {
