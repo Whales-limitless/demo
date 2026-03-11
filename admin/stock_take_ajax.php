@@ -30,22 +30,29 @@ if ($action === 'load_products') {
     $filterCat = trim($_POST['filter_cat'] ?? '');
     $filterSubCat = trim($_POST['filter_sub_cat'] ?? '');
 
-    $query = "SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE `checked` = 'Y'";
+    // Join with stock_take_item + stock_take to get last stock take date per product
+    // Only consider sessions that are SUBMITTED or APPROVED (meaningful counts)
+    $query = "SELECT p.`barcode`, p.`name`, COALESCE(p.`qoh`, 0) AS qoh,
+              MAX(st.`created_at`) AS last_stock_take
+              FROM `PRODUCTS` p
+              LEFT JOIN `stock_take_item` sti ON sti.`barcode` = p.`barcode`
+              LEFT JOIN `stock_take` st ON st.`id` = sti.`stock_take_id` AND st.`status` IN ('SUBMITTED', 'APPROVED')
+              WHERE p.`checked` = 'Y'";
     $params = [];
     $types = '';
 
     if ($filterCat !== '') {
-        $query .= " AND `cat` = ?";
+        $query .= " AND p.`cat` = ?";
         $params[] = $filterCat;
         $types .= 's';
     }
     if ($filterSubCat !== '') {
-        $query .= " AND `sub_cat` = ?";
+        $query .= " AND p.`sub_cat` = ?";
         $params[] = $filterSubCat;
         $types .= 's';
     }
 
-    $query .= " ORDER BY `name` ASC";
+    $query .= " GROUP BY p.`barcode`, p.`name`, p.`qoh` ORDER BY last_stock_take ASC, p.`name` ASC";
 
     $products = [];
     if (!empty($params)) {

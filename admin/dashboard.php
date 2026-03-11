@@ -88,6 +88,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .countdown-label { color: var(--text-muted); font-size: 13px; }
 .status-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+.refresh-btn {
+    background: #3b82f6; color: #fff; border: none; padding: 9px 16px; border-radius: 10px;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: background var(--transition);
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.refresh-btn:hover { background: #2563eb; }
+.refresh-btn.spinning i { animation: spin 0.8s linear infinite; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
 .sound-toggle {
     background: #6b7280; color: #fff; border: none; padding: 9px 14px; border-radius: 10px;
     font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: background var(--transition);
@@ -188,6 +197,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             <span class="countdown-label">Refresh in <strong id="seconds">15</strong>s</span>
         </div>
         <div class="status-right">
+            <button type="button" class="refresh-btn" id="refreshBtn" onclick="manualRefresh();" title="Refresh now">
+                <i class="fas fa-sync-alt" id="refreshIcon"></i> Refresh
+            </button>
             <button type="button" class="sound-toggle" id="soundToggle" onclick="toggleSound();">
                 <i class="fas fa-volume-mute" id="soundIcon"></i>
             </button>
@@ -579,6 +591,21 @@ function saveEdit() {
             Swal.fire({ icon: 'error', title: 'Error', text: data });
         }
     });
+}
+
+// ── Manual Refresh ─────────────────────────────────────
+
+function manualRefresh() {
+    var btn = document.getElementById('refreshBtn');
+    btn.classList.add('spinning');
+    btn.disabled = true;
+    doPoll();
+    countdown = currentInterval;
+    updateCountdown();
+    setTimeout(function() {
+        btn.classList.remove('spinning');
+        btn.disabled = false;
+    }, 800);
 }
 
 // ── Init ───────────────────────────────────────────────
