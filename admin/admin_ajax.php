@@ -26,6 +26,17 @@ if ($action === "done") {
         $affected1 = $connect->affected_rows;
 
         if ($result1 && $affected1 > 0) {
+            // Reduce QOH for each item in this order (only PURCHASE orders, not STOCKIN)
+            $itemsResult = $connect->query("SELECT BARCODE, QTY, PTYPE FROM `orderlist` WHERE SALNUM = '$delid' AND BARCODE <> 'PT'");
+            if ($itemsResult) {
+                while ($item = $itemsResult->fetch_assoc()) {
+                    if (($item['PTYPE'] ?? '') !== 'STOCKIN' && $item['QTY'] > 0) {
+                        $itemBarcode = $connect->real_escape_string($item['BARCODE']);
+                        $itemQty = intval($item['QTY']);
+                        $connect->query("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) - $itemQty WHERE `barcode` = '$itemBarcode'");
+                    }
+                }
+            }
             echo "Saved.";
         } elseif ($result1 && $affected1 == 0) {
             echo "Error: No rows updated. Order may already be DONE.";

@@ -8,11 +8,6 @@ $sidebarSections = [
         ['page' => 'product',        'href' => 'product.php',          'icon' => 'fas fa-boxes-stacked',        'label' => 'Products'],
         ['page' => 'product_trend',  'href' => 'product_trend.php',    'icon' => 'fas fa-chart-line',           'label' => 'Product Trends'],
     ],
-    'PURCHASING' => [
-        ['page' => 'supplier',    'href' => 'supplier.php',         'icon' => 'fas fa-truck',                'label' => 'Suppliers'],
-        ['page' => 'po',          'href' => 'po.php',               'icon' => 'fas fa-file-invoice',         'label' => 'Purchase Orders'],
-        ['page' => 'grn',         'href' => 'grn.php',              'icon' => 'fas fa-dolly',                'label' => 'Receiving'],
-    ],
     'INVENTORY' => [
         ['page' => 'rack',        'href' => 'rack.php',             'icon' => 'fas fa-warehouse',            'label' => 'Racks'],
         ['page' => 'stock_take',  'href' => 'stock_take.php',       'icon' => 'fas fa-clipboard-check',      'label' => 'Stock Take'],
