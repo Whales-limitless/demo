@@ -41,55 +41,18 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .filter-select { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; background: #fff; transition: border-color var(--transition); min-width: 140px; }
 .filter-select:focus { border-color: var(--primary); }
 .item-count { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
-/* Product Grid */
-.product-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-@media (min-width: 768px) { .product-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 993px) { .product-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (min-width: 1200px) { .product-grid { grid-template-columns: repeat(5, 1fr); } }
-
-.product-card { background: var(--surface); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); display: flex; flex-direction: column; transition: box-shadow var(--transition), transform var(--transition); animation: fadeUp 0.35s ease both; }
-.product-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
-.product-img-wrap { position: relative; overflow: hidden; }
-.product-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; transition: transform 0.4s ease; background: var(--bg); }
-.product-card:hover .product-img { transform: scale(1.03); }
-.no-img-product { width: 100%; aspect-ratio: 1; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 11px; font-weight: 600; text-align: center; padding: 12px; }
-.stock-badge { position: absolute; top: 8px; right: 8px; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.03em; }
-.stock-badge.in-stock { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
-.stock-badge.out-of-stock { background: #fef2f2; color: var(--primary); border: 1px solid #fecaca; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table thead th { background: var(--text); color: #fff; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; padding: 10px 12px; white-space: nowrap; text-align: left; }
+.data-table tbody td { padding: 10px 12px; vertical-align: middle; border-bottom: 1px solid #f3f4f6; }
+.data-table tbody tr:hover { background: #f9fafb; }
+.data-table tbody tr.no-results td { text-align: center; padding: 40px; color: var(--text-muted); }
 .badge-status { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .badge-active { background: #dcfce7; color: #16a34a; }
 .badge-inactive { background: #fee2e2; color: #dc2626; }
-.product-info { padding: 12px; display: flex; flex-direction: column; flex: 1; }
-.product-name { font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.product-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
-.tag { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
-.tag-rack { background: #fef3c7; color: #92400e; cursor: pointer; transition: all var(--transition); }
-.tag-rack.unset { background: var(--bg); color: var(--text-muted); }
-.tag-rack:hover { opacity: 0.8; }
-.tag-rack-remark { background: #e0f2fe; color: #0369a1; cursor: pointer; transition: all var(--transition); }
-.tag-rack-remark:hover { opacity: 0.8; }
-.qty-label { font-size: 16px; color: #1a1a1a; margin-bottom: 8px; font-weight: 800; }
-.product-actions-bar { margin-top: auto; padding-top: 8px; display: flex; gap: 4px; }
-.btn-action { flex: 1; padding: 7px 10px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); display: inline-flex; align-items: center; justify-content: center; gap: 4px; color: #fff; }
+.badge-low { background: #fef3c7; color: #d97706; display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; margin-left: 4px; }
+.btn-action { padding: 5px 12px; border: none; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); display: inline-block; margin: 1px; color: #fff; }
 .btn-edit { background: #3b82f6; } .btn-edit:hover { background: #2563eb; }
 .btn-delete { background: #ef4444; } .btn-delete:hover { background: #dc2626; }
-.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 15px; }
-@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-
-/* Rack modal */
-.rack-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1060; justify-content: center; align-items: center; padding: 16px; }
-.rack-modal-overlay.active { display: flex; }
-.rack-modal { background: var(--surface); border-radius: 14px; padding: 24px; max-width: 400px; width: 100%; box-shadow: var(--shadow-md); }
-.rack-modal h3 { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 16px; }
-.rack-modal label { font-size: 13px; font-weight: 600; color: var(--text); display: block; margin-bottom: 6px; }
-.rack-modal input, .rack-modal select { width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; transition: border-color var(--transition); margin-bottom: 12px; }
-.rack-modal input:focus, .rack-modal select:focus { border-color: var(--primary); }
-.rack-modal-actions { display: flex; gap: 8px; margin-top: 8px; }
-.rack-modal-actions button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; transition: all var(--transition); }
-.rack-modal-actions .btn-save-rack { background: var(--primary); color: #fff; }
-.rack-modal-actions .btn-save-rack:hover { background: var(--primary-dark); }
-.rack-modal-actions .btn-cancel-rack { background: var(--bg); color: var(--text); }
-.rack-modal-actions .btn-cancel-rack:hover { background: #e5e7eb; }
 .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
 .modal-header { border-bottom: 1px solid #e5e7eb; }
 .modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
@@ -141,10 +104,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     .search-box { max-width: 100%; }
     .toolbar-filters { flex-direction: column; align-items: stretch; }
     .filter-select { width: 100%; }
-    .btn-action { padding: 5px 8px; font-size: 11px; }
-    .product-name { font-size: 12px; }
-    .product-info { padding: 10px; }
-    .product-grid { gap: 10px; }
+    .btn-action { padding: 4px 8px; font-size: 11px; }
 }
 </style>
 </head>
@@ -190,39 +150,30 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             <div class="item-count" id="itemCount">Loading...</div>
         </div>
 
-        <div id="dataBody" class="product-grid">
-            <div class="empty-state" style="grid-column:1/-1;"><i class="fas fa-spinner fa-spin" style="font-size:24px;display:block;margin-bottom:8px;"></i>Loading products...</div>
+        <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px">No</th>
+                        <th style="width:50px">Img</th>
+                        <th>Barcode</th>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>QOH</th>
+                        <th>Rack</th>
+                        <th>Status</th>
+                        <th style="width:1%">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="dataBody">
+                    <tr class="no-results"><td colspan="9" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
+                </tbody>
+            </table>
         </div>
 
         <div class="pagination-wrap" id="paginationWrap" style="display:none;">
             <div class="pagination-info" id="paginationInfo"></div>
             <div class="pagination-btns" id="paginationBtns"></div>
-        </div>
-    </div>
-</div>
-
-<!-- Rack Select Modal (card inline) -->
-<div class="rack-modal-overlay" id="rackModalOverlay">
-    <div class="rack-modal">
-        <h3><i class="fas fa-warehouse" style="margin-right:6px;"></i> Set Rack</h3>
-        <label>Select Rack</label>
-        <select id="rackModalSelect"><option value="">-- No Rack --</option></select>
-        <div class="rack-modal-actions">
-            <button class="btn-cancel-rack" onclick="closeCardRackModal();">Cancel</button>
-            <button class="btn-save-rack" onclick="saveCardRack();">Save</button>
-        </div>
-    </div>
-</div>
-
-<!-- Rack Remark Modal (card inline) -->
-<div class="rack-modal-overlay" id="rackRemarkModalOverlay">
-    <div class="rack-modal">
-        <h3><i class="fas fa-pen" style="margin-right:6px;"></i> Rack Remark</h3>
-        <label>Rack Remark</label>
-        <input type="text" id="rackRemarkInput" placeholder="Enter rack remark...">
-        <div class="rack-modal-actions">
-            <button class="btn-cancel-rack" onclick="closeCardRackRemarkModal();">Cancel</button>
-            <button class="btn-save-rack" onclick="saveCardRackRemark();">Save</button>
         </div>
     </div>
 </div>
@@ -409,7 +360,7 @@ function fetchProducts(page) {
     var cat = document.getElementById('filterCategory').value;
     var status = document.getElementById('filterStatus').value;
 
-    document.getElementById('dataBody').innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><i class="fas fa-spinner fa-spin" style="font-size:24px;display:block;margin-bottom:8px;"></i>Loading...</div>';
+    document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="9" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
 
     $.ajax({
         type: 'POST', url: 'product_ajax.php',
@@ -420,17 +371,18 @@ function fetchProducts(page) {
             renderPagination(data);
         },
         error: function() {
-            document.getElementById('dataBody').innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><i class="fas fa-exclamation-triangle" style="font-size:24px;display:block;margin-bottom:8px;"></i>Failed to load products</div>';
+            document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
         }
     });
 }
 
 function renderTable(data) {
-    var container = document.getElementById('dataBody');
+    var tbody = document.getElementById('dataBody');
     var products = data.products || [];
+    var offset = (data.page - 1) * data.per_page;
 
     if (products.length === 0) {
-        container.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><i class="fas fa-boxes-stacked" style="font-size:24px;display:block;margin-bottom:8px;"></i>No products found</div>';
+        tbody.innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-boxes-stacked" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products found</td></tr>';
         document.getElementById('itemCount').textContent = '0 product(s)';
         return;
     }
@@ -439,50 +391,30 @@ function renderTable(data) {
     for (var i = 0; i < products.length; i++) {
         var p = products[i];
         var isActive = (p.checked || 'Y') === 'Y';
-        var qoh = Math.round(parseFloat(p.qoh || 0));
-        var inStock = qoh > 0;
+        var qoh = parseFloat(p.qoh || 0);
 
-        // Image
-        var imgHtml;
+        html += '<tr>';
+        html += '<td>' + (offset + i + 1) + '</td>';
         if (p.image) {
-            imgHtml = '<img class="product-img" src="../img/' + escHtml(p.image) + '" alt="' + escHtml(p.name || '') + '" loading="lazy">';
+            html += '<td><img src="../img/' + escHtml(p.image) + '" class="product-thumb" loading="lazy"></td>';
         } else {
-            imgHtml = '<div class="no-img-product">NO IMAGE</div>';
+            html += '<td><div class="product-thumb-placeholder"><i class="fas fa-image"></i></div></td>';
         }
-
-        // Stock badge
-        var badgeHtml = '<span class="stock-badge ' + (inStock ? 'in-stock' : 'out-of-stock') + '">' + (inStock ? 'In Stock' : 'Out of Stock') + '</span>';
-
-        // Rack tags
-        var rack = p.rack || '';
-        var rackLabel = rack ? 'Rack: ' + escHtml(rack) : 'No Rack';
-        var rackClass = rack ? 'tag tag-rack' : 'tag tag-rack unset';
-        var tagsHtml = '<span class="' + rackClass + '" onclick="openCardRackModal(' + p.id + ', \'' + escHtml(rack).replace(/'/g, "\\'") + '\');">&#9881; ' + rackLabel + '</span>';
-        if (!rack) {
-            tagsHtml += '<span class="tag tag-rack-remark" onclick="openCardRackRemarkModal(' + p.id + ', \'' + escHtml(rack).replace(/'/g, "\\'") + '\');">&#9998; Rack Remark</span>';
-        }
-
-        // Status badge
-        var statusHtml = '<span class="badge-status ' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? 'Active' : 'Inactive') + '</span>';
-
-        // Action buttons
-        var actionsHtml = '<button class="btn-action btn-edit" onclick="openEditModal(' + p.id + ');"><i class="fas fa-pen"></i> Edit</button>';
+        html += '<td><strong>' + escHtml(p.barcode || '') + '</strong></td>';
+        html += '<td>' + escHtml(p.name || '') + '</td>';
+        html += '<td>' + escHtml(p.cat || '') + '</td>';
+        html += '<td>' + Math.round(qoh) + '</td>';
+        html += '<td>' + escHtml(p.rack || '') + '</td>';
+        html += '<td><span class="badge-status ' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? 'Active' : 'Inactive') + '</span></td>';
+        html += '<td style="white-space:nowrap">';
+        html += '<button class="btn-action btn-edit" onclick="openEditModal(' + p.id + ');"><i class="fas fa-pen"></i> Edit</button>';
         if (isActive) {
-            actionsHtml += '<button class="btn-action btn-delete" onclick="deactivateProduct(' + p.id + ',\'' + escHtml(p.name || '').replace(/'/g, "\\'") + '\');"><i class="fas fa-ban"></i></button>';
+            html += ' <button class="btn-action btn-delete" onclick="deactivateProduct(' + p.id + ',\'' + escHtml(p.name || '').replace(/'/g, "\\'") + '\');"><i class="fas fa-ban"></i></button>';
         }
-
-        html += '<div class="product-card" data-id="' + p.id + '" style="animation-delay:' + (i+1)*0.03 + 's">' +
-            '<div class="product-img-wrap">' + imgHtml + badgeHtml + '</div>' +
-            '<div class="product-info">' +
-                '<div class="product-name">' + escHtml(p.name || '') + '</div>' +
-                '<div class="product-tags">' + tagsHtml + '</div>' +
-                '<div class="qty-label">Qty: <span>' + qoh + '</span></div>' +
-                statusHtml +
-                '<div class="product-actions-bar">' + actionsHtml + '</div>' +
-            '</div>' +
-        '</div>';
+        html += '</td>';
+        html += '</tr>';
     }
-    container.innerHTML = html;
+    tbody.innerHTML = html;
     document.getElementById('itemCount').textContent = data.total + ' product(s)';
 }
 
@@ -990,80 +922,6 @@ function showExistingImage(imageName) {
         document.getElementById('imgUploadArea').classList.add('has-image');
     }
 }
-
-// ===================== CARD RACK MODALS =====================
-
-var cardRackProductId = null;
-
-function openCardRackModal(productId, currentRack) {
-    cardRackProductId = productId;
-    // Populate select from racksCache
-    var sel = document.getElementById('rackModalSelect');
-    sel.innerHTML = '<option value="">-- No Rack --</option>';
-    racksCache.forEach(function(r) {
-        sel.innerHTML += '<option value="' + escHtml(r.code) + '"' + (r.code === currentRack ? ' selected' : '') + '>' + escHtml(r.code) + (r.description ? ' - ' + escHtml(r.description) : '') + '</option>';
-    });
-    document.getElementById('rackModalOverlay').classList.add('active');
-}
-
-function closeCardRackModal() {
-    document.getElementById('rackModalOverlay').classList.remove('active');
-    cardRackProductId = null;
-}
-
-function saveCardRack() {
-    if (!cardRackProductId) return;
-    var val = document.getElementById('rackModalSelect').value.trim();
-    $.post('product_ajax.php', { action: 'update_rack', id: cardRackProductId, rack: val }, function(r) {
-        if (r.success) {
-            updateCardRackTags(cardRackProductId, r.rack);
-        }
-        closeCardRackModal();
-    }, 'json');
-}
-
-function openCardRackRemarkModal(productId, currentRack) {
-    cardRackProductId = productId;
-    document.getElementById('rackRemarkInput').value = currentRack || '';
-    document.getElementById('rackRemarkModalOverlay').classList.add('active');
-    document.getElementById('rackRemarkInput').focus();
-}
-
-function closeCardRackRemarkModal() {
-    document.getElementById('rackRemarkModalOverlay').classList.remove('active');
-    cardRackProductId = null;
-}
-
-function saveCardRackRemark() {
-    if (!cardRackProductId) return;
-    var val = document.getElementById('rackRemarkInput').value.trim();
-    $.post('product_ajax.php', { action: 'update_rack', id: cardRackProductId, rack: val }, function(r) {
-        if (r.success) {
-            updateCardRackTags(cardRackProductId, r.rack);
-            closeCardRackRemarkModal();
-        } else {
-            Swal.fire({ icon: 'error', text: r.error || 'Failed to update.' });
-        }
-    }, 'json');
-}
-
-function updateCardRackTags(productId, newRack) {
-    var card = document.querySelector('.product-card[data-id="' + productId + '"]');
-    if (!card) return;
-    var tagsEl = card.querySelector('.product-tags');
-    if (!tagsEl) return;
-    var rackLabel = newRack ? 'Rack: ' + escHtml(newRack) : 'No Rack';
-    var rackClass = newRack ? 'tag tag-rack' : 'tag tag-rack unset';
-    var html = '<span class="' + rackClass + '" onclick="openCardRackModal(' + productId + ', \'' + escHtml(newRack || '').replace(/'/g, "\\'") + '\');">&#9881; ' + rackLabel + '</span>';
-    if (!newRack) {
-        html += '<span class="tag tag-rack-remark" onclick="openCardRackRemarkModal(' + productId + ', \'' + escHtml(newRack || '').replace(/'/g, "\\'") + '\');">&#9998; Rack Remark</span>';
-    }
-    tagsEl.innerHTML = html;
-}
-
-// Close rack modals on overlay click
-document.getElementById('rackModalOverlay').addEventListener('click', function(e) { if (e.target === this) closeCardRackModal(); });
-document.getElementById('rackRemarkModalOverlay').addEventListener('click', function(e) { if (e.target === this) closeCardRackRemarkModal(); });
 
 // Modal autofocus
 document.getElementById('productModal').addEventListener('shown.bs.modal', function() {
