@@ -17,7 +17,13 @@ if (empty($salnum)) {
 // Fetch order items
 $items = [];
 $orderInfo = null;
-$stmt = $connect->prepare("SELECT SALNUM, NAME, SDATE, TTIME, BARCODE, PDESC, QTY, PTYPE, TXTTO FROM `orderlist` WHERE `SALNUM` = ? AND `BARCODE` <> 'PT' ORDER BY `ID` ASC");
+// Check if branch_code column exists
+$hasBranchCol = false;
+$colCheck = $connect->query("SHOW COLUMNS FROM `orderlist` LIKE 'branch_code'");
+if ($colCheck && $colCheck->num_rows > 0) $hasBranchCol = true;
+
+$selectCols = "SALNUM, NAME, SDATE, TTIME, BARCODE, PDESC, QTY, PTYPE, TXTTO" . ($hasBranchCol ? ", branch_code" : "");
+$stmt = $connect->prepare("SELECT $selectCols FROM `orderlist` WHERE `SALNUM` = ? AND `BARCODE` <> 'PT' ORDER BY `ID` ASC");
 $stmt->bind_param("s", $salnum);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -29,7 +35,8 @@ while ($row = $result->fetch_assoc()) {
             'SDATE' => $row['SDATE'],
             'TTIME' => $row['TTIME'],
             'PTYPE' => $row['PTYPE'],
-            'TXTTO' => $row['TXTTO']
+            'TXTTO' => $row['TXTTO'],
+            'branch_code' => $row['branch_code'] ?? ''
         ];
     }
     $items[] = $row;
@@ -58,6 +65,21 @@ foreach ($items as $item) {
 $orderDate = !empty($orderInfo['SDATE']) ? date('d/m/Y', strtotime($orderInfo['SDATE'])) : '-';
 $orderTime = !empty($orderInfo['TTIME']) ? date('h:i A', strtotime($orderInfo['TTIME'])) : '-';
 $orderTypeLabel = ($orderInfo['PTYPE'] === 'STOCKIN') ? 'Stock In' : 'Purchase';
+
+// Look up branch name
+$branchName = '';
+if (!empty($orderInfo['branch_code'])) {
+    $brStmt = $connect->prepare("SELECT `name` FROM `branch` WHERE `code` = ? LIMIT 1");
+    if ($brStmt) {
+        $brStmt->bind_param("s", $orderInfo['branch_code']);
+        $brStmt->execute();
+        $brRes = $brStmt->get_result();
+        if ($brRes && $brRow = $brRes->fetch_assoc()) {
+            $branchName = $brRow['name'];
+        }
+        $brStmt->close();
+    }
+}
 
 $autoPrint = isset($_GET['auto_print']) && $_GET['auto_print'] == '1';
 ?>
@@ -298,6 +320,12 @@ window.onload = function() { window.print(); }
         <div class="info-item">
             <span class="info-label">To</span>
             <span>: <?php echo htmlspecialchars($orderInfo['TXTTO']); ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($branchName)): ?>
+        <div class="info-item">
+            <span class="info-label">Branch</span>
+            <span>: <?php echo htmlspecialchars($branchName); ?></span>
         </div>
         <?php endif; ?>
         <div class="info-item">

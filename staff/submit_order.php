@@ -38,6 +38,7 @@ $curDate = date('Y-m-d');
 $curTime = date('H:i:s');
 $ptype = ($orderType === 'STOCKIN') ? 'STOCKIN' : 'PURCHASE';
 $outlet = 'WEB';
+$branchCode = $_SESSION['user_branch_code'] ?? ($_SESSION['user_outlet'] ?? '');
 
 $insertedCount = 0;
 $errors = [];
@@ -53,7 +54,9 @@ foreach ($items as $item) {
     $escapedAccode = mysqli_real_escape_string($connect, $userAccode);
     $escapedUserName = mysqli_real_escape_string($connect, $userName);
 
-    $sql = "INSERT INTO `orderlist` (OUTLET, SDATE, ACCODE, NAME, SALNUM, BARCODE, PDESC, QTY, PTYPE, TRANSNO, TDATE, TTIME, STATUS, PRINT, view_status, ADMINRMK, SOUND, TXTTO)
+    $escapedBranch = mysqli_real_escape_string($connect, $branchCode);
+
+    $sql = "INSERT INTO `orderlist` (OUTLET, SDATE, ACCODE, NAME, SALNUM, BARCODE, PDESC, QTY, PTYPE, TRANSNO, TDATE, TTIME, STATUS, PRINT, view_status, ADMINRMK, SOUND, TXTTO, branch_code)
             VALUES (
                 '$outlet',
                 '$curDate',
@@ -72,7 +75,8 @@ foreach ($items as $item) {
                 '0',
                 '',
                 '0',
-                '" . mysqli_real_escape_string($connect, $txtTo) . "'
+                '" . mysqli_real_escape_string($connect, $txtTo) . "',
+                '$escapedBranch'
             )";
 
     if (mysqli_query($connect, $sql)) {

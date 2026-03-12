@@ -48,7 +48,7 @@ function generateCode($connect) {
 
 if ($action === 'get') {
     $id = intval($_POST['id'] ?? 0);
-    $stmt = $connect->prepare("SELECT `ID`,`USER1`,`USER_NAME`,`USERNAME`,`TYPE` FROM `sysfile` WHERE `ID` = ? LIMIT 1");
+    $stmt = $connect->prepare("SELECT `ID`,`USER1`,`USER_NAME`,`USERNAME`,`TYPE`,`OUTLET` FROM `sysfile` WHERE `ID` = ? LIMIT 1");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -65,9 +65,15 @@ if ($action === 'get') {
     $password = trim($_POST['password'] ?? '');
     $name     = trim($_POST['name'] ?? '');
     $type     = trim($_POST['type'] ?? 'S');
+    $branch   = trim($_POST['branch'] ?? '');
 
     if ($username === '' || $password === '') {
         echo json_encode(['error' => 'Username and password are required.']);
+        exit;
+    }
+
+    if ($branch === '') {
+        echo json_encode(['error' => 'Branch is required.']);
         exit;
     }
 
@@ -90,8 +96,8 @@ if ($action === 'get') {
     // Auto-generate code
     $code = generateCode($connect);
 
-    $stmt = $connect->prepare("INSERT INTO `sysfile` (`USER1`,`USER2`,`USER_NAME`,`USERNAME`,`TYPE`,`STATUS`,`OUTLET`) VALUES (?,?,?,?,?,'Y','MAIN')");
-    $stmt->bind_param("sssss", $username, $password, $name, $code, $type);
+    $stmt = $connect->prepare("INSERT INTO `sysfile` (`USER1`,`USER2`,`USER_NAME`,`USERNAME`,`TYPE`,`STATUS`,`OUTLET`) VALUES (?,?,?,?,?,'Y',?)");
+    $stmt->bind_param("ssssss", $username, $password, $name, $code, $type, $branch);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => 'User created. Code: ' . $code]);
@@ -105,9 +111,15 @@ if ($action === 'get') {
     $password = trim($_POST['password'] ?? '');
     $name     = trim($_POST['name'] ?? '');
     $type     = trim($_POST['type'] ?? 'S');
+    $branch   = trim($_POST['branch'] ?? '');
 
     if ($id <= 0) {
         echo json_encode(['error' => 'Invalid user ID.']);
+        exit;
+    }
+
+    if ($branch === '') {
+        echo json_encode(['error' => 'Branch is required.']);
         exit;
     }
 
@@ -116,11 +128,11 @@ if ($action === 'get') {
     }
 
     if ($password !== '') {
-        $stmt = $connect->prepare("UPDATE `sysfile` SET `USER2`=?, `USER_NAME`=?, `TYPE`=? WHERE `ID`=?");
-        $stmt->bind_param("sssi", $password, $name, $type, $id);
+        $stmt = $connect->prepare("UPDATE `sysfile` SET `USER2`=?, `USER_NAME`=?, `TYPE`=?, `OUTLET`=? WHERE `ID`=?");
+        $stmt->bind_param("ssssi", $password, $name, $type, $branch, $id);
     } else {
-        $stmt = $connect->prepare("UPDATE `sysfile` SET `USER_NAME`=?, `TYPE`=? WHERE `ID`=?");
-        $stmt->bind_param("ssi", $name, $type, $id);
+        $stmt = $connect->prepare("UPDATE `sysfile` SET `USER_NAME`=?, `TYPE`=?, `OUTLET`=? WHERE `ID`=?");
+        $stmt->bind_param("sssi", $name, $type, $branch, $id);
     }
 
     if ($stmt->execute()) {

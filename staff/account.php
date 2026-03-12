@@ -232,7 +232,7 @@ if ($stResult && $row = $stResult->fetch_assoc()) {
                 if ($acctType === 'A') $roleLabel = 'Admin';
                 elseif ($acctType === 'D') $roleLabel = 'Delivery';
                 ?>
-                <p><?php echo $roleLabel; ?><?php echo !empty($_SESSION['user_outlet']) ? ' &middot; ' . htmlspecialchars($_SESSION['user_outlet']) : ''; ?></p>
+                <p><?php echo $roleLabel; ?><?php echo !empty($_SESSION['user_branch_name']) ? ' &middot; ' . htmlspecialchars($_SESSION['user_branch_name']) : (!empty($_SESSION['user_outlet']) ? ' &middot; ' . htmlspecialchars($_SESSION['user_outlet']) : ''); ?></p>
             </div>
         </div>
 

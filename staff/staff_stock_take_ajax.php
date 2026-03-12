@@ -33,6 +33,7 @@ function ensureItemStatusColumn($connect) {
 
 $action = $_POST['action'] ?? '';
 $staffName = $_SESSION['user_name'] ?? 'Staff';
+$staffBranch = $_SESSION['user_branch_code'] ?? ($_SESSION['user_outlet'] ?? '');
 
 if ($action === 'list_sessions') {
     ensureItemStatusColumn($connect);
@@ -219,8 +220,11 @@ if ($action === 'list_sessions') {
         $sessionCompleted = false;
         if ($remaining === 0) {
             // All items submitted - mark session as SUBMITTED for admin review
-            $submitStmt = $connect->prepare("UPDATE `stock_take` SET `status`='SUBMITTED', `submitted_by`=?, `submitted_at`=NOW() WHERE `id`=? AND `status`='DRAFT'");
-            $submitStmt->bind_param("si", $staffName, $sessionId);
+            // Try to add branch_code column if not exists (safe for first run)
+            $connect->query("ALTER TABLE `stock_take` ADD COLUMN `branch_code` VARCHAR(20) DEFAULT NULL AFTER `approved_by`");
+
+            $submitStmt = $connect->prepare("UPDATE `stock_take` SET `status`='SUBMITTED', `submitted_by`=?, `submitted_at`=NOW(), `branch_code`=? WHERE `id`=? AND `status`='DRAFT'");
+            $submitStmt->bind_param("ssi", $staffName, $staffBranch, $sessionId);
             $submitStmt->execute();
             $submitStmt->close();
             $sessionCompleted = true;
