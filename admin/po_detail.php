@@ -254,6 +254,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                                     <?php endif; ?>
                                 </div>
                             </div>
+                            <input type="hidden" class="item-barcode" value="<?php echo htmlspecialchars($item['barcode']); ?>">
+                            <input type="hidden" class="item-desc" value="<?php echo htmlspecialchars($item['product_desc']); ?>">
                         </td>
                         <td><?php if ($isDraft): ?><input type="number" class="item-qty" value="<?php echo $item['qty_ordered']; ?>" min="0.01" step="0.01"><?php else: echo $item['qty_ordered']; endif; ?></td>
                         <td><?php echo $item['qty_received']; ?><?php if ($item['qty_received'] < $item['qty_ordered'] && !$isDraft): ?> <span class="discrepancy" title="Pending"><i class="fas fa-exclamation-circle"></i></span><?php endif; ?></td>
