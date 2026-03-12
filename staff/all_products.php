@@ -199,11 +199,14 @@ var allCategories = [];
 
 var trendLabels = { green: 'Hot', yellow: 'Moderate', red: 'Slow', black: 'Dead' };
 var BATCH_SIZE = 2; // Categories per batch
+var SEARCH_BATCH_SIZE = 50; // Products per batch in search mode
 var loadedIndex = 0; // Next category index to render
 var isLoading = false;
 var isSearchMode = false;
 var totalProducts = 0;
 var dataLoaded = false;
+var searchResults = []; // Scored results for batch rendering
+var searchRenderedCount = 0; // How many search results rendered so far
 
 // Flatten all products for search
 var allProductsFlat = [];
@@ -280,7 +283,11 @@ function doRelevanceSearch(query) {
   // Sort by score descending
   scored.sort(function(a, b) { return b.score - a.score; });
 
-  // Render results
+  // Store for batch rendering
+  searchResults = scored;
+  searchRenderedCount = 0;
+
+  // Render header
   var sections = document.getElementById('productSections');
   var matchCount = scored.length;
 
@@ -291,19 +298,41 @@ function doRelevanceSearch(query) {
 
   if (matchCount === 0) {
     sections.innerHTML = headerHtml + '<div style="text-align:center;padding:40px 0;color:var(--text-muted);font-size:14px;">No products found.</div>';
+    document.getElementById('loadSentinel').style.display = 'none';
   } else {
-    var cardsHtml = scored.map(function(item, i) {
-      return renderProductCard(item.product, i);
-    }).join('');
-    sections.innerHTML = headerHtml + '<div class="product-grid">' + cardsHtml + '</div>';
+    sections.innerHTML = headerHtml + '<div class="product-grid" id="searchGrid"></div>';
+    loadNextSearchBatch();
   }
 
-  document.getElementById('loadSentinel').style.display = 'none';
   document.getElementById('productTotal').textContent = matchCount + ' results';
+}
+
+function loadNextSearchBatch() {
+  if (!isSearchMode || searchRenderedCount >= searchResults.length) {
+    document.getElementById('loadSentinel').style.display = 'none';
+    return;
+  }
+
+  var grid = document.getElementById('searchGrid');
+  var end = Math.min(searchRenderedCount + SEARCH_BATCH_SIZE, searchResults.length);
+  var html = '';
+  for (var i = searchRenderedCount; i < end; i++) {
+    html += renderProductCard(searchResults[i].product, i);
+  }
+  grid.insertAdjacentHTML('beforeend', html);
+  searchRenderedCount = end;
+
+  if (searchRenderedCount < searchResults.length) {
+    document.getElementById('loadSentinel').style.display = 'flex';
+  } else {
+    document.getElementById('loadSentinel').style.display = 'none';
+  }
 }
 
 function clearSearch() {
   isSearchMode = false;
+  searchResults = [];
+  searchRenderedCount = 0;
   loadedIndex = 0;
   document.getElementById('productSearchInput').value = '';
   document.getElementById('productSections').innerHTML = '';
@@ -413,8 +442,12 @@ function loadNextBatch() {
 // ==================== INFINITE SCROLL ====================
 var sentinel = document.getElementById('loadSentinel');
 var observer = new IntersectionObserver(function(entries) {
-  if (entries[0].isIntersecting && !isSearchMode) {
-    loadNextBatch();
+  if (entries[0].isIntersecting) {
+    if (isSearchMode) {
+      loadNextSearchBatch();
+    } else {
+      loadNextBatch();
+    }
   }
 }, { rootMargin: '400px' }); // Trigger 400px before sentinel is visible
 
