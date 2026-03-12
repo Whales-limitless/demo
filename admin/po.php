@@ -70,21 +70,26 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 /* Product search modal */
 .product-search-modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1060; align-items:center; justify-content:center; }
 .product-search-modal-overlay.show { display:flex; }
-.product-search-modal { background:#fff; border-radius:var(--radius); width:90%; max-width:750px; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 8px 32px rgba(0,0,0,0.2); }
+.product-search-modal { background:#fff; border-radius:var(--radius); width:90%; max-width:700px; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 8px 32px rgba(0,0,0,0.2); }
 .product-search-modal .psm-header { padding:16px 20px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
 .product-search-modal .psm-header h5 { margin:0; font-family:'Outfit',sans-serif; font-weight:700; font-size:16px; }
-.product-search-modal .psm-body { padding:16px 20px; overflow-y:auto; flex:1; }
-.product-search-modal .psm-search-row { display:flex; gap:8px; margin-bottom:14px; }
-.product-search-modal .psm-search-row input { flex:1; padding:9px 14px; border:1px solid #d1d5db; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:13px; outline:none; }
-.product-search-modal .psm-search-row input:focus { border-color:var(--primary); }
-.product-search-modal .psm-search-row button { padding:9px 18px; background:var(--primary); color:#fff; border:none; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
-.product-search-modal .psm-search-row button:hover { background:var(--primary-dark); }
-.psm-results-table { width:100%; border-collapse:collapse; font-size:13px; }
-.psm-results-table th { background:#f9fafb; padding:8px 10px; font-weight:600; font-size:12px; text-align:left; border-bottom:2px solid #e5e7eb; position:sticky; top:0; }
-.psm-results-table td { padding:8px 10px; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
-.psm-results-table tbody tr { cursor:pointer; transition:background 0.15s; }
-.psm-results-table tbody tr:hover { background:#f0f9ff; }
-.psm-no-results { text-align:center; padding:30px; color:var(--text-muted); font-size:13px; }
+.psm-search-wrap { position:relative; padding:16px 20px 0; }
+.psm-search-input { width:100%; padding:11px 14px 11px 40px; border:2px solid #e5e7eb; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:14px; outline:none; }
+.psm-search-input:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(200,16,46,0.1); }
+.psm-search-icon { position:absolute; left:34px; top:50%; transform:translateY(-50%); color:var(--text-muted); pointer-events:none; }
+.psm-search-icon i { font-size:14px; }
+.psm-results { overflow-y:auto; flex:1; padding:8px 0; }
+.psm-item { display:flex; align-items:center; gap:12px; padding:10px 20px; cursor:pointer; border-bottom:1px solid #f3f4f6; transition:background 0.15s; }
+.psm-item:last-child { border-bottom:none; }
+.psm-item:hover { background:#f0f9ff; }
+.psm-item-info { flex:1; min-width:0; }
+.psm-item-name { font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.psm-item-name mark { background:#fef3c7; border-radius:2px; padding:0 1px; }
+.psm-item-meta { font-size:11px; color:var(--text-muted); margin-top:2px; }
+.psm-item-qoh { font-size:11px; font-weight:600; white-space:nowrap; }
+.psm-item-qoh.in { color:#16a34a; }
+.psm-item-qoh.out { color:#dc2626; }
+.psm-empty { text-align:center; padding:30px 20px; color:var(--text-muted); font-size:13px; }
 
 /* Line items table */
 .line-items-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
@@ -238,20 +243,18 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 </div>
 
 <!-- Product Search Modal (modal in modal) -->
-<div class="product-search-modal-overlay" id="productSearchOverlay">
-    <div class="product-search-modal">
+<div class="product-search-modal-overlay" id="productSearchOverlay" onclick="if(event.target===this)closeProductSearchModal();">
+    <div class="product-search-modal" onclick="event.stopPropagation();">
         <div class="psm-header">
             <h5><i class="fas fa-search" style="color:var(--primary);margin-right:6px;"></i>Search Product</h5>
-            <button type="button" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted);" onclick="closeProductSearchModal();">&times;</button>
+            <button type="button" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);line-height:1;" onclick="closeProductSearchModal();">&times;</button>
         </div>
-        <div class="psm-body">
-            <div class="psm-search-row">
-                <input type="text" id="psmSearchInput" placeholder="Type product name or barcode..." onkeydown="if(event.key==='Enter')searchProducts();">
-                <button onclick="searchProducts();"><i class="fas fa-search"></i> Search</button>
-            </div>
-            <div id="psmResultsContainer">
-                <div class="psm-no-results">Type a product name or barcode and click Search</div>
-            </div>
+        <div class="psm-search-wrap">
+            <span class="psm-search-icon"><i class="fas fa-search"></i></span>
+            <input type="text" class="psm-search-input" id="psmSearchInput" placeholder="Type product name or barcode..." autocomplete="off">
+        </div>
+        <div class="psm-results" id="psmResultsContainer">
+            <div class="psm-empty">Start typing to search products</div>
         </div>
     </div>
 </div>
@@ -431,49 +434,78 @@ function renumberLines() {
 }
 
 // ==================== PRODUCT SEARCH MODAL ====================
+var psmSearchTimer = null;
+var psmSearchXhr = null;
+
 function openProductSearchModal() {
     document.getElementById('psmSearchInput').value = '';
-    document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-no-results">Type a product name or barcode and click Search</div>';
+    document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty">Start typing to search products</div>';
     document.getElementById('productSearchOverlay').classList.add('show');
     setTimeout(function() { document.getElementById('psmSearchInput').focus(); }, 100);
 }
 
 function closeProductSearchModal() {
     document.getElementById('productSearchOverlay').classList.remove('show');
+    if (psmSearchXhr) { psmSearchXhr.abort(); psmSearchXhr = null; }
 }
 
-function searchProducts() {
-    var q = document.getElementById('psmSearchInput').value.trim();
-    if (q.length < 1) { return; }
-    var container = document.getElementById('psmResultsContainer');
-    container.innerHTML = '<div class="psm-no-results"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+function highlightMatch(text, query) {
+    if (!query) return escHtml(text);
+    var escaped = escHtml(text);
+    var re = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return escaped.replace(re, '<mark>$1</mark>');
+}
 
-    $.ajax({
+document.getElementById('psmSearchInput').addEventListener('input', function() {
+    var q = this.value.trim();
+    clearTimeout(psmSearchTimer);
+    if (q.length < 1) {
+        document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty">Start typing to search products</div>';
+        if (psmSearchXhr) { psmSearchXhr.abort(); psmSearchXhr = null; }
+        return;
+    }
+    psmSearchTimer = setTimeout(function() { doProductSearch(q); }, 250);
+});
+
+document.getElementById('psmSearchInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeProductSearchModal();
+});
+
+function doProductSearch(q) {
+    if (psmSearchXhr) { psmSearchXhr.abort(); }
+    var container = document.getElementById('psmResultsContainer');
+    container.innerHTML = '<div class="psm-empty"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+
+    psmSearchXhr = $.ajax({
         type: 'POST', url: 'po_ajax.php', data: { action: 'search_products', q: q }, dataType: 'json',
         success: function(data) {
+            psmSearchXhr = null;
             var products = data.products || [];
             if (products.length === 0) {
-                container.innerHTML = '<div class="psm-no-results">No products found for "' + escHtml(q) + '"</div>';
+                container.innerHTML = '<div class="psm-empty">No products found for "' + escHtml(q) + '"</div>';
                 return;
             }
-            var html = '<table class="psm-results-table"><thead><tr><th>Product</th><th>Barcode</th><th>UOM</th><th>QOH</th></tr></thead><tbody>';
+            var html = '';
             products.forEach(function(p) {
-                html += '<tr onclick="selectProductFromModal(\'' + escHtml(p.barcode) + '\', \'' + escHtml(p.name).replace(/'/g, "\\'") + '\', \'' + escHtml(p.uom || '') + '\');">';
-                html += '<td><strong>' + escHtml(p.name) + '</strong></td>';
-                html += '<td>' + escHtml(p.barcode) + '</td>';
-                html += '<td>' + escHtml(p.uom || '-') + '</td>';
-                html += '<td>' + (p.qoh || 0) + '</td>';
-                html += '</tr>';
+                var qohClass = (p.qoh || 0) > 0 ? 'in' : 'out';
+                html += '<div class="psm-item" onclick="selectProductFromModal(\'' + escHtml(p.barcode) + '\', \'' + escHtml(p.name).replace(/'/g, "\\'") + '\', \'' + escHtml(p.uom || '') + '\');">';
+                html += '<div class="psm-item-info"><div class="psm-item-name">' + highlightMatch(p.name, q) + '</div>';
+                html += '<div class="psm-item-meta">' + escHtml(p.barcode) + (p.uom ? ' &middot; ' + escHtml(p.uom) : '') + '</div></div>';
+                html += '<span class="psm-item-qoh ' + qohClass + '">QOH: ' + (p.qoh || 0) + '</span>';
+                html += '</div>';
             });
-            html += '</tbody></table>';
             container.innerHTML = html;
-        }
+        },
+        error: function() { psmSearchXhr = null; }
     });
 }
 
 function selectProductFromModal(barcode, name, uom) {
-    closeProductSearchModal();
     addLineItem(barcode, name, uom, 1);
+    // Keep modal open for adding more products, just clear search
+    document.getElementById('psmSearchInput').value = '';
+    document.getElementById('psmSearchInput').focus();
+    document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty">Product added! Search for more or close.</div>';
 }
 
 // ==================== SAVE PO ====================
