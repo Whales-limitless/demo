@@ -66,6 +66,18 @@ if ('serviceWorker' in navigator) {
     </a></li>
 
     <div class="sidebar-divider"></div>
+    <div class="sidebar-section-label">Procurement</div>
+
+    <li><a href="staff_po.php" data-page="staff_po.php">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Purchase Orders
+    </a></li>
+    <li><a href="staff_grn.php" data-page="staff_grn.php">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      Goods Receiving
+    </a></li>
+
+    <div class="sidebar-divider"></div>
     <div class="sidebar-section-label">Inventory</div>
 
     <li><a href="staff_stock_take.php" data-page="staff_stock_take.php">
