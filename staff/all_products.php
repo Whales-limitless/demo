@@ -262,8 +262,8 @@ function scoreProduct(p, q) {
 }
 
 function doRelevanceSearch(query) {
-  var q = query.trim();
-  if (!q) {
+  var q = query;
+  if (q.length === 0) {
     clearSearch();
     return;
   }
@@ -462,15 +462,8 @@ function renderAllForSearch() {
 // Search button click
 document.getElementById('searchBtn').addEventListener('click', function() {
   if (!dataLoaded) return;
-  var input = document.getElementById('productSearchInput');
-  var raw = input.value;
-  var q = raw.trim();
-  if (raw.length > 0 && !q) {
-    var sections = document.getElementById('productSections');
-    sections.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-muted);font-size:14px;">Please enter a valid search term.</div>';
-    return;
-  }
-  if (q) doRelevanceSearch(q);
+  var q = document.getElementById('productSearchInput').value;
+  if (q.length > 0) doRelevanceSearch(q);
 });
 
 // Enter key in search input
@@ -478,14 +471,8 @@ document.getElementById('productSearchInput').addEventListener('keydown', functi
   if (e.key === 'Enter') {
     e.preventDefault();
     if (!dataLoaded) return;
-    var raw = this.value;
-    var q = raw.trim();
-    if (raw.length > 0 && !q) {
-      var sections = document.getElementById('productSections');
-      sections.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-muted);font-size:14px;">Please enter a valid search term.</div>';
-      return;
-    }
-    if (q) doRelevanceSearch(q);
+    var q = this.value;
+    if (q.length > 0) doRelevanceSearch(q);
   }
 });
 

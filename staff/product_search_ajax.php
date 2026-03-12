@@ -10,7 +10,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 require_once 'dbconnection.php';
 $connect->set_charset("utf8mb4");
 
-$search = trim($_GET['q'] ?? '');
+$search = $_GET['q'] ?? '';
 
 if ($search === '') {
     echo json_encode(['products' => []]);
