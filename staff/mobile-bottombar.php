@@ -46,6 +46,24 @@
     <div class="inv-modal-handle"></div>
     <div class="inv-modal-title">Inventory</div>
     <div class="inv-modal-buttons">
+      <a href="staff_po.php" class="inv-modal-btn">
+        <div class="inv-icon" style="background:#dbeafe;color:#2563eb;">
+          <svg><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div class="inv-label">
+          Purchase Orders
+          <small>Create and manage POs</small>
+        </div>
+      </a>
+      <a href="staff_grn.php" class="inv-modal-btn">
+        <div class="inv-icon" style="background:#fef3c7;color:#d97706;">
+          <svg><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        </div>
+        <div class="inv-label">
+          Goods Receiving
+          <small>Receive stock from POs</small>
+        </div>
+      </a>
       <a href="staff_stock_take.php" class="inv-modal-btn">
         <div class="inv-icon stock-take">
           <svg><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
@@ -151,6 +169,8 @@
     'products.php': 'tabCategory',
     'all_products.php': 'tabProducts',
     'account.php': 'tabAccount',
+    'staff_po.php': 'tabInventory',
+    'staff_grn.php': 'tabInventory',
     'staff_stock_take.php': 'tabInventory',
     'staff_stock_loss.php': 'tabInventory',
     'del_dashboard.php': 'tabDelivery',

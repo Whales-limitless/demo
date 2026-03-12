@@ -1,0 +1,500 @@
+<?php
+session_start();
+date_default_timezone_set("Asia/Kuala_Lumpur");
+
+header('Content-Type: application/json; charset=utf-8');
+
+if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true) {
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
+
+require_once 'dbconnection.php';
+$connect->set_charset("utf8mb4");
+
+$action = $_POST['action'] ?? '';
+
+// Generate next PO number: PO-YYYYMM-0001
+function generatePONumber($connect) {
+    $prefix = 'PO-' . date('Ym') . '-';
+    $result = $connect->query("SELECT `po_number` FROM `purchase_order` WHERE `po_number` LIKE '$prefix%' ORDER BY `po_number` DESC LIMIT 1");
+    $next = 1;
+    if ($result && $row = $result->fetch_assoc()) {
+        $num = intval(substr($row['po_number'], -4));
+        $next = $num + 1;
+    }
+    return $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
+}
+
+function generateGRNNumber($connect) {
+    $prefix = 'GRN-' . date('Ym') . '-';
+    $result = $connect->query("SELECT `grn_number` FROM `grn` WHERE `grn_number` LIKE '" . $connect->real_escape_string($prefix) . "%' ORDER BY `grn_number` DESC LIMIT 1");
+    $next = 1;
+    if ($result && $row = $result->fetch_assoc()) {
+        $num = intval(substr($row['grn_number'], -4));
+        $next = $num + 1;
+    }
+    return $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
+}
+
+// ==================== PRODUCT SEARCH ====================
+if ($action === 'search_products') {
+    $search = trim($_POST['q'] ?? '');
+    if ($search === '') {
+        echo json_encode(['products' => []]);
+        exit;
+    }
+
+    $normalizedSearch = $search;
+    $normalizedSearch = str_replace(["\u{201C}", "\u{201D}", "\u{2033}", "\u{FF02}"], '"', $normalizedSearch);
+    $normalizedSearch = str_replace(["\u{2018}", "\u{2019}", "\u{2032}", "\u{FF07}"], "'", $normalizedSearch);
+    $altSearch = str_replace('"', "''", $normalizedSearch);
+    $altSearch2 = str_replace("''", '"', $normalizedSearch);
+    $normalizedLike = '%' . $normalizedSearch . '%';
+    $altLike = '%' . $altSearch . '%';
+    $altLike2 = '%' . $altSearch2 . '%';
+
+    $stmt = $connect->prepare("
+        SELECT p.`id`, p.`barcode`, p.`name`, p.`img1` AS image, p.`uom`,
+               COALESCE(p.`qoh`, 0) AS qoh, p.`cat_code`, p.`rack`,
+               c.`cat_name` AS category_name
+        FROM `PRODUCTS` p
+        LEFT JOIN `category` c ON p.`cat_code` = c.`cat_code`
+        WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?
+               OR p.`barcode` LIKE ? OR p.`barcode` LIKE ? OR p.`barcode` LIKE ?)
+          AND (p.`checked` != 'N' OR p.`checked` IS NULL)
+        ORDER BY p.`name` ASC
+        LIMIT 20
+    ");
+    $stmt->bind_param("ssssss", $normalizedLike, $altLike, $altLike2, $normalizedLike, $altLike, $altLike2);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $products = [];
+    $seen = [];
+    while ($row = $result->fetch_assoc()) {
+        if (isset($seen[$row['id']])) continue;
+        $seen[$row['id']] = true;
+        $row['id'] = (int)$row['id'];
+        $row['qoh'] = (float)$row['qoh'];
+        $products[] = $row;
+    }
+    $stmt->close();
+    echo json_encode(['products' => $products]);
+
+// ==================== QUICK CREATE PRODUCT ====================
+} elseif ($action === 'quick_create_product') {
+    $name = trim($_POST['name'] ?? '');
+    $uom = trim($_POST['uom'] ?? '');
+    $barcode = trim($_POST['barcode'] ?? '');
+
+    if ($name === '') {
+        echo json_encode(['error' => 'Product name is required.']);
+        exit;
+    }
+
+    if ($barcode === '') {
+        $barcode = 'NEW-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
+    }
+
+    $chk = $connect->prepare("SELECT `id` FROM `PRODUCTS` WHERE `barcode` = ? LIMIT 1");
+    $chk->bind_param("s", $barcode);
+    $chk->execute();
+    if ($chk->get_result()->num_rows > 0) {
+        echo json_encode(['error' => 'Barcode already exists.']);
+        $chk->close();
+        exit;
+    }
+    $chk->close();
+
+    // Handle image upload
+    $image = '';
+    if (isset($_FILES['product_image']) && $_FILES['product_image']['error'] === UPLOAD_ERR_OK) {
+        $file = $_FILES['product_image'];
+        $uploadDir = __DIR__ . '/../img/';
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+
+        if (in_array($mimeType, $allowedTypes) && $file['size'] <= 10 * 1024 * 1024) {
+            $fileName = 'prod_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.jpg';
+            $destPath = $uploadDir . $fileName;
+            switch ($mimeType) {
+                case 'image/jpeg': $img = @imagecreatefromjpeg($file['tmp_name']); break;
+                case 'image/png':  $img = @imagecreatefrompng($file['tmp_name']); break;
+                case 'image/gif':  $img = @imagecreatefromgif($file['tmp_name']); break;
+                case 'image/webp': $img = @imagecreatefromwebp($file['tmp_name']); break;
+                default: $img = false;
+            }
+            if ($img) {
+                $maxDim = 800;
+                $origW = imagesx($img);
+                $origH = imagesy($img);
+                if ($origW > $maxDim || $origH > $maxDim) {
+                    if ($origW >= $origH) { $newW = $maxDim; $newH = intval($origH * $maxDim / $origW); }
+                    else { $newH = $maxDim; $newW = intval($origW * $maxDim / $origH); }
+                    $resized = imagecreatetruecolor($newW, $newH);
+                    imagealphablending($resized, false);
+                    imagesavealpha($resized, true);
+                    imagecopyresampled($resized, $img, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+                    imagedestroy($img);
+                    $img = $resized;
+                }
+                imagejpeg($img, $destPath, 75);
+                imagedestroy($img);
+                $image = $fileName;
+            }
+        }
+    }
+
+    $checked = 'Y';
+    $qoh = 0.0;
+    $empty = '';
+    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`cat_code`,`sub_code`,`uom`,`rack`,`qoh`,`checked`,`img1`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $stmt->bind_param("ssssssssssdss", $barcode, $empty, $name, $empty, $empty, $empty, $empty, $empty, $uom, $empty, $qoh, $checked, $image);
+
+    if ($stmt->execute()) {
+        $newId = $connect->insert_id;
+        echo json_encode([
+            'success' => 'Product created.',
+            'product' => ['id' => $newId, 'barcode' => $barcode, 'name' => $name, 'uom' => $uom, 'image' => $image, 'qoh' => 0]
+        ]);
+    } else {
+        echo json_encode(['error' => 'Failed to create product: ' . $connect->error]);
+    }
+    $stmt->close();
+
+// ==================== PO LIST ====================
+} elseif ($action === 'list_po') {
+    $status = trim($_POST['status'] ?? '');
+    $where = "1=1";
+    $params = [];
+    $types = "";
+
+    if ($status !== '') {
+        $where .= " AND po.status = ?";
+        $params[] = $status;
+        $types .= "s";
+    }
+
+    $sql = "SELECT po.*, s.name AS supplier_name FROM `purchase_order` po LEFT JOIN `supplier` s ON po.supplier_id = s.id WHERE $where ORDER BY po.id DESC LIMIT 100";
+    $stmt = $connect->prepare($sql);
+    if ($types !== '') {
+        $stmt->bind_param($types, ...$params);
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $pos = [];
+    while ($r = $result->fetch_assoc()) {
+        $pos[] = $r;
+    }
+    $stmt->close();
+    echo json_encode(['pos' => $pos]);
+
+// ==================== CREATE PO ====================
+} elseif ($action === 'create') {
+    $supplierId = intval($_POST['supplier_id'] ?? 0);
+    $orderDate = trim($_POST['order_date'] ?? '');
+    $expectedDate = trim($_POST['expected_date'] ?? '');
+    $remark = trim($_POST['remark'] ?? '');
+    $items = json_decode($_POST['items'] ?? '[]', true);
+    $createdBy = $_SESSION['user_name'] ?? 'Staff';
+
+    if ($supplierId <= 0 || $orderDate === '') {
+        echo json_encode(['error' => 'Supplier and order date are required.']);
+        exit;
+    }
+    if (empty($items)) {
+        echo json_encode(['error' => 'At least one line item is required.']);
+        exit;
+    }
+
+    $poNumber = generatePONumber($connect);
+    $expectedDateVal = $expectedDate !== '' ? $expectedDate : null;
+
+    $stmt = $connect->prepare("INSERT INTO `purchase_order` (`po_number`,`supplier_id`,`order_date`,`expected_date`,`status`,`total_amount`,`remark`,`created_by`) VALUES (?,?,?,?,'DRAFT',0,?,?)");
+    $stmt->bind_param("sissss", $poNumber, $supplierId, $orderDate, $expectedDateVal, $remark, $createdBy);
+
+    if (!$stmt->execute()) {
+        echo json_encode(['error' => 'Failed to create PO: ' . $connect->error]);
+        $stmt->close();
+        exit;
+    }
+    $newPoId = $connect->insert_id;
+    $stmt->close();
+
+    $itemStmt = $connect->prepare("INSERT INTO `purchase_order_item` (`po_id`,`barcode`,`product_desc`,`qty_ordered`,`unit_cost`,`uom`) VALUES (?,?,?,?,0,?)");
+    foreach ($items as $item) {
+        $barcode = trim($item['barcode'] ?? '');
+        $desc = trim($item['product_desc'] ?? '');
+        $qtyOrdered = floatval($item['qty_ordered'] ?? 0);
+        $uom = trim($item['uom'] ?? '');
+        $itemStmt->bind_param("issds", $newPoId, $barcode, $desc, $qtyOrdered, $uom);
+        $itemStmt->execute();
+    }
+    $itemStmt->close();
+
+    echo json_encode(['success' => 'PO ' . $poNumber . ' created.', 'po_id' => $newPoId]);
+
+// ==================== UPDATE PO ====================
+} elseif ($action === 'update') {
+    $id = intval($_POST['id'] ?? 0);
+    $supplierId = intval($_POST['supplier_id'] ?? 0);
+    $orderDate = trim($_POST['order_date'] ?? '');
+    $expectedDate = trim($_POST['expected_date'] ?? '');
+    $remark = trim($_POST['remark'] ?? '');
+    $items = json_decode($_POST['items'] ?? '[]', true);
+
+    if ($id <= 0) {
+        echo json_encode(['error' => 'Invalid PO ID.']);
+        exit;
+    }
+
+    $chk = $connect->query("SELECT `status` FROM `purchase_order` WHERE `id` = $id LIMIT 1");
+    if (!$chk || $chk->num_rows === 0) {
+        echo json_encode(['error' => 'PO not found.']);
+        exit;
+    }
+    $row = $chk->fetch_assoc();
+    if ($row['status'] !== 'DRAFT') {
+        echo json_encode(['error' => 'Only DRAFT POs can be edited.']);
+        exit;
+    }
+
+    $expectedDateVal = $expectedDate !== '' ? $expectedDate : null;
+
+    $stmt = $connect->prepare("UPDATE `purchase_order` SET `supplier_id`=?,`order_date`=?,`expected_date`=?,`total_amount`=0,`remark`=? WHERE `id`=?");
+    $stmt->bind_param("isssi", $supplierId, $orderDate, $expectedDateVal, $remark, $id);
+    $stmt->execute();
+    $stmt->close();
+
+    $connect->query("DELETE FROM `purchase_order_item` WHERE `po_id` = $id");
+
+    $itemStmt = $connect->prepare("INSERT INTO `purchase_order_item` (`po_id`,`barcode`,`product_desc`,`qty_ordered`,`unit_cost`,`uom`) VALUES (?,?,?,?,0,?)");
+    foreach ($items as $item) {
+        $barcode = trim($item['barcode'] ?? '');
+        $desc = trim($item['product_desc'] ?? '');
+        $qtyOrdered = floatval($item['qty_ordered'] ?? 0);
+        $uom = trim($item['uom'] ?? '');
+        $itemStmt->bind_param("issds", $id, $barcode, $desc, $qtyOrdered, $uom);
+        $itemStmt->execute();
+    }
+    $itemStmt->close();
+
+    echo json_encode(['success' => 'PO updated.', 'po_id' => $id]);
+
+// ==================== GET PO DETAIL ====================
+} elseif ($action === 'get_po') {
+    $id = intval($_POST['id'] ?? 0);
+    $stmt = $connect->prepare("SELECT po.*, s.name AS supplier_name FROM `purchase_order` po LEFT JOIN `supplier` s ON po.supplier_id = s.id WHERE po.id = ? LIMIT 1");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $po = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$po) {
+        echo json_encode(['error' => 'PO not found.']);
+        exit;
+    }
+
+    $itemResult = $connect->query("SELECT poi.*, p.img1 AS product_image FROM `purchase_order_item` poi LEFT JOIN `PRODUCTS` p ON poi.barcode = p.barcode WHERE poi.po_id = $id ORDER BY poi.id ASC");
+    $items = [];
+    if ($itemResult) {
+        while ($r = $itemResult->fetch_assoc()) {
+            $items[] = $r;
+        }
+    }
+
+    echo json_encode(['po' => $po, 'items' => $items]);
+
+// ==================== APPROVE PO ====================
+} elseif ($action === 'approve') {
+    $id = intval($_POST['id'] ?? 0);
+    $approvedBy = $_SESSION['user_name'] ?? 'Staff';
+
+    $stmt = $connect->prepare("UPDATE `purchase_order` SET `status`='APPROVED', `approved_by`=?, `approved_date`=NOW() WHERE `id`=? AND `status`='DRAFT'");
+    $stmt->bind_param("si", $approvedBy, $id);
+    $stmt->execute();
+
+    if ($stmt->affected_rows > 0) {
+        echo json_encode(['success' => 'PO approved.']);
+    } else {
+        echo json_encode(['error' => 'Could not approve. PO may not be in DRAFT status.']);
+    }
+    $stmt->close();
+
+// ==================== CANCEL PO ====================
+} elseif ($action === 'cancel') {
+    $id = intval($_POST['id'] ?? 0);
+    $stmt = $connect->prepare("UPDATE `purchase_order` SET `status`='CANCELLED' WHERE `id`=? AND `status` IN ('DRAFT','APPROVED')");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+
+    if ($stmt->affected_rows > 0) {
+        echo json_encode(['success' => 'PO cancelled.']);
+    } else {
+        echo json_encode(['error' => 'Could not cancel.']);
+    }
+    $stmt->close();
+
+// ==================== SUPPLIERS LIST (for dropdown) ====================
+} elseif ($action === 'list_suppliers') {
+    $result = $connect->query("SELECT `id`, `code`, `name` FROM `supplier` WHERE `status` = 'ACTIVE' ORDER BY `name` ASC");
+    $list = [];
+    if ($result) {
+        while ($r = $result->fetch_assoc()) {
+            $list[] = $r;
+        }
+    }
+    echo json_encode(['suppliers' => $list]);
+
+// ==================== GRN LIST ====================
+} elseif ($action === 'list_grn') {
+    $result = $connect->query("SELECT g.*, s.name AS supplier_name, po.po_number FROM `grn` g LEFT JOIN `supplier` s ON g.supplier_id = s.id LEFT JOIN `purchase_order` po ON g.po_id = po.id ORDER BY g.id DESC LIMIT 100");
+    $grns = [];
+    if ($result) {
+        while ($r = $result->fetch_assoc()) {
+            $grns[] = $r;
+        }
+    }
+    echo json_encode(['grns' => $grns]);
+
+// ==================== GET PO ITEMS FOR RECEIVING ====================
+} elseif ($action === 'get_po_items') {
+    $poId = intval($_POST['po_id'] ?? 0);
+    $stmt = $connect->prepare("SELECT po.*, s.name AS supplier_name, s.id AS supplier_id FROM `purchase_order` po LEFT JOIN `supplier` s ON po.supplier_id = s.id WHERE po.id = ? AND po.status IN ('APPROVED','PARTIALLY_RECEIVED') LIMIT 1");
+    $stmt->bind_param("i", $poId);
+    $stmt->execute();
+    $po = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$po) {
+        echo json_encode(['error' => 'PO not found or not in receivable status.']);
+        exit;
+    }
+
+    $itemResult = $connect->query("SELECT poi.*, p.img1 AS product_image FROM `purchase_order_item` poi LEFT JOIN `PRODUCTS` p ON poi.barcode = p.barcode WHERE poi.po_id = $poId ORDER BY poi.id ASC");
+    $items = [];
+    if ($itemResult) {
+        while ($r = $itemResult->fetch_assoc()) {
+            $r['qty_pending'] = $r['qty_ordered'] - $r['qty_received'];
+            $items[] = $r;
+        }
+    }
+    echo json_encode(['po' => $po, 'items' => $items]);
+
+// ==================== APPROVED POS FOR RECEIVING DROPDOWN ====================
+} elseif ($action === 'list_receivable_pos') {
+    $result = $connect->query("SELECT po.id, po.po_number, s.name AS supplier_name FROM `purchase_order` po LEFT JOIN `supplier` s ON po.supplier_id = s.id WHERE po.status IN ('APPROVED','PARTIALLY_RECEIVED') ORDER BY po.id DESC");
+    $pos = [];
+    if ($result) {
+        while ($r = $result->fetch_assoc()) {
+            $pos[] = $r;
+        }
+    }
+    echo json_encode(['pos' => $pos]);
+
+// ==================== RECEIVE GRN ====================
+} elseif ($action === 'receive') {
+    $poId = intval($_POST['po_id'] ?? 0);
+    $supplierId = intval($_POST['supplier_id'] ?? 0);
+    $remark = trim($_POST['remark'] ?? '');
+    $items = json_decode($_POST['items'] ?? '[]', true);
+    $receivedBy = $_SESSION['user_name'] ?? 'Staff';
+
+    if ($supplierId <= 0) {
+        echo json_encode(['error' => 'Invalid supplier.']);
+        exit;
+    }
+    if (empty($items)) {
+        echo json_encode(['error' => 'No items to receive.']);
+        exit;
+    }
+
+    if ($poId > 0) {
+        $chk = $connect->query("SELECT `status` FROM `purchase_order` WHERE `id` = $poId LIMIT 1");
+        if (!$chk || $chk->num_rows === 0) {
+            echo json_encode(['error' => 'PO not found.']);
+            exit;
+        }
+        $row = $chk->fetch_assoc();
+        if (!in_array($row['status'], ['APPROVED', 'PARTIALLY_RECEIVED'])) {
+            echo json_encode(['error' => 'PO is not in a receivable status.']);
+            exit;
+        }
+    }
+
+    $connect->begin_transaction();
+
+    try {
+        $grnNumber = generateGRNNumber($connect);
+        $receiveDate = date('Y-m-d');
+        $poIdVal = $poId > 0 ? $poId : null;
+
+        $stmt = $connect->prepare("INSERT INTO `grn` (`grn_number`,`po_id`,`supplier_id`,`receive_date`,`received_by`,`remark`) VALUES (?,?,?,?,?,?)");
+        $stmt->bind_param("siisss", $grnNumber, $poIdVal, $supplierId, $receiveDate, $receivedBy, $remark);
+        if (!$stmt->execute()) {
+            throw new Exception('Failed to create GRN: ' . $connect->error);
+        }
+        $grnId = $connect->insert_id;
+        $stmt->close();
+
+        $grnItemStmt = $connect->prepare("INSERT INTO `grn_item` (`grn_id`,`po_item_id`,`barcode`,`product_desc`,`qty_received`,`qty_rejected`,`unit_cost`,`batch_no`,`rack_location`) VALUES (?,?,?,?,?,?,0,?,?)");
+        $updateQohStmt = $connect->prepare("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) + ? WHERE `barcode` = ?");
+        $updatePoItemStmt = $connect->prepare("UPDATE `purchase_order_item` SET `qty_received` = `qty_received` + ? WHERE `id` = ?");
+
+        foreach ($items as $item) {
+            $poItemId = !empty($item['po_item_id']) ? intval($item['po_item_id']) : null;
+            $barcode = trim($item['barcode'] ?? '');
+            $desc = trim($item['product_desc'] ?? '');
+            $qtyReceived = floatval($item['qty_received'] ?? 0);
+            $qtyRejected = floatval($item['qty_rejected'] ?? 0);
+            $batchNo = trim($item['batch_no'] ?? '');
+            $rackLoc = trim($item['rack_location'] ?? '');
+
+            $grnItemStmt->bind_param("iissddss", $grnId, $poItemId, $barcode, $desc, $qtyReceived, $qtyRejected, $batchNo, $rackLoc);
+            if (!$grnItemStmt->execute()) {
+                throw new Exception('Failed to insert GRN item: ' . $connect->error);
+            }
+
+            if ($qtyReceived > 0 && $barcode !== '') {
+                $updateQohStmt->bind_param("ds", $qtyReceived, $barcode);
+                $updateQohStmt->execute();
+            }
+
+            if ($poItemId && $qtyReceived > 0) {
+                $updatePoItemStmt->bind_param("di", $qtyReceived, $poItemId);
+                $updatePoItemStmt->execute();
+            }
+        }
+
+        $grnItemStmt->close();
+        $updateQohStmt->close();
+        $updatePoItemStmt->close();
+
+        if ($poId > 0) {
+            $poItemsResult = $connect->query("SELECT SUM(`qty_ordered`) as total_ordered, SUM(`qty_received`) as total_received FROM `purchase_order_item` WHERE `po_id` = $poId");
+            if ($poItemsResult && $poRow = $poItemsResult->fetch_assoc()) {
+                $totalOrdered = floatval($poRow['total_ordered']);
+                $totalReceived = floatval($poRow['total_received']);
+                if ($totalReceived >= $totalOrdered) {
+                    $connect->query("UPDATE `purchase_order` SET `status` = 'RECEIVED' WHERE `id` = $poId");
+                } else {
+                    $connect->query("UPDATE `purchase_order` SET `status` = 'PARTIALLY_RECEIVED' WHERE `id` = $poId");
+                }
+            }
+        }
+
+        $connect->commit();
+        echo json_encode(['success' => 'GRN ' . $grnNumber . ' created. Stock quantities updated.', 'grn_id' => $grnId]);
+
+    } catch (Exception $e) {
+        $connect->rollback();
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+
+} else {
+    echo json_encode(['error' => 'Invalid action.']);
+}
+?>
