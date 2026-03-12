@@ -553,7 +553,14 @@ if (ppModal) {
 
 function addProductLine(product) {
     // Check if product already in list
-    var existing = document.querySelector('#itemsBody tr[data-barcode="' + product.barcode + '"]');
+    var existingRows = document.querySelectorAll('#itemsBody tr[data-barcode]');
+    var existing = null;
+    for (var i = 0; i < existingRows.length; i++) {
+        if (existingRows[i].getAttribute('data-barcode') === product.barcode) {
+            existing = existingRows[i];
+            break;
+        }
+    }
     if (existing) {
         var qtyInput = existing.querySelector('.item-qty');
         if (qtyInput) {
@@ -579,12 +586,17 @@ function addProductLine(product) {
     tr.innerHTML = '<td>' + rowCount + '</td>' +
         '<td><div class="line-product">' + imgHtml + '<div><div class="line-product-name">' + escHtml(product.name) + '</div>' +
             (product.barcode ? '<div style="font-size:11px;color:var(--text-muted);">' + escHtml(product.barcode) + '</div>' : '') +
-        '</div></div><input type="hidden" class="item-barcode" value="' + escHtml(product.barcode || '') + '"><input type="hidden" class="item-desc" value="' + escHtml(product.name) + '"></td>' +
+        '</div></div><input type="hidden" class="item-barcode"><input type="hidden" class="item-desc"></td>' +
         '<td><input type="number" class="item-qty" value="1" min="0.01" step="0.01"></td>' +
         '<td>0</td>' +
-        '<td><input type="text" class="item-uom" value="' + escHtml(product.uom || '') + '"></td>' +
+        '<td><input type="text" class="item-uom"></td>' +
         '<td><button type="button" class="btn-sm-action btn-remove" onclick="removeRow(this);"><i class="fas fa-times"></i></button></td>';
     tbody.appendChild(tr);
+
+    // Set values via DOM properties to avoid HTML escaping issues
+    tr.querySelector('.item-barcode').value = product.barcode || '';
+    tr.querySelector('.item-desc').value = product.name || '';
+    tr.querySelector('.item-uom').value = product.uom || '';
 
     // Focus qty field
     tr.querySelector('.item-qty').focus();
@@ -680,14 +692,30 @@ function renumber() {
 function collectItems() {
     var items = [];
     document.querySelectorAll('#itemsBody tr').forEach(function(tr) {
+        // Get barcode: hidden input first, then data-attribute fallback
+        var barcode = '';
         var barcodeInput = tr.querySelector('.item-barcode');
+        if (barcodeInput && barcodeInput.value.trim() !== '') {
+            barcode = barcodeInput.value.trim();
+        } else {
+            barcode = tr.getAttribute('data-barcode') || '';
+        }
+
+        // Get description: hidden input first, then visible text fallback
+        var desc = '';
         var descInput = tr.querySelector('.item-desc');
-        var barcode = barcodeInput ? barcodeInput.value.trim() : (tr.getAttribute('data-barcode') || '');
-        var desc = descInput ? descInput.value.trim() : '';
+        if (descInput && descInput.value.trim() !== '') {
+            desc = descInput.value.trim();
+        } else {
+            var nameEl = tr.querySelector('.line-product-name');
+            if (nameEl) desc = nameEl.textContent.trim();
+        }
+
         var qty = parseFloat(tr.querySelector('.item-qty')?.value || tr.cells[2].textContent) || 0;
         var uom = (tr.querySelector('.item-uom')?.value || '').trim();
         var itemId = tr.getAttribute('data-item-id') || '';
-        if (desc !== '' && qty > 0) {
+
+        if (barcode !== '' && qty > 0) {
             items.push({ id: itemId, barcode: barcode, product_desc: desc, qty_ordered: qty, uom: uom });
         }
     });
