@@ -484,7 +484,13 @@ function normalizeQuotes(s) {
 
 // Product search (filters by name, SKU, or barcode)
 function filterProducts(query) {
-  var q = normalizeQuotes(query.toLowerCase());
+  var q = normalizeQuotes(query.trim().toLowerCase());
+  if (!q) {
+    // Empty or whitespace-only: show all products
+    document.querySelectorAll('.product-card').forEach(function(card) { card.style.display = ''; });
+    document.querySelectorAll('.subcat-section, .oos-section').forEach(function(sec) { sec.style.display = ''; });
+    return;
+  }
   var qAlt = q.replace(/"/g, "''");
   var qAlt2 = q.replace(/''/g, '"');
   document.querySelectorAll('.product-card').forEach(function(card) {
