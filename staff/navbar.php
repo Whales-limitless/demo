@@ -260,20 +260,12 @@ if ('serviceWorker' in navigator) {
 
   if (searchInput) {
     searchInput.addEventListener('input', function() {
-      var raw = this.value;
-      var q = raw.trim();
+      var q = this.value;
       clearTimeout(debounceTimer);
       if (q.length < 1) {
         if (activeXhr) { activeXhr.abort(); activeXhr = null; }
-        if (raw.length > 0) {
-          // User typed only spaces
-          dropdown.innerHTML = '<div class="search-empty">Please enter a valid search term</div>';
-          positionDropdown();
-          dropdown.classList.add('active');
-        } else {
-          dropdown.classList.remove('active');
-          dropdown.innerHTML = '';
-        }
+        dropdown.classList.remove('active');
+        dropdown.innerHTML = '';
         return;
       }
       debounceTimer = setTimeout(function() { doProductSearch(q); }, 250);
@@ -282,16 +274,8 @@ if ('serviceWorker' in navigator) {
     searchInput.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') {
         e.preventDefault();
-        var raw = this.value;
-        var q = raw.trim();
-        if (raw.length > 0 && q.length === 0) {
-          dropdown.innerHTML = '<div class="search-empty">Please enter a valid search term</div>';
-          positionDropdown();
-          dropdown.classList.add('active');
-          return;
-        }
         dropdown.classList.remove('active');
-        goToSearch(q);
+        goToSearch(this.value);
       }
     });
 
@@ -300,21 +284,13 @@ if ('serviceWorker' in navigator) {
     if (searchBtn) {
       searchBtn.addEventListener('click', function(e) {
         e.preventDefault();
-        var raw = searchInput.value;
-        var q = raw.trim();
-        if (raw.length > 0 && q.length === 0) {
-          dropdown.innerHTML = '<div class="search-empty">Please enter a valid search term</div>';
-          positionDropdown();
-          dropdown.classList.add('active');
-          return;
-        }
         dropdown.classList.remove('active');
-        goToSearch(q);
+        goToSearch(searchInput.value);
       });
     }
 
     searchInput.addEventListener('focus', function() {
-      var q = this.value.trim();
+      var q = this.value;
       if (q.length >= 1 && dropdown.innerHTML) {
         positionDropdown();
         dropdown.classList.add('active');

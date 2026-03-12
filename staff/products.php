@@ -484,9 +484,8 @@ function normalizeQuotes(s) {
 
 // Product search (filters by name, SKU, or barcode)
 function filterProducts(query) {
-  var q = normalizeQuotes(query.trim().toLowerCase());
-  if (!q) {
-    // Empty or whitespace-only: show all products
+  var q = normalizeQuotes(query.toLowerCase());
+  if (q.length === 0) {
     document.querySelectorAll('.product-card').forEach(function(card) { card.style.display = ''; });
     document.querySelectorAll('.subcat-section, .oos-section').forEach(function(sec) { sec.style.display = ''; });
     return;
