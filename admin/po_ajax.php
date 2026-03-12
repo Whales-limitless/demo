@@ -349,18 +349,48 @@ if ($action === 'lookup_product') {
     // Delete old items and re-insert
     $connect->query("DELETE FROM `purchase_order_item` WHERE `po_id` = $id");
 
-    $itemStmt = $connect->prepare("INSERT INTO `purchase_order_item` (`po_id`,`barcode`,`product_desc`,`qty_ordered`,`unit_cost`,`uom`) VALUES (?,?,?,?,0,?)");
-    foreach ($items as $item) {
-        $barcode = trim($item['barcode'] ?? '');
-        $desc = trim($item['product_desc'] ?? '');
-        $qtyOrdered = floatval($item['qty_ordered'] ?? 0);
-        $uom = trim($item['uom'] ?? '');
-        $itemStmt->bind_param("issds", $id, $barcode, $desc, $qtyOrdered, $uom);
-        $itemStmt->execute();
-    }
-    $itemStmt->close();
+    $debugItems = [];
+    $debugItems['raw_post_items'] = $_POST['items'] ?? 'NOT SET';
+    $debugItems['json_decode_result'] = $items;
+    $debugItems['json_last_error'] = json_last_error();
+    $debugItems['json_last_error_msg'] = json_last_error_msg();
+    $debugItems['item_count'] = is_array($items) ? count($items) : 'NOT ARRAY';
 
-    echo json_encode(['success' => 'PO updated.', 'po_id' => $id]);
+    $insertErrors = [];
+    $itemStmt = $connect->prepare("INSERT INTO `purchase_order_item` (`po_id`,`barcode`,`product_desc`,`qty_ordered`,`unit_cost`,`uom`) VALUES (?,?,?,?,0,?)");
+    if (!$itemStmt) {
+        $insertErrors[] = 'Prepare failed: ' . $connect->error;
+    } else {
+        foreach ($items as $idx => $item) {
+            $barcode = trim($item['barcode'] ?? '');
+            $desc = trim($item['product_desc'] ?? '');
+            $qtyOrdered = floatval($item['qty_ordered'] ?? 0);
+            $uom = trim($item['uom'] ?? '');
+            $itemStmt->bind_param("issds", $id, $barcode, $desc, $qtyOrdered, $uom);
+            $ok = $itemStmt->execute();
+            if (!$ok) {
+                $insertErrors[] = 'Item ' . $idx . ' insert failed: ' . $itemStmt->error;
+            }
+        }
+        $itemStmt->close();
+    }
+
+    // Verify what's actually in the DB now
+    $verifyResult = $connect->query("SELECT * FROM `purchase_order_item` WHERE `po_id` = $id");
+    $dbRows = [];
+    if ($verifyResult) {
+        while ($vr = $verifyResult->fetch_assoc()) {
+            $dbRows[] = $vr;
+        }
+    }
+
+    echo json_encode([
+        'success' => 'PO updated.',
+        'po_id' => $id,
+        'debug' => $debugItems,
+        'insert_errors' => $insertErrors,
+        'db_verify' => $dbRows
+    ]);
 
 } elseif ($action === 'approve') {
     $id = intval($_POST['id'] ?? 0);

@@ -772,6 +772,14 @@ function savePO() {
         },
         dataType: 'json',
         success: function(data) {
+            // DEBUG: Show server response before redirect
+            if (data.debug || data.insert_errors || data.db_verify) {
+                var serverDebug = 'SERVER RESPONSE DEBUG:\n\n';
+                serverDebug += 'Insert errors: ' + JSON.stringify(data.insert_errors, null, 2) + '\n\n';
+                serverDebug += 'DB verify (rows in DB after save):\n' + JSON.stringify(data.db_verify, null, 2) + '\n\n';
+                serverDebug += 'Debug info:\n' + JSON.stringify(data.debug, null, 2);
+                alert(serverDebug);
+            }
             if (data.success) {
                 Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
                     if (data.po_id) window.location.href = 'po_detail.php?id=' + data.po_id;
