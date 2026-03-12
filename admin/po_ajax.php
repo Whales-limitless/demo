@@ -55,6 +55,146 @@ if ($action === 'lookup_product') {
     }
     $stmt->close();
 
+} elseif ($action === 'search_products') {
+    $search = trim($_POST['q'] ?? '');
+    if ($search === '') {
+        echo json_encode(['products' => []]);
+        exit;
+    }
+
+    // Normalize quote variants
+    $normalizedSearch = $search;
+    $normalizedSearch = str_replace(["\u{201C}", "\u{201D}", "\u{2033}", "\u{FF02}"], '"', $normalizedSearch);
+    $normalizedSearch = str_replace(["\u{2018}", "\u{2019}", "\u{2032}", "\u{FF07}"], "'", $normalizedSearch);
+    $altSearch = str_replace('"', "''", $normalizedSearch);
+    $altSearch2 = str_replace("''", '"', $normalizedSearch);
+    $normalizedLike = '%' . $normalizedSearch . '%';
+    $altLike = '%' . $altSearch . '%';
+    $altLike2 = '%' . $altSearch2 . '%';
+
+    $stmt = $connect->prepare("
+        SELECT p.`id`, p.`barcode`, p.`name`, p.`img1` AS image, p.`uom`,
+               COALESCE(p.`qoh`, 0) AS qoh, p.`cat_code`, p.`rack`,
+               c.`cat_name` AS category_name
+        FROM `PRODUCTS` p
+        LEFT JOIN `category` c ON p.`cat_code` = c.`cat_code`
+        WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?
+               OR p.`barcode` LIKE ? OR p.`barcode` LIKE ? OR p.`barcode` LIKE ?)
+          AND (p.`checked` != 'N' OR p.`checked` IS NULL)
+        ORDER BY p.`name` ASC
+        LIMIT 20
+    ");
+    $stmt->bind_param("ssssss", $normalizedLike, $altLike, $altLike2, $normalizedLike, $altLike, $altLike2);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $products = [];
+    $seen = [];
+    while ($row = $result->fetch_assoc()) {
+        if (isset($seen[$row['id']])) continue;
+        $seen[$row['id']] = true;
+        $row['id'] = (int)$row['id'];
+        $row['qoh'] = (float)$row['qoh'];
+        $products[] = $row;
+    }
+    $stmt->close();
+
+    echo json_encode(['products' => $products]);
+
+} elseif ($action === 'quick_create_product') {
+    $name = trim($_POST['name'] ?? '');
+    $uom = trim($_POST['uom'] ?? '');
+    $barcode = trim($_POST['barcode'] ?? '');
+
+    if ($name === '') {
+        echo json_encode(['error' => 'Product name is required.']);
+        exit;
+    }
+
+    // Auto-generate barcode if empty
+    if ($barcode === '') {
+        $barcode = 'NEW-' . date('YmdHis') . '-' . strtoupper(bin2hex(random_bytes(2)));
+    }
+
+    // Check duplicate barcode
+    $chk = $connect->prepare("SELECT `id` FROM `PRODUCTS` WHERE `barcode` = ? LIMIT 1");
+    $chk->bind_param("s", $barcode);
+    $chk->execute();
+    if ($chk->get_result()->num_rows > 0) {
+        echo json_encode(['error' => 'Barcode already exists.']);
+        $chk->close();
+        exit;
+    }
+    $chk->close();
+
+    // Handle image upload
+    $image = '';
+    if (isset($_FILES['product_image']) && $_FILES['product_image']['error'] === UPLOAD_ERR_OK) {
+        $file = $_FILES['product_image'];
+        $uploadDir = __DIR__ . '/../img/';
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+
+        if (in_array($mimeType, $allowedTypes) && $file['size'] <= 10 * 1024 * 1024) {
+            $fileName = 'prod_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.jpg';
+            $destPath = $uploadDir . $fileName;
+
+            // Create image resource
+            switch ($mimeType) {
+                case 'image/jpeg': $img = @imagecreatefromjpeg($file['tmp_name']); break;
+                case 'image/png':  $img = @imagecreatefrompng($file['tmp_name']); break;
+                case 'image/gif':  $img = @imagecreatefromgif($file['tmp_name']); break;
+                case 'image/webp': $img = @imagecreatefromwebp($file['tmp_name']); break;
+                default: $img = false;
+            }
+            if ($img) {
+                $maxDim = 800;
+                $origW = imagesx($img);
+                $origH = imagesy($img);
+                if ($origW > $maxDim || $origH > $maxDim) {
+                    if ($origW >= $origH) { $newW = $maxDim; $newH = intval($origH * $maxDim / $origW); }
+                    else { $newH = $maxDim; $newW = intval($origW * $maxDim / $origH); }
+                    $resized = imagecreatetruecolor($newW, $newH);
+                    imagealphablending($resized, false);
+                    imagesavealpha($resized, true);
+                    imagecopyresampled($resized, $img, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+                    imagedestroy($img);
+                    $img = $resized;
+                }
+                imagejpeg($img, $destPath, 75);
+                imagedestroy($img);
+                $image = $fileName;
+            }
+        }
+    }
+
+    $checked = 'Y';
+    $qoh = 0.0;
+    $empty = '';
+
+    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`cat_code`,`sub_code`,`uom`,`rack`,`qoh`,`checked`,`img1`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $stmt->bind_param("ssssssssssdss", $barcode, $empty, $name, $empty, $empty, $empty, $empty, $empty, $uom, $empty, $qoh, $checked, $image);
+
+    if ($stmt->execute()) {
+        $newId = $connect->insert_id;
+        echo json_encode([
+            'success' => 'Product created.',
+            'product' => [
+                'id' => $newId,
+                'barcode' => $barcode,
+                'name' => $name,
+                'uom' => $uom,
+                'image' => $image,
+                'qoh' => 0
+            ]
+        ]);
+    } else {
+        echo json_encode(['error' => 'Failed to create product: ' . $connect->error]);
+    }
+    $stmt->close();
+
 } elseif ($action === 'create') {
     $supplierId = intval($_POST['supplier_id'] ?? 0);
     $orderDate = trim($_POST['order_date'] ?? '');

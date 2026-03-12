@@ -28,7 +28,8 @@ if (!$isNew) {
         exit;
     }
 
-    $itemResult = $connect->query("SELECT * FROM `purchase_order_item` WHERE `po_id` = $poId ORDER BY `id` ASC");
+    // Fetch items with product image
+    $itemResult = $connect->query("SELECT poi.*, p.img1 AS product_image FROM `purchase_order_item` poi LEFT JOIN `PRODUCTS` p ON poi.barcode = p.barcode WHERE poi.po_id = $poId ORDER BY poi.id ASC");
     if ($itemResult) {
         while ($r = $itemResult->fetch_assoc()) {
             $items[] = $r;
@@ -101,6 +102,50 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-outline:hover { background: #f3f4f6; }
 .action-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
 .discrepancy { color: #d97706; font-weight: 600; }
+
+/* Product Search */
+.product-search-wrap { position: relative; }
+.product-search-input { width: 100%; padding: 8px 12px 8px 34px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color var(--transition); }
+.product-search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(200,16,46,0.1); }
+.product-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; pointer-events: none; }
+.product-search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.15); z-index: 1050; max-height: 320px; overflow-y: auto; display: none; margin-top: 4px; }
+.product-search-dropdown.active { display: block; }
+.ps-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; transition: background 0.15s; border-bottom: 1px solid #f3f4f6; }
+.ps-item:last-child { border-bottom: none; }
+.ps-item:hover { background: #f9fafb; }
+.ps-item-img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #f3f4f6; flex-shrink: 0; }
+.ps-item-noimg { width: 40px; height: 40px; border-radius: 6px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #d1d5db; font-size: 16px; }
+.ps-item-info { flex: 1; min-width: 0; }
+.ps-item-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-item-name mark { background: #fef3c7; border-radius: 2px; padding: 0 1px; }
+.ps-item-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+.ps-item-meta .tag { background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: 10px; }
+.ps-item-qoh { font-size: 11px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+.ps-item-qoh.in-stock { color: #16a34a; }
+.ps-item-qoh.out-stock { color: #dc2626; }
+.ps-empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.ps-loading { padding: 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.ps-create-new { display: flex; align-items: center; gap: 8px; padding: 10px 14px; cursor: pointer; background: #f0fdf4; color: #16a34a; font-weight: 600; font-size: 13px; border-top: 1px solid #dcfce7; transition: background 0.15s; }
+.ps-create-new:hover { background: #dcfce7; }
+.ps-create-new i { font-size: 14px; }
+
+/* Line item product cell with image */
+.line-product { display: flex; align-items: center; gap: 10px; }
+.line-product-img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; background: #f3f4f6; flex-shrink: 0; }
+.line-product-noimg { width: 36px; height: 36px; border-radius: 6px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #d1d5db; font-size: 14px; }
+.line-product-name { font-weight: 500; font-size: 13px; }
+
+/* New Product Modal */
+.modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
+.modal-header { border-bottom: 1px solid #e5e7eb; }
+.modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
+.modal-footer { border-top: 1px solid #e5e7eb; }
+.img-preview-box { width: 100%; max-width: 200px; height: 150px; border: 2px dashed #d1d5db; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; transition: border-color 0.2s; position: relative; }
+.img-preview-box:hover { border-color: var(--primary); }
+.img-preview-box img { width: 100%; height: 100%; object-fit: cover; }
+.img-preview-box .placeholder { text-align: center; color: var(--text-muted); font-size: 12px; }
+.img-preview-box .placeholder i { font-size: 24px; display: block; margin-bottom: 6px; }
+
 @media (max-width: 768px) {
     .page-content { padding: 16px; }
 }
@@ -154,6 +199,18 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <?php endif; ?>
     </div>
 
+    <!-- Add Product Search (Draft only) -->
+    <?php if ($isDraft): ?>
+    <div class="card">
+        <div class="card-title">Add Product</div>
+        <div class="product-search-wrap" id="productSearchWrap">
+            <i class="fas fa-search product-search-icon"></i>
+            <input type="text" class="product-search-input" id="productSearchInput" placeholder="Search product by name..." autocomplete="off">
+            <div class="product-search-dropdown" id="productSearchDropdown"></div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Line Items -->
     <div class="card">
         <div class="card-title">Line Items</div>
@@ -162,10 +219,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 <thead>
                     <tr>
                         <th style="width:40px">#</th>
-                        <th style="width:160px">Barcode</th>
-                        <th>Description</th>
-                        <th style="width:90px">Qty Ordered</th>
-                        <th style="width:90px">Qty Received</th>
+                        <th>Product</th>
+                        <th style="width:100px">Qty Ordered</th>
+                        <th style="width:100px">Qty Received</th>
                         <th style="width:80px">UOM</th>
                         <?php if ($isDraft): ?><th style="width:50px"></th><?php endif; ?>
                     </tr>
@@ -173,11 +229,24 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 <tbody id="itemsBody">
                     <?php if (!$isNew): ?>
                     <?php foreach ($items as $idx => $item): ?>
-                    <tr data-item-id="<?php echo $item['id']; ?>">
+                    <tr data-item-id="<?php echo $item['id']; ?>" data-barcode="<?php echo htmlspecialchars($item['barcode']); ?>">
                         <td><?php echo $idx + 1; ?></td>
-                        <td><?php if ($isDraft): ?><input type="text" class="item-barcode" value="<?php echo htmlspecialchars($item['barcode']); ?>" onchange="lookupProduct(this);"><?php else: echo htmlspecialchars($item['barcode']); endif; ?></td>
-                        <td><?php if ($isDraft): ?><input type="text" class="item-desc" value="<?php echo htmlspecialchars($item['product_desc']); ?>"><?php else: echo htmlspecialchars($item['product_desc']); endif; ?></td>
-                        <td><?php if ($isDraft): ?><input type="number" class="item-qty" value="<?php echo $item['qty_ordered']; ?>" min="0" step="0.01"><?php else: echo $item['qty_ordered']; endif; ?></td>
+                        <td>
+                            <div class="line-product">
+                                <?php if (!empty($item['product_image'])): ?>
+                                <img class="line-product-img" src="../img/<?php echo htmlspecialchars($item['product_image']); ?>" alt="">
+                                <?php else: ?>
+                                <div class="line-product-noimg"><i class="fas fa-image"></i></div>
+                                <?php endif; ?>
+                                <div>
+                                    <div class="line-product-name"><?php echo htmlspecialchars($item['product_desc']); ?></div>
+                                    <?php if (!empty($item['barcode'])): ?>
+                                    <div style="font-size:11px;color:var(--text-muted);"><?php echo htmlspecialchars($item['barcode']); ?></div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </td>
+                        <td><?php if ($isDraft): ?><input type="number" class="item-qty" value="<?php echo $item['qty_ordered']; ?>" min="0.01" step="0.01"><?php else: echo $item['qty_ordered']; endif; ?></td>
                         <td><?php echo $item['qty_received']; ?><?php if ($item['qty_received'] < $item['qty_ordered'] && !$isDraft): ?> <span class="discrepancy" title="Pending"><i class="fas fa-exclamation-circle"></i></span><?php endif; ?></td>
                         <td><?php if ($isDraft): ?><input type="text" class="item-uom" value="<?php echo htmlspecialchars($item['uom']); ?>"><?php else: echo htmlspecialchars($item['uom']); endif; ?></td>
                         <?php if ($isDraft): ?><td><button type="button" class="btn-sm-action btn-remove" onclick="removeRow(this);"><i class="fas fa-times"></i></button></td><?php endif; ?>
@@ -189,7 +258,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         </div>
 
         <?php if ($isDraft): ?>
-        <button type="button" class="btn btn-outline-secondary btn-sm mt-3" onclick="addRow();"><i class="fas fa-plus"></i> Add Line</button>
+        <div id="emptyHint" style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;<?php echo count($items) > 0 ? 'display:none;' : ''; ?>">
+            <i class="fas fa-search" style="font-size:20px;display:block;margin-bottom:8px;"></i>
+            Use the search above to add products to this order.
+        </div>
         <?php endif; ?>
     </div>
 
@@ -210,30 +282,300 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
+<!-- New Product Modal -->
+<div class="modal fade" id="newProductModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plus-circle" style="color:var(--primary);"></i> Add New Product</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Product Name <span class="text-danger">*</span></label>
+                    <input type="text" id="npName" class="form-control" placeholder="Enter product name">
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">UOM</label>
+                        <input type="text" id="npUom" class="form-control" placeholder="e.g. PCS, KG, CTN">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Barcode <span style="font-weight:normal;color:var(--text-muted);">(optional)</span></label>
+                        <input type="text" id="npBarcode" class="form-control" placeholder="Auto-generated if empty">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Product Image <span style="font-weight:normal;color:var(--text-muted);">(optional)</span></label>
+                    <div class="img-preview-box" id="npImgBox" onclick="document.getElementById('npImageFile').click();">
+                        <div class="placeholder" id="npImgPlaceholder">
+                            <i class="fas fa-camera"></i>
+                            Click to upload
+                        </div>
+                        <img id="npImgPreview" src="" alt="" style="display:none;">
+                    </div>
+                    <input type="file" id="npImageFile" accept="image/*" style="display:none;" onchange="previewNewProductImage(this);">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success w-50" onclick="saveNewProduct();"><i class="fas fa-check"></i> Create & Add to PO</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 var poId = <?php echo $poId; ?>;
 var isDraft = <?php echo $isDraft ? 'true' : 'false'; ?>;
+var newProductModal = null;
 
-function addRow() {
+document.addEventListener('DOMContentLoaded', function() {
+    var modalEl = document.getElementById('newProductModal');
+    if (modalEl) newProductModal = new bootstrap.Modal(modalEl);
+});
+
+// ===================== PRODUCT SEARCH =====================
+
+var searchInput = document.getElementById('productSearchInput');
+var searchDropdown = document.getElementById('productSearchDropdown');
+var searchWrap = document.getElementById('productSearchWrap');
+var searchTimer = null;
+var searchXhr = null;
+
+function escHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function highlightMatch(text, query) {
+    if (!query) return escHtml(text);
+    var escaped = escHtml(text);
+    var re = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return escaped.replace(re, '<mark>$1</mark>');
+}
+
+function doProductSearch(q) {
+    if (!q || q.length < 1) {
+        searchDropdown.classList.remove('active');
+        searchDropdown.innerHTML = '';
+        return;
+    }
+
+    if (searchXhr) { searchXhr.abort(); searchXhr = null; }
+
+    searchDropdown.innerHTML = '<div class="ps-loading"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    searchDropdown.classList.add('active');
+
+    searchXhr = $.ajax({
+        type: 'POST', url: 'po_ajax.php', data: { action: 'search_products', q: q }, dataType: 'json',
+        success: function(data) {
+            searchXhr = null;
+            renderSearchResults(data.products || [], q);
+        },
+        error: function() {
+            searchXhr = null;
+            searchDropdown.classList.remove('active');
+        }
+    });
+}
+
+function renderSearchResults(products, query) {
+    if (products.length === 0) {
+        searchDropdown.innerHTML = '<div class="ps-empty"><i class="fas fa-search" style="display:block;margin-bottom:6px;font-size:16px;"></i>No products found for "' + escHtml(query) + '"</div>' +
+            '<div class="ps-create-new" onclick="openNewProductModal(\'' + escHtml(query).replace(/'/g, "\\'") + '\');"><i class="fas fa-plus-circle"></i> Create new product "' + escHtml(query) + '"</div>';
+        searchDropdown.classList.add('active');
+        return;
+    }
+
+    var html = products.map(function(p) {
+        var imgHtml;
+        if (p.image) {
+            imgHtml = '<img class="ps-item-img" src="../img/' + escHtml(p.image) + '" alt="" loading="lazy">';
+        } else {
+            imgHtml = '<div class="ps-item-noimg"><i class="fas fa-image"></i></div>';
+        }
+
+        var qohClass = p.qoh > 0 ? 'in-stock' : 'out-stock';
+        var qohText = 'QOH: ' + p.qoh;
+
+        return '<div class="ps-item" onclick=\'addProductLine(' + JSON.stringify(p).replace(/'/g, "&#39;") + ')\'>' +
+            imgHtml +
+            '<div class="ps-item-info">' +
+                '<div class="ps-item-name">' + highlightMatch(p.name, query) + '</div>' +
+                '<div class="ps-item-meta">' +
+                    (p.barcode ? '<span class="tag">' + escHtml(p.barcode) + '</span>' : '') +
+                    (p.category_name ? '<span class="tag">' + escHtml(p.category_name) + '</span>' : '') +
+                    (p.uom ? '<span class="tag">' + escHtml(p.uom) + '</span>' : '') +
+                '</div>' +
+            '</div>' +
+            '<span class="ps-item-qoh ' + qohClass + '">' + qohText + '</span>' +
+        '</div>';
+    }).join('');
+
+    // Add "Create new" option at the bottom
+    html += '<div class="ps-create-new" onclick="openNewProductModal(\'' + escHtml(query).replace(/'/g, "\\'") + '\');"><i class="fas fa-plus-circle"></i> Create new product</div>';
+
+    searchDropdown.innerHTML = html;
+    searchDropdown.classList.add('active');
+}
+
+if (searchInput) {
+    searchInput.addEventListener('input', function() {
+        var q = this.value.trim();
+        clearTimeout(searchTimer);
+        if (q.length < 1) {
+            if (searchXhr) { searchXhr.abort(); searchXhr = null; }
+            searchDropdown.classList.remove('active');
+            searchDropdown.innerHTML = '';
+            return;
+        }
+        searchTimer = setTimeout(function() { doProductSearch(q); }, 250);
+    });
+
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            searchDropdown.classList.remove('active');
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (searchWrap && !searchWrap.contains(e.target)) {
+            searchDropdown.classList.remove('active');
+        }
+    });
+}
+
+// ===================== ADD PRODUCT TO LINE ITEMS =====================
+
+function addProductLine(product) {
+    // Check if product already in list
+    var existing = document.querySelector('#itemsBody tr[data-barcode="' + product.barcode + '"]');
+    if (existing) {
+        var qtyInput = existing.querySelector('.item-qty');
+        if (qtyInput) {
+            qtyInput.value = (parseFloat(qtyInput.value) || 0) + 1;
+            qtyInput.focus();
+            qtyInput.select();
+        }
+        searchDropdown.classList.remove('active');
+        searchInput.value = '';
+        return;
+    }
+
     var tbody = document.getElementById('itemsBody');
     var rowCount = tbody.rows.length + 1;
     var tr = document.createElement('tr');
+    tr.setAttribute('data-barcode', product.barcode || '');
+
+    var imgHtml;
+    if (product.image) {
+        imgHtml = '<img class="line-product-img" src="../img/' + escHtml(product.image) + '" alt="">';
+    } else {
+        imgHtml = '<div class="line-product-noimg"><i class="fas fa-image"></i></div>';
+    }
+
     tr.innerHTML = '<td>' + rowCount + '</td>' +
-        '<td><input type="text" class="item-barcode" placeholder="Scan/enter barcode" onchange="lookupProduct(this);"></td>' +
-        '<td><input type="text" class="item-desc" placeholder="Product description"></td>' +
-        '<td><input type="number" class="item-qty" value="1" min="0" step="0.01"></td>' +
+        '<td><div class="line-product">' + imgHtml + '<div><div class="line-product-name">' + escHtml(product.name) + '</div>' +
+            (product.barcode ? '<div style="font-size:11px;color:var(--text-muted);">' + escHtml(product.barcode) + '</div>' : '') +
+        '</div></div><input type="hidden" class="item-barcode" value="' + escHtml(product.barcode || '') + '"><input type="hidden" class="item-desc" value="' + escHtml(product.name) + '"></td>' +
+        '<td><input type="number" class="item-qty" value="1" min="0.01" step="0.01"></td>' +
         '<td>0</td>' +
-        '<td><input type="text" class="item-uom" value=""></td>' +
+        '<td><input type="text" class="item-uom" value="' + escHtml(product.uom || '') + '"></td>' +
         '<td><button type="button" class="btn-sm-action btn-remove" onclick="removeRow(this);"><i class="fas fa-times"></i></button></td>';
     tbody.appendChild(tr);
+
+    // Focus qty field
+    tr.querySelector('.item-qty').focus();
+    tr.querySelector('.item-qty').select();
+
+    searchDropdown.classList.remove('active');
+    searchInput.value = '';
+
+    // Hide empty hint
+    var hint = document.getElementById('emptyHint');
+    if (hint) hint.style.display = 'none';
 }
+
+// ===================== NEW PRODUCT MODAL =====================
+
+function openNewProductModal(prefillName) {
+    searchDropdown.classList.remove('active');
+    document.getElementById('npName').value = prefillName || '';
+    document.getElementById('npUom').value = '';
+    document.getElementById('npBarcode').value = '';
+    document.getElementById('npImageFile').value = '';
+    document.getElementById('npImgPreview').style.display = 'none';
+    document.getElementById('npImgPlaceholder').style.display = '';
+    newProductModal.show();
+    setTimeout(function() {
+        document.getElementById('npName').focus();
+    }, 300);
+}
+
+function previewNewProductImage(input) {
+    if (input.files && input.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var img = document.getElementById('npImgPreview');
+            img.src = e.target.result;
+            img.style.display = 'block';
+            document.getElementById('npImgPlaceholder').style.display = 'none';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function saveNewProduct() {
+    var name = document.getElementById('npName').value.trim();
+    if (name === '') {
+        Swal.fire({ icon: 'warning', text: 'Product name is required.' });
+        return;
+    }
+
+    var formData = new FormData();
+    formData.append('action', 'quick_create_product');
+    formData.append('name', name);
+    formData.append('uom', document.getElementById('npUom').value.trim());
+    formData.append('barcode', document.getElementById('npBarcode').value.trim());
+
+    var fileInput = document.getElementById('npImageFile');
+    if (fileInput.files && fileInput.files[0]) {
+        formData.append('product_image', fileInput.files[0]);
+    }
+
+    $.ajax({
+        type: 'POST', url: 'po_ajax.php', data: formData,
+        processData: false, contentType: false, dataType: 'json',
+        success: function(data) {
+            if (data.success && data.product) {
+                newProductModal.hide();
+                addProductLine(data.product);
+                Swal.fire({ icon: 'success', text: 'Product "' + data.product.name + '" created and added.', timer: 2000, showConfirmButton: false });
+            } else {
+                Swal.fire({ icon: 'error', text: data.error || 'Failed to create product.' });
+            }
+        },
+        error: function() {
+            Swal.fire({ icon: 'error', text: 'Network error. Please try again.' });
+        }
+    });
+}
+
+// ===================== LINE ITEM MANAGEMENT =====================
 
 function removeRow(btn) {
     btn.closest('tr').remove();
     renumber();
+    // Show empty hint if no rows
+    var hint = document.getElementById('emptyHint');
+    if (hint && document.querySelectorAll('#itemsBody tr').length === 0) {
+        hint.style.display = '';
+    }
 }
 
 function renumber() {
@@ -241,36 +583,24 @@ function renumber() {
     rows.forEach(function(row, i) { row.cells[0].textContent = i + 1; });
 }
 
-function lookupProduct(input) {
-    var barcode = input.value.trim();
-    if (barcode === '') return;
-    var tr = input.closest('tr');
-
-    $.ajax({
-        type: 'POST', url: 'po_ajax.php', data: { action: 'lookup_product', barcode: barcode }, dataType: 'json',
-        success: function(data) {
-            if (data.name) {
-                tr.querySelector('.item-desc').value = data.name;
-                if (data.uom) tr.querySelector('.item-uom').value = data.uom;
-            }
-        }
-    });
-}
-
 function collectItems() {
     var items = [];
     document.querySelectorAll('#itemsBody tr').forEach(function(tr) {
-        var barcode = (tr.querySelector('.item-barcode')?.value || tr.cells[1].textContent).trim();
-        var desc = (tr.querySelector('.item-desc')?.value || tr.cells[2].textContent).trim();
-        var qty = parseFloat(tr.querySelector('.item-qty')?.value || tr.cells[3].textContent) || 0;
-        var uom = (tr.querySelector('.item-uom')?.value || tr.cells[5].textContent).trim();
+        var barcodeInput = tr.querySelector('.item-barcode');
+        var descInput = tr.querySelector('.item-desc');
+        var barcode = barcodeInput ? barcodeInput.value.trim() : (tr.getAttribute('data-barcode') || '');
+        var desc = descInput ? descInput.value.trim() : '';
+        var qty = parseFloat(tr.querySelector('.item-qty')?.value || tr.cells[2].textContent) || 0;
+        var uom = (tr.querySelector('.item-uom')?.value || '').trim();
         var itemId = tr.getAttribute('data-item-id') || '';
-        if (barcode !== '' && qty > 0) {
+        if (desc !== '' && qty > 0) {
             items.push({ id: itemId, barcode: barcode, product_desc: desc, qty_ordered: qty, uom: uom });
         }
     });
     return items;
 }
+
+// ===================== SAVE / APPROVE / CANCEL =====================
 
 function savePO() {
     var supplierId = document.getElementById('supplierId').value;
@@ -357,11 +687,6 @@ function cancelPO() {
             });
         }
     });
-}
-
-// Auto-add first row for new POs
-if (isDraft && document.querySelectorAll('#itemsBody tr').length === 0) {
-    addRow();
 }
 </script>
 </body>
