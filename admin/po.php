@@ -67,29 +67,18 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .status-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .status-tab:hover:not(.active) { border-color: var(--primary); color: var(--primary); }
 
-/* Product search modal */
-.product-search-modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1060; align-items:center; justify-content:center; }
-.product-search-modal-overlay.show { display:flex; }
-.product-search-modal { background:#fff; border-radius:var(--radius); width:90%; max-width:700px; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 8px 32px rgba(0,0,0,0.2); }
-.product-search-modal .psm-header { padding:16px 20px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
-.product-search-modal .psm-header h5 { margin:0; font-family:'Outfit',sans-serif; font-weight:700; font-size:16px; }
-.psm-search-wrap { position:relative; padding:16px 20px 0; }
-.psm-search-input { width:100%; padding:11px 14px 11px 40px; border:2px solid #e5e7eb; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:14px; outline:none; }
-.psm-search-input:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(200,16,46,0.1); }
-.psm-search-icon { position:absolute; left:34px; top:50%; transform:translateY(-50%); color:var(--text-muted); pointer-events:none; }
-.psm-search-icon i { font-size:14px; }
-.psm-results { overflow-y:auto; flex:1; padding:8px 0; }
-.psm-item { display:flex; align-items:center; gap:12px; padding:10px 20px; cursor:pointer; border-bottom:1px solid #f3f4f6; transition:background 0.15s; }
+/* Product search result items */
+.psm-item { display:flex; align-items:center; gap:12px; padding:10px 14px; cursor:pointer; border-bottom:1px solid #f3f4f6; transition:background 0.15s; }
 .psm-item:last-child { border-bottom:none; }
 .psm-item:hover { background:#f0f9ff; }
 .psm-item-info { flex:1; min-width:0; }
 .psm-item-name { font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.psm-item-name mark { background:#fef3c7; border-radius:2px; padding:0 1px; }
 .psm-item-meta { font-size:11px; color:var(--text-muted); margin-top:2px; }
 .psm-item-qoh { font-size:11px; font-weight:600; white-space:nowrap; }
 .psm-item-qoh.in { color:#16a34a; }
 .psm-item-qoh.out { color:#dc2626; }
 .psm-empty { text-align:center; padding:30px 20px; color:var(--text-muted); font-size:13px; }
+#psmResultsContainer { max-height:350px; overflow-y:auto; }
 
 /* Line items table */
 .line-items-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
@@ -242,19 +231,20 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
-<!-- Product Search Modal (modal in modal) -->
-<div class="product-search-modal-overlay" id="productSearchOverlay" onclick="if(event.target===this)closeProductSearchModal();">
-    <div class="product-search-modal" onclick="event.stopPropagation();">
-        <div class="psm-header">
-            <h5><i class="fas fa-search" style="color:var(--primary);margin-right:6px;"></i>Search Product</h5>
-            <button type="button" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);line-height:1;" onclick="closeProductSearchModal();">&times;</button>
-        </div>
-        <div class="psm-search-wrap">
-            <span class="psm-search-icon"><i class="fas fa-search"></i></span>
-            <input type="text" class="psm-search-input" id="psmSearchInput" placeholder="Type product name or barcode..." autocomplete="off">
-        </div>
-        <div class="psm-results" id="psmResultsContainer">
-            <div class="psm-empty">Start typing to search products</div>
+<!-- Product Search Modal (Bootstrap modal) -->
+<div class="modal fade" id="productSearchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-search" style="color:var(--primary);margin-right:6px;"></i>Search Product</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="form-control mb-3" id="psmSearchInput" placeholder="Type product name or barcode..." autocomplete="off">
+                <div id="psmResultsContainer">
+                    <div class="psm-empty">Start typing to search products</div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -263,13 +253,23 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-var poModal = null, viewModal = null;
+var poModal = null, viewModal = null, productSearchModal = null;
 var currentStatus = '';
 var lineItemIndex = 0;
 
 document.addEventListener('DOMContentLoaded', function() {
     poModal = new bootstrap.Modal(document.getElementById('poModal'));
     viewModal = new bootstrap.Modal(document.getElementById('viewModal'));
+    productSearchModal = new bootstrap.Modal(document.getElementById('productSearchModal'));
+    // Auto-focus search input when product search modal opens
+    document.getElementById('productSearchModal').addEventListener('shown.bs.modal', function() {
+        document.getElementById('psmSearchInput').focus();
+    });
+    // Clear search when modal closes
+    document.getElementById('productSearchModal').addEventListener('hidden.bs.modal', function() {
+        document.getElementById('psmSearchInput').value = '';
+        document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty">Start typing to search products</div>';
+    });
     loadPOs();
 });
 
@@ -438,37 +438,18 @@ var psmSearchTimer = null;
 var psmSearchXhr = null;
 
 function openProductSearchModal() {
-    document.getElementById('psmSearchInput').value = '';
-    document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty">Start typing to search products</div>';
-    document.getElementById('productSearchOverlay').classList.add('show');
-    setTimeout(function() { document.getElementById('psmSearchInput').focus(); }, 100);
-}
-
-function closeProductSearchModal() {
-    document.getElementById('productSearchOverlay').classList.remove('show');
-    if (psmSearchXhr) { psmSearchXhr.abort(); psmSearchXhr = null; }
-}
-
-function highlightMatch(text, query) {
-    if (!query) return escHtml(text);
-    var escaped = escHtml(text);
-    var re = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
-    return escaped.replace(re, '<mark>$1</mark>');
+    productSearchModal.show();
 }
 
 document.getElementById('psmSearchInput').addEventListener('input', function() {
     var q = this.value.trim();
     clearTimeout(psmSearchTimer);
+    if (psmSearchXhr) { psmSearchXhr.abort(); psmSearchXhr = null; }
     if (q.length < 1) {
         document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty">Start typing to search products</div>';
-        if (psmSearchXhr) { psmSearchXhr.abort(); psmSearchXhr = null; }
         return;
     }
     psmSearchTimer = setTimeout(function() { doProductSearch(q); }, 250);
-});
-
-document.getElementById('psmSearchInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeProductSearchModal();
 });
 
 function doProductSearch(q) {
@@ -489,7 +470,7 @@ function doProductSearch(q) {
             products.forEach(function(p) {
                 var qohClass = (p.qoh || 0) > 0 ? 'in' : 'out';
                 html += '<div class="psm-item" onclick="selectProductFromModal(\'' + escHtml(p.barcode) + '\', \'' + escHtml(p.name).replace(/'/g, "\\'") + '\', \'' + escHtml(p.uom || '') + '\');">';
-                html += '<div class="psm-item-info"><div class="psm-item-name">' + highlightMatch(p.name, q) + '</div>';
+                html += '<div class="psm-item-info"><div class="psm-item-name">' + escHtml(p.name) + '</div>';
                 html += '<div class="psm-item-meta">' + escHtml(p.barcode) + (p.uom ? ' &middot; ' + escHtml(p.uom) : '') + '</div></div>';
                 html += '<span class="psm-item-qoh ' + qohClass + '">QOH: ' + (p.qoh || 0) + '</span>';
                 html += '</div>';
@@ -502,10 +483,7 @@ function doProductSearch(q) {
 
 function selectProductFromModal(barcode, name, uom) {
     addLineItem(barcode, name, uom, 1);
-    // Keep modal open for adding more products, just clear search
-    document.getElementById('psmSearchInput').value = '';
-    document.getElementById('psmSearchInput').focus();
-    document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty">Product added! Search for more or close.</div>';
+    productSearchModal.hide();
 }
 
 // ==================== SAVE PO ====================
