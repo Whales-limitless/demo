@@ -26,6 +26,13 @@ $sidebarSections = [
         ['page' => 'del_location',  'href' => 'del_location.php',  'icon' => 'fas fa-map-marker-alt',    'label' => 'Locations'],
         ['page' => 'del_report',    'href' => 'del_report.php',    'icon' => 'fas fa-chart-bar',         'label' => 'Delivery Reports'],
     ],
+    'REPORTS' => [
+        ['page' => 'report_stock_movement', 'href' => 'report_stock_movement.php', 'icon' => 'fas fa-exchange-alt',   'label' => 'Stock Movement'],
+        ['page' => 'report_sales_date',     'href' => 'report_sales_date.php',     'icon' => 'fas fa-calendar-alt',   'label' => 'Sales by Date'],
+        ['page' => 'report_sales_staff',    'href' => 'report_sales_staff.php',    'icon' => 'fas fa-user-tie',       'label' => 'Sales by Staff'],
+        ['page' => 'report_sales_product',  'href' => 'report_sales_product.php',  'icon' => 'fas fa-box-open',       'label' => 'Sales by Product'],
+        ['page' => 'report_sales_branch',   'href' => 'report_sales_branch.php',   'icon' => 'fas fa-store',          'label' => 'Sales by Branch'],
+    ],
     'ADMIN' => [
         ['page' => 'user',        'href' => 'user.php',             'icon' => 'fas fa-users',                'label' => 'Users'],
     ],
