@@ -35,6 +35,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_outlet'] = $user['OUTLET'] ?? '';
             $_SESSION['user_dept'] = $user['DEPT'] ?? '';
             $_SESSION['user_type'] = $user['TYPE'] ?? 'S';
+
+            // Load branch name from branch table
+            $_SESSION['user_branch_code'] = $user['OUTLET'] ?? '';
+            $_SESSION['user_branch_name'] = '';
+            if (!empty($user['OUTLET'])) {
+                $brStmt = $connect->prepare("SELECT `name` FROM `branch` WHERE `code` = ? LIMIT 1");
+                if ($brStmt) {
+                    $brStmt->bind_param("s", $user['OUTLET']);
+                    $brStmt->execute();
+                    $brResult = $brStmt->get_result();
+                    if ($brResult && $brRow = $brResult->fetch_assoc()) {
+                        $_SESSION['user_branch_name'] = $brRow['name'];
+                    }
+                    $brStmt->close();
+                }
+            }
             header("Location: index.php");
             exit;
         } else {

@@ -76,6 +76,10 @@ if ('serviceWorker' in navigator) {
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       Stock Loss
     </a></li>
+    <li><a href="staff_history.php" data-page="staff_history.php">
+      <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Purchase History
+    </a></li>
     <?php endif; ?>
 
     <?php if ($userType === 'A' || $userType === 'D'): ?>

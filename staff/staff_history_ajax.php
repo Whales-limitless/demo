@@ -20,7 +20,7 @@ if ($action === 'items') {
     }
 
     $items = [];
-    $result = $connect->query("SELECT `BARCODE`, `PDESC`, `QTY` FROM `orderlist` WHERE `SALNUM` = '$salnum' AND `PTYPE` = 'STOCKIN' AND `BARCODE` <> 'PT' ORDER BY `ID` ASC");
+    $result = $connect->query("SELECT `BARCODE`, `PDESC`, `QTY` FROM `orderlist` WHERE `SALNUM` = '$salnum' AND `PTYPE` IN ('STOCKIN','PURCHASE') AND `BARCODE` <> 'PT' ORDER BY `ID` ASC");
     if ($result) {
         while ($row = $result->fetch_assoc()) {
             $items[] = $row;

@@ -15,6 +15,7 @@ $connect->set_charset("utf8mb4");
 $action = $_POST['action'] ?? '';
 $staffName = $_SESSION['user_name'] ?? 'Staff';
 $staffOutlet = $_SESSION['user_outlet'] ?? 'WEB';
+$staffBranch = $_SESSION['user_branch_code'] ?? ($_SESSION['user_outlet'] ?? '');
 
 if ($action === 'search') {
     $q = trim($_POST['q'] ?? '');
@@ -91,8 +92,11 @@ if ($action === 'search') {
         $negQty = -$qty;
         $desc = substr($product['name'], 0, 48);
 
-        $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`IP`,`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`MNO`,`BARCODE`,`PDESC`,`LOOSE`,`PGROUP`,`PRODTYPE`,`QTYADJ`,`SERIALNUMBER`,`REMARK`,`LOSS_REASON`) VALUES ('','STOCKLOSS',?,?,?,?,?,'',?,?,0,'','',?,'',?,?)");
-        $adjStmt->bind_param("sssssssdss", $staffName, $staffOutlet, $curDate, $curTime, $salnum, $barcode, $desc, $negQty, $remark, $reason);
+        // Try to add branch_code column if not exists (safe for first run)
+        $connect->query("ALTER TABLE `stockadj` ADD COLUMN `branch_code` VARCHAR(20) DEFAULT NULL");
+
+        $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`IP`,`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`MNO`,`BARCODE`,`PDESC`,`LOOSE`,`PGROUP`,`PRODTYPE`,`QTYADJ`,`SERIALNUMBER`,`REMARK`,`LOSS_REASON`,`branch_code`) VALUES ('','STOCKLOSS',?,?,?,?,?,'',?,?,0,'','',?,'',?,?,?)");
+        $adjStmt->bind_param("sssssssdsss", $staffName, $staffOutlet, $curDate, $curTime, $salnum, $barcode, $desc, $negQty, $remark, $reason, $staffBranch);
         if (!$adjStmt->execute()) {
             throw new Exception('Failed to insert adjustment: ' . $connect->error);
         }

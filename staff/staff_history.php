@@ -20,9 +20,9 @@ if (!empty($selectedMonth)) {
     $ymEnd = date('Y-m-t', strtotime($ymStart));
 
     $stmt = $connect->prepare("
-        SELECT SALNUM, NAME, SDATE, TTIME, SUM(QTY) AS TOTAL_QTY, COUNT(*) AS ITEM_COUNT, TXTTO
+        SELECT SALNUM, NAME, SDATE, TTIME, SUM(QTY) AS TOTAL_QTY, COUNT(*) AS ITEM_COUNT, TXTTO, PTYPE
         FROM `orderlist`
-        WHERE PTYPE = 'STOCKIN' AND SDATE BETWEEN ? AND ?
+        WHERE PTYPE IN ('STOCKIN','PURCHASE') AND SDATE BETWEEN ? AND ?
         GROUP BY SALNUM
         ORDER BY SDATE DESC, TTIME DESC
     ");
@@ -46,7 +46,7 @@ for ($i = 0; $i <= 6; $i++) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock In History</title>
+    <title>Purchase History</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
@@ -102,6 +102,10 @@ for ($i = 0; $i <= 6; $i++) {
         .action-btn:hover { border-color: var(--primary); color: var(--primary); }
         .action-btn svg { width: 16px; height: 16px; }
 
+        .type-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+        .badge-stockin { background: #dbeafe; color: #2563eb; }
+        .badge-purchase { background: #fef3c7; color: #92400e; }
+
         .empty-state { text-align: center; padding: 48px 16px; color: var(--text-muted); }
         .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.5; }
         .empty-state p { font-size: 14px; }
@@ -130,7 +134,7 @@ for ($i = 0; $i <= 6; $i++) {
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
             </svg>
         </a>
-        <span class="page-title">Stock In History</span>
+        <span class="page-title">Purchase History</span>
     </header>
 
     <div class="main-content">
@@ -146,7 +150,7 @@ for ($i = 0; $i <= 6; $i++) {
             </select>
         </div>
 
-        <div class="record-count">Showing <strong><?php echo count($stockInRecords); ?></strong> stock-in record(s) for <strong><?php echo date('F Y', strtotime($selectedMonth . '-01')); ?></strong></div>
+        <div class="record-count">Showing <strong><?php echo count($stockInRecords); ?></strong> record(s) for <strong><?php echo date('F Y', strtotime($selectedMonth . '-01')); ?></strong></div>
 
         <?php if (count($stockInRecords) === 0): ?>
         <div class="empty-state">
@@ -163,6 +167,7 @@ for ($i = 0; $i <= 6; $i++) {
                     <div class="stockin-salnum"><?php echo htmlspecialchars($rec['SALNUM']); ?></div>
                     <div class="stockin-date"><?php echo !empty($rec['SDATE']) ? date('d M Y', strtotime($rec['SDATE'])) : ''; ?><?php echo !empty($rec['TTIME']) ? ', ' . date('h:i A', strtotime($rec['TTIME'])) : ''; ?></div>
                 </div>
+                <span class="type-badge <?php echo ($rec['PTYPE'] ?? '') === 'STOCKIN' ? 'badge-stockin' : 'badge-purchase'; ?>"><?php echo ($rec['PTYPE'] ?? '') === 'STOCKIN' ? 'Stock In' : 'Purchase'; ?></span>
             </div>
             <div class="stockin-summary">
                 <div class="stockin-stat"><strong><?php echo intval($rec['ITEM_COUNT']); ?></strong> item(s)</div>
@@ -187,6 +192,10 @@ for ($i = 0; $i <= 6; $i++) {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
                     View Items
                 </button>
+                <a class="action-btn" href="stockin_preview.php?salnum=<?php echo urlencode($rec['SALNUM']); ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    Print
+                </a>
             </div>
         </div>
         <?php endforeach; ?>
@@ -197,7 +206,7 @@ for ($i = 0; $i <= 6; $i++) {
     <div class="items-overlay" id="itemsOverlay" onclick="if(event.target===this)closeItems()">
         <div class="items-modal">
             <h3>
-                <span id="itemsTitle">Stock In Items</span>
+                <span id="itemsTitle">Purchase Items</span>
                 <button class="close-btn" onclick="closeItems()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>

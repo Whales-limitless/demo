@@ -10,6 +10,16 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 include('../staff/dbconnection.php');
 $connect->set_charset("utf8mb4");
 
+// Ensure branch table exists
+$connect->query("CREATE TABLE IF NOT EXISTS `branch` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT,
+    `code` VARCHAR(20) NOT NULL,
+    `name` VARCHAR(100) NOT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_branch_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 // Fetch all users
 $users = [];
 $result = $connect->query("SELECT * FROM `sysfile` ORDER BY `ID` ASC");
@@ -17,6 +27,21 @@ if ($result) {
     while ($r = $result->fetch_assoc()) {
         $users[] = $r;
     }
+}
+
+// Fetch all branches
+$branches = [];
+$brResult = $connect->query("SELECT * FROM `branch` ORDER BY `name` ASC");
+if ($brResult) {
+    while ($r = $brResult->fetch_assoc()) {
+        $branches[] = $r;
+    }
+}
+
+// Build branch name lookup
+$branchMap = [];
+foreach ($branches as $br) {
+    $branchMap[$br['code']] = $br['name'];
 }
 
 $adminName = htmlspecialchars($_SESSION['admin_name'] ?? 'Admin');
@@ -237,9 +262,14 @@ body {
 <div class="page-content">
     <div class="page-header">
         <h1><i class="fas fa-users" style="color:var(--primary);margin-right:8px;"></i>User Management</h1>
-        <button class="btn-add" onclick="openCreateModal();">
-            <i class="fas fa-plus"></i> Add User
-        </button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-add" style="background:#3b82f6;" onclick="openBranchModal();">
+                <i class="fas fa-building"></i> Manage Branches
+            </button>
+            <button class="btn-add" onclick="openCreateModal();">
+                <i class="fas fa-plus"></i> Add User
+            </button>
+        </div>
     </div>
 
     <div class="table-card">
@@ -260,13 +290,14 @@ body {
                         <th>Username</th>
                         <th>Name</th>
                         <th>Type</th>
+                        <th>Branch</th>
                         <th style="width:1%">Action</th>
                     </tr>
                 </thead>
                 <tbody id="usersBody">
                     <?php if (count($users) === 0): ?>
                     <tr class="no-results">
-                        <td colspan="6"><i class="fas fa-users-slash" style="font-size:24px;margin-bottom:8px;display:block;"></i>No users found</td>
+                        <td colspan="7"><i class="fas fa-users-slash" style="font-size:24px;margin-bottom:8px;display:block;"></i>No users found</td>
                     </tr>
                     <?php else: ?>
                     <?php foreach ($users as $i => $u): ?>
@@ -287,6 +318,10 @@ body {
                         <td><strong><?php echo htmlspecialchars($u['USER1'] ?? ''); ?></strong></td>
                         <td><?php echo htmlspecialchars($u['USER_NAME'] ?? ''); ?></td>
                         <td><span class="badge-type <?php echo $badgeClass; ?>"><?php echo $typeName; ?></span></td>
+                        <td><?php
+                            $userOutlet = $u['OUTLET'] ?? '';
+                            echo !empty($userOutlet) && isset($branchMap[$userOutlet]) ? htmlspecialchars($branchMap[$userOutlet]) : '<span style="color:var(--text-muted);font-size:12px;">-</span>';
+                        ?></td>
                         <td style="white-space:nowrap">
                             <button type="button" class="btn-action btn-edit" onclick="openEditModal(<?php echo (int)$u['ID']; ?>);">
                                 <i class="fas fa-pen"></i> Edit
@@ -345,12 +380,45 @@ body {
                         <option value="D">Delivery</option>
                     </select>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="fBranch">Branch <span class="text-danger">*</span></label>
+                    <select id="fBranch" class="form-select">
+                        <option value="">-- Select Branch --</option>
+                        <?php foreach ($branches as $br): ?>
+                        <option value="<?php echo htmlspecialchars($br['code']); ?>"><?php echo htmlspecialchars($br['name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-success w-50" onclick="saveUser();">
                     <i class="fas fa-check"></i> Save
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Branch Management Modal -->
+<div class="modal fade" id="branchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-building"></i> Manage Branches</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex gap-2 mb-3">
+                    <input type="text" id="branchName" class="form-control" placeholder="Enter branch name...">
+                    <input type="hidden" id="branchEditId" value="">
+                    <button class="btn btn-success" style="white-space:nowrap;" onclick="saveBranch();">
+                        <i class="fas fa-plus"></i> <span id="branchBtnText">Add</span>
+                    </button>
+                </div>
+                <div id="branchList" style="max-height:400px;overflow-y:auto;">
+                    <p class="text-muted text-center py-3">Loading...</p>
+                </div>
             </div>
         </div>
     </div>
@@ -363,9 +431,11 @@ body {
 
 <script>
 var userModal = null;
+var branchModalObj = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     userModal = new bootstrap.Modal(document.getElementById('userModal'));
+    branchModalObj = new bootstrap.Modal(document.getElementById('branchModal'));
 });
 
 // Search
@@ -407,6 +477,7 @@ function openCreateModal() {
     document.getElementById('passwordHint').style.display = 'none';
     document.getElementById('fName').value = '';
     document.getElementById('fType').value = 'S';
+    document.getElementById('fBranch').value = '';
     userModal.show();
 }
 
@@ -434,6 +505,7 @@ function openEditModal(id) {
             document.getElementById('fPassword').value = '';
             document.getElementById('fName').value = data.USER_NAME || '';
             document.getElementById('fType').value = data.TYPE || 'S';
+            document.getElementById('fBranch').value = data.OUTLET || '';
             userModal.show();
         }
     });
@@ -446,6 +518,7 @@ function saveUser() {
     var password = document.getElementById('fPassword').value.trim();
     var name = document.getElementById('fName').value.trim();
     var type = document.getElementById('fType').value;
+    var branch = document.getElementById('fBranch').value;
 
     if (username === '') {
         Swal.fire({ icon: 'warning', text: 'Username is required.' });
@@ -457,12 +530,18 @@ function saveUser() {
         return;
     }
 
+    if (branch === '') {
+        Swal.fire({ icon: 'warning', text: 'Please select a branch.' });
+        return;
+    }
+
     var postData = {
         action: editId ? 'update' : 'create',
         username: username,
         password: password,
         name: name,
-        type: type
+        type: type,
+        branch: branch
     };
 
     if (editId) {
@@ -524,6 +603,147 @@ document.getElementById('userModal').addEventListener('shown.bs.modal', function
     if (!el.disabled) el.focus();
     else document.getElementById('fPassword').focus();
 });
+
+// ==================== BRANCH MANAGEMENT ====================
+function openBranchModal() {
+    branchModalObj.show();
+    loadBranches();
+}
+
+function loadBranches() {
+    $.ajax({
+        type: 'POST',
+        url: 'branch_ajax.php',
+        data: { action: 'list' },
+        dataType: 'json',
+        success: function(data) {
+            var list = document.getElementById('branchList');
+            var branches = data.branches || [];
+            if (branches.length === 0) {
+                list.innerHTML = '<p class="text-muted text-center py-3">No branches yet. Add one above.</p>';
+                return;
+            }
+            var html = '<table class="table table-sm mb-0"><thead><tr><th>Name</th><th>Code</th><th style="width:1%"></th></tr></thead><tbody>';
+            branches.forEach(function(br) {
+                html += '<tr>';
+                html += '<td><strong>' + escHtml(br.name) + '</strong></td>';
+                html += '<td><span class="code-tag">' + escHtml(br.code) + '</span></td>';
+                html += '<td style="white-space:nowrap">';
+                html += '<button class="btn btn-sm btn-outline-primary me-1" onclick="editBranch(' + br.id + ',\'' + escAttr(br.name) + '\')"><i class="fas fa-pen"></i></button>';
+                html += '<button class="btn btn-sm btn-outline-danger" onclick="deleteBranch(' + br.id + ',\'' + escAttr(br.name) + '\')"><i class="fas fa-trash"></i></button>';
+                html += '</td></tr>';
+            });
+            html += '</tbody></table>';
+            list.innerHTML = html;
+        }
+    });
+}
+
+function saveBranch() {
+    var name = document.getElementById('branchName').value.trim();
+    var editId = document.getElementById('branchEditId').value;
+
+    if (name === '') {
+        Swal.fire({ icon: 'warning', text: 'Branch name is required.' });
+        return;
+    }
+
+    var postData = { action: editId ? 'update' : 'create', name: name };
+    if (editId) postData.id = editId;
+
+    $.ajax({
+        type: 'POST',
+        url: 'branch_ajax.php',
+        data: postData,
+        dataType: 'json',
+        success: function(data) {
+            if (data.success) {
+                document.getElementById('branchName').value = '';
+                document.getElementById('branchEditId').value = '';
+                document.getElementById('branchBtnText').textContent = 'Add';
+                loadBranches();
+                refreshBranchDropdown();
+                Swal.fire({ icon: 'success', text: data.success, timer: 1200, showConfirmButton: false });
+            } else {
+                Swal.fire({ icon: 'error', text: data.error });
+            }
+        }
+    });
+}
+
+function editBranch(id, name) {
+    document.getElementById('branchEditId').value = id;
+    document.getElementById('branchName').value = name;
+    document.getElementById('branchBtnText').textContent = 'Update';
+    document.getElementById('branchName').focus();
+}
+
+function deleteBranch(id, name) {
+    Swal.fire({
+        title: 'Delete branch?',
+        text: 'Delete "' + name + '"?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Delete'
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.ajax({
+                type: 'POST',
+                url: 'branch_ajax.php',
+                data: { action: 'delete', id: id },
+                dataType: 'json',
+                success: function(data) {
+                    if (data.success) {
+                        loadBranches();
+                        refreshBranchDropdown();
+                        Swal.fire({ icon: 'success', text: data.success, timer: 1200, showConfirmButton: false });
+                    } else {
+                        Swal.fire({ icon: 'error', text: data.error });
+                    }
+                }
+            });
+        }
+    });
+}
+
+function refreshBranchDropdown() {
+    $.ajax({
+        type: 'POST',
+        url: 'branch_ajax.php',
+        data: { action: 'list' },
+        dataType: 'json',
+        success: function(data) {
+            var sel = document.getElementById('fBranch');
+            var currentVal = sel.value;
+            sel.innerHTML = '<option value="">-- Select Branch --</option>';
+            (data.branches || []).forEach(function(br) {
+                var opt = document.createElement('option');
+                opt.value = br.code;
+                opt.textContent = br.name;
+                if (br.code === currentVal) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+    });
+}
+
+// Reset branch edit form when modal closes
+document.getElementById('branchModal').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('branchName').value = '';
+    document.getElementById('branchEditId').value = '';
+    document.getElementById('branchBtnText').textContent = 'Add';
+});
+
+function escHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function escAttr(s) {
+    return s.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
 </script>
 
 </body>
