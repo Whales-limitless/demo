@@ -191,11 +191,10 @@ body {
     table-layout: fixed;
 }
 .items-table thead th {
-    background: #1a1a1a;
-    color: #fff;
-    font-weight: 600;
-    font-size: 11px;
-    text-transform: uppercase;
+    background: #fff;
+    color: #1a1a1a;
+    font-weight: 700;
+    font-size: 13px;
     padding: 8px 10px;
     text-align: left;
     border: 1px solid #1a1a1a;
