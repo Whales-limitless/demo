@@ -67,12 +67,24 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .status-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .status-tab:hover:not(.active) { border-color: var(--primary); color: var(--primary); }
 
-/* Product search */
-.product-search-wrap { position: relative; }
-.product-search-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #d1d5db; border-radius: 8px; max-height: 250px; overflow-y: auto; z-index: 1050; display: none; box-shadow: var(--shadow-md); }
-.product-search-results .item { padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
-.product-search-results .item:hover { background: #f0f9ff; }
-.product-search-results .item .barcode { color: var(--text-muted); font-size: 11px; }
+/* Product search modal */
+.product-search-modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1060; align-items:center; justify-content:center; }
+.product-search-modal-overlay.show { display:flex; }
+.product-search-modal { background:#fff; border-radius:var(--radius); width:90%; max-width:750px; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 8px 32px rgba(0,0,0,0.2); }
+.product-search-modal .psm-header { padding:16px 20px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
+.product-search-modal .psm-header h5 { margin:0; font-family:'Outfit',sans-serif; font-weight:700; font-size:16px; }
+.product-search-modal .psm-body { padding:16px 20px; overflow-y:auto; flex:1; }
+.product-search-modal .psm-search-row { display:flex; gap:8px; margin-bottom:14px; }
+.product-search-modal .psm-search-row input { flex:1; padding:9px 14px; border:1px solid #d1d5db; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:13px; outline:none; }
+.product-search-modal .psm-search-row input:focus { border-color:var(--primary); }
+.product-search-modal .psm-search-row button { padding:9px 18px; background:var(--primary); color:#fff; border:none; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.product-search-modal .psm-search-row button:hover { background:var(--primary-dark); }
+.psm-results-table { width:100%; border-collapse:collapse; font-size:13px; }
+.psm-results-table th { background:#f9fafb; padding:8px 10px; font-weight:600; font-size:12px; text-align:left; border-bottom:2px solid #e5e7eb; position:sticky; top:0; }
+.psm-results-table td { padding:8px 10px; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
+.psm-results-table tbody tr { cursor:pointer; transition:background 0.15s; }
+.psm-results-table tbody tr:hover { background:#f0f9ff; }
+.psm-no-results { text-align:center; padding:30px; color:var(--text-muted); font-size:13px; }
 
 /* Line items table */
 .line-items-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
@@ -179,10 +191,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 </div>
 
                 <hr>
-                <label class="form-label fw-semibold">Line Items</label>
-                <div class="product-search-wrap mb-2">
-                    <input type="text" id="productSearch" class="form-control" placeholder="Search product by name or barcode...">
-                    <div class="product-search-results" id="productResults"></div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <label class="form-label fw-semibold mb-0">Line Items</label>
+                    <button type="button" class="btn-add" onclick="openProductSearchModal();"><i class="fas fa-search"></i> Search Product</button>
                 </div>
 
                 <div style="overflow-x:auto;">
@@ -194,19 +205,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                                 <th>Barcode</th>
                                 <th style="width:80px">UOM</th>
                                 <th style="width:100px">Qty</th>
-                                <th style="width:120px">Unit Cost</th>
-                                <th style="width:100px">Subtotal</th>
                                 <th style="width:40px"></th>
                             </tr>
                         </thead>
                         <tbody id="lineItems"></tbody>
-                        <tfoot>
-                            <tr>
-                                <td colspan="6" style="text-align:right;font-weight:700;">Total:</td>
-                                <td id="lineTotal" style="font-weight:700;">0.00</td>
-                                <td></td>
-                            </tr>
-                        </tfoot>
                     </table>
                 </div>
             </div>
@@ -235,6 +237,25 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
+<!-- Product Search Modal (modal in modal) -->
+<div class="product-search-modal-overlay" id="productSearchOverlay">
+    <div class="product-search-modal">
+        <div class="psm-header">
+            <h5><i class="fas fa-search" style="color:var(--primary);margin-right:6px;"></i>Search Product</h5>
+            <button type="button" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted);" onclick="closeProductSearchModal();">&times;</button>
+        </div>
+        <div class="psm-body">
+            <div class="psm-search-row">
+                <input type="text" id="psmSearchInput" placeholder="Type product name or barcode..." onkeydown="if(event.key==='Enter')searchProducts();">
+                <button onclick="searchProducts();"><i class="fas fa-search"></i> Search</button>
+            </div>
+            <div id="psmResultsContainer">
+                <div class="psm-no-results">Type a product name or barcode and click Search</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -242,7 +263,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 var poModal = null, viewModal = null;
 var currentStatus = '';
 var lineItemIndex = 0;
-var searchTimeout = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     poModal = new bootstrap.Modal(document.getElementById('poModal'));
@@ -348,7 +368,6 @@ function clearForm() {
     document.getElementById('fExpectedDate').value = '';
     document.getElementById('fRemark').value = '';
     document.getElementById('lineItems').innerHTML = '';
-    document.getElementById('lineTotal').textContent = '0.00';
     lineItemIndex = 0;
 }
 
@@ -377,9 +396,8 @@ function editPO(id) {
                 document.getElementById('fRemark').value = po.remark || '';
 
                 (data.items || []).forEach(function(item) {
-                    addLineItem(item.barcode, item.product_desc, item.uom, item.qty_ordered, item.unit_cost);
+                    addLineItem(item.barcode, item.product_desc, item.uom, item.qty_ordered);
                 });
-                recalcTotal();
                 poModal.show();
             }
         });
@@ -387,7 +405,7 @@ function editPO(id) {
 }
 
 // ==================== LINE ITEMS ====================
-function addLineItem(barcode, desc, uom, qty, cost) {
+function addLineItem(barcode, desc, uom, qty) {
     lineItemIndex++;
     var idx = lineItemIndex;
     var html = '<tr id="line_' + idx + '">';
@@ -395,9 +413,7 @@ function addLineItem(barcode, desc, uom, qty, cost) {
     html += '<td>' + escHtml(desc) + '<input type="hidden" class="li-barcode" value="' + escHtml(barcode) + '"><input type="hidden" class="li-desc" value="' + escHtml(desc) + '"></td>';
     html += '<td><small class="text-muted">' + escHtml(barcode) + '</small></td>';
     html += '<td><input type="text" class="li-uom" value="' + escHtml(uom || '') + '"></td>';
-    html += '<td><input type="number" class="li-qty" value="' + (parseFloat(qty) || 0) + '" min="0" step="any" onchange="recalcTotal();" oninput="recalcTotal();"></td>';
-    html += '<td><input type="number" class="li-cost" value="' + (parseFloat(cost) || 0).toFixed(2) + '" min="0" step="0.01" onchange="recalcTotal();" oninput="recalcTotal();"></td>';
-    html += '<td class="li-subtotal">' + ((parseFloat(qty) || 0) * (parseFloat(cost) || 0)).toFixed(2) + '</td>';
+    html += '<td><input type="number" class="li-qty" value="' + (parseFloat(qty) || 1) + '" min="0" step="any"></td>';
     html += '<td><button class="btn-remove-line" onclick="removeLine(' + idx + ');"><i class="fas fa-times"></i></button></td>';
     html += '</tr>';
     document.getElementById('lineItems').insertAdjacentHTML('beforeend', html);
@@ -406,7 +422,6 @@ function addLineItem(barcode, desc, uom, qty, cost) {
 function removeLine(idx) {
     var row = document.getElementById('line_' + idx);
     if (row) row.remove();
-    recalcTotal();
     renumberLines();
 }
 
@@ -415,60 +430,51 @@ function renumberLines() {
     rows.forEach(function(r, i) { r.cells[0].textContent = i + 1; });
 }
 
-function recalcTotal() {
-    var total = 0;
-    document.querySelectorAll('#lineItems tr').forEach(function(row) {
-        var qty = parseFloat(row.querySelector('.li-qty').value) || 0;
-        var cost = parseFloat(row.querySelector('.li-cost').value) || 0;
-        var sub = qty * cost;
-        row.querySelector('.li-subtotal').textContent = sub.toFixed(2);
-        total += sub;
-    });
-    document.getElementById('lineTotal').textContent = total.toFixed(2);
+// ==================== PRODUCT SEARCH MODAL ====================
+function openProductSearchModal() {
+    document.getElementById('psmSearchInput').value = '';
+    document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-no-results">Type a product name or barcode and click Search</div>';
+    document.getElementById('productSearchOverlay').classList.add('show');
+    setTimeout(function() { document.getElementById('psmSearchInput').focus(); }, 100);
 }
 
-// ==================== PRODUCT SEARCH ====================
-document.getElementById('productSearch').addEventListener('input', function() {
-    var q = this.value.trim();
-    clearTimeout(searchTimeout);
-    if (q.length < 2) { document.getElementById('productResults').style.display = 'none'; return; }
+function closeProductSearchModal() {
+    document.getElementById('productSearchOverlay').classList.remove('show');
+}
 
-    searchTimeout = setTimeout(function() {
-        $.ajax({
-            type: 'POST', url: 'po_ajax.php', data: { action: 'search_products', q: q }, dataType: 'json',
-            success: function(data) {
-                var container = document.getElementById('productResults');
-                var products = data.products || [];
-                if (products.length === 0) {
-                    container.innerHTML = '<div class="item text-muted">No products found</div>';
-                    container.style.display = 'block';
-                    return;
-                }
-                var html = '';
-                products.forEach(function(p) {
-                    html += '<div class="item" onclick="selectProduct(\'' + escHtml(p.barcode) + '\', \'' + escHtml(p.name).replace(/'/g, "\\'") + '\', \'' + escHtml(p.uom || '') + '\');">';
-                    html += '<strong>' + escHtml(p.name) + '</strong><br><span class="barcode">' + escHtml(p.barcode) + ' | UOM: ' + escHtml(p.uom || '-') + ' | QOH: ' + p.qoh + '</span>';
-                    html += '</div>';
-                });
-                container.innerHTML = html;
-                container.style.display = 'block';
+function searchProducts() {
+    var q = document.getElementById('psmSearchInput').value.trim();
+    if (q.length < 1) { return; }
+    var container = document.getElementById('psmResultsContainer');
+    container.innerHTML = '<div class="psm-no-results"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+
+    $.ajax({
+        type: 'POST', url: 'po_ajax.php', data: { action: 'search_products', q: q }, dataType: 'json',
+        success: function(data) {
+            var products = data.products || [];
+            if (products.length === 0) {
+                container.innerHTML = '<div class="psm-no-results">No products found for "' + escHtml(q) + '"</div>';
+                return;
             }
-        });
-    }, 300);
-});
-
-function selectProduct(barcode, name, uom) {
-    document.getElementById('productResults').style.display = 'none';
-    document.getElementById('productSearch').value = '';
-    addLineItem(barcode, name, uom, 1, 0);
-    recalcTotal();
+            var html = '<table class="psm-results-table"><thead><tr><th>Product</th><th>Barcode</th><th>UOM</th><th>QOH</th></tr></thead><tbody>';
+            products.forEach(function(p) {
+                html += '<tr onclick="selectProductFromModal(\'' + escHtml(p.barcode) + '\', \'' + escHtml(p.name).replace(/'/g, "\\'") + '\', \'' + escHtml(p.uom || '') + '\');">';
+                html += '<td><strong>' + escHtml(p.name) + '</strong></td>';
+                html += '<td>' + escHtml(p.barcode) + '</td>';
+                html += '<td>' + escHtml(p.uom || '-') + '</td>';
+                html += '<td>' + (p.qoh || 0) + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+    });
 }
 
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('.product-search-wrap')) {
-        document.getElementById('productResults').style.display = 'none';
-    }
-});
+function selectProductFromModal(barcode, name, uom) {
+    closeProductSearchModal();
+    addLineItem(barcode, name, uom, 1);
+}
 
 // ==================== SAVE PO ====================
 function savePO() {
@@ -486,7 +492,7 @@ function savePO() {
             product_desc: row.querySelector('.li-desc').value,
             uom: row.querySelector('.li-uom').value,
             qty_ordered: parseFloat(row.querySelector('.li-qty').value) || 0,
-            unit_cost: parseFloat(row.querySelector('.li-cost').value) || 0
+            unit_cost: 0
         });
     });
 
@@ -543,12 +549,9 @@ function viewPO(id) {
             html += '</div>';
 
             html += '<table class="line-items-table">';
-            html += '<thead><tr><th>#</th><th>Product</th><th>Barcode</th><th>UOM</th><th>Ordered</th><th>Received</th><th>Unit Cost</th><th>Subtotal</th></tr></thead>';
+            html += '<thead><tr><th>#</th><th>Product</th><th>Barcode</th><th>UOM</th><th>Ordered</th><th>Received</th></tr></thead>';
             html += '<tbody>';
-            var grandTotal = 0;
             items.forEach(function(item, i) {
-                var sub = (parseFloat(item.qty_ordered) || 0) * (parseFloat(item.unit_cost) || 0);
-                grandTotal += sub;
                 html += '<tr>';
                 html += '<td>' + (i + 1) + '</td>';
                 html += '<td>' + escHtml(item.product_desc) + '</td>';
@@ -556,12 +559,9 @@ function viewPO(id) {
                 html += '<td>' + escHtml(item.uom || '-') + '</td>';
                 html += '<td>' + parseFloat(item.qty_ordered || 0).toFixed(2) + '</td>';
                 html += '<td>' + parseFloat(item.qty_received || 0).toFixed(2) + '</td>';
-                html += '<td>' + parseFloat(item.unit_cost || 0).toFixed(2) + '</td>';
-                html += '<td>' + sub.toFixed(2) + '</td>';
                 html += '</tr>';
             });
             html += '</tbody>';
-            html += '<tfoot><tr><td colspan="7" style="text-align:right;font-weight:700;">Total:</td><td style="font-weight:700;">' + grandTotal.toFixed(2) + '</td></tr></tfoot>';
             html += '</table>';
 
             document.getElementById('viewTitle').innerHTML = '<i class="fas fa-file-invoice"></i> ' + escHtml(po.po_number);
