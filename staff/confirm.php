@@ -240,16 +240,10 @@ function finishOrder() {
         try {
           var resp = JSON.parse(xhr.responseText);
           if (resp.success) {
-            if (orderType === 'purchase') {
-              title.textContent = 'Purchase Submitted!';
-              msg.textContent = 'Order ' + resp.salnum + ' has been placed successfully.';
-            } else {
-              title.textContent = 'Stock In Submitted!';
-              msg.textContent = 'Stock in ' + resp.salnum + ' has been recorded successfully.';
-            }
-            overlay.classList.add('active');
             sessionStorage.removeItem('confirmItems');
             sessionStorage.removeItem('cart');
+            // Redirect to preview/print page
+            window.location.href = 'stockin_preview.php?salnum=' + encodeURIComponent(resp.salnum);
           } else {
             alert('Order failed: ' + (resp.error || 'Unknown error'));
             updateType();

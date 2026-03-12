@@ -267,8 +267,8 @@ if ($stResult && $row = $stResult->fetch_assoc()) {
                         </svg>
                     </div>
                     <div class="menu-text">
-                        <h3>Stock In History</h3>
-                        <p>View stock receiving records</p>
+                        <h3>Purchase History</h3>
+                        <p>View purchase and stock in records</p>
                     </div>
                     <div class="menu-arrow">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
