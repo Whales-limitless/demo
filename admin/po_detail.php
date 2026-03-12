@@ -28,12 +28,16 @@ if (!$isNew) {
         exit;
     }
 
-    // Fetch items with product image
-    $itemResult = $connect->query("SELECT poi.*, p.img1 AS product_image FROM `purchase_order_item` poi LEFT JOIN `PRODUCTS` p ON poi.barcode = p.barcode WHERE poi.po_id = $poId ORDER BY poi.id ASC");
+    // Fetch items - use subquery for product image to avoid LEFT JOIN duplicate issues
+    $itemQuery = "SELECT poi.id, poi.po_id, poi.barcode, poi.product_desc, poi.qty_ordered, poi.qty_received, poi.unit_cost, poi.uom, poi.remark, (SELECT p.img1 FROM `PRODUCTS` p WHERE p.barcode = poi.barcode LIMIT 1) AS product_image FROM `purchase_order_item` poi WHERE poi.po_id = $poId ORDER BY poi.id ASC";
+    $itemResult = $connect->query($itemQuery);
+    $pageLoadDebug = ['query_ok' => !!$itemResult, 'query_error' => $connect->error, 'po_id' => $poId, 'query' => $itemQuery];
     if ($itemResult) {
+        $pageLoadDebug['num_rows'] = $itemResult->num_rows;
         while ($r = $itemResult->fetch_assoc()) {
             $items[] = $r;
         }
+        $pageLoadDebug['items_fetched'] = $items;
     }
 }
 
@@ -168,6 +172,18 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <body>
 
 <?php include('nav.php'); ?>
+
+<?php if (!$isNew && isset($pageLoadDebug)): ?>
+<div style="background:#fff3cd;border:2px solid #f59e0b;padding:12px 16px;margin:10px 24px;border-radius:8px;font-size:12px;font-family:monospace;white-space:pre-wrap;max-height:300px;overflow:auto;">
+<strong>PAGE LOAD DEBUG (po_id=<?php echo $poId; ?>):</strong>
+Query OK: <?php echo $pageLoadDebug['query_ok'] ? 'YES' : 'NO'; ?>
+
+Query Error: "<?php echo htmlspecialchars($pageLoadDebug['query_error']); ?>"
+Num rows: <?php echo $pageLoadDebug['num_rows'] ?? 'N/A'; ?>
+
+Items fetched: <?php echo htmlspecialchars(json_encode($pageLoadDebug['items_fetched'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)); ?>
+</div>
+<?php endif; ?>
 
 <div class="page-content">
     <div class="page-header">
