@@ -164,11 +164,15 @@ body {
 }
 
 .info-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px 24px;
     font-size: 13px;
     margin-bottom: 20px;
+}
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 4px;
 }
 .info-item {
     display: flex;
@@ -177,7 +181,6 @@ body {
 .info-label {
     font-weight: 700;
     white-space: nowrap;
-    min-width: 100px;
 }
 
 .items-table {
@@ -185,6 +188,7 @@ body {
     border-collapse: collapse;
     font-size: 13px;
     margin-top: 10px;
+    table-layout: fixed;
 }
 .items-table thead th {
     background: #1a1a1a;
@@ -198,7 +202,7 @@ body {
 }
 .items-table tbody td {
     padding: 6px 10px;
-    border: 1px solid #d1d5db;
+    border: 1px solid #1a1a1a;
     vertical-align: middle;
 }
 .items-table tbody tr:nth-child(even) {
@@ -210,7 +214,7 @@ body {
 .items-table tfoot td {
     padding: 8px 10px;
     font-weight: 700;
-    border: 1px solid #d1d5db;
+    border: 1px solid #1a1a1a;
     background: #f3f4f6;
 }
 
@@ -247,16 +251,23 @@ body {
 }
 
 @media (max-width: 800px) {
+    body { overflow-x: hidden; }
     .a4-page {
         width: 100%;
         min-height: auto;
-        margin: 12px;
-        padding: 20px 16px;
-        border-radius: 12px;
+        margin: 0;
+        padding: 16px 12px;
+        border-radius: 0;
+        box-shadow: none;
     }
-    .info-grid {
-        grid-template-columns: 1fr;
-    }
+    .doc-header .company-name { font-size: 18px; }
+    .doc-header .doc-title { font-size: 16px; }
+    .info-row { flex-wrap: wrap; }
+    .items-table { font-size: 12px; }
+    .items-table thead th { padding: 6px 8px; font-size: 10px; }
+    .items-table tbody td { padding: 5px 8px; word-break: break-word; }
+    .items-table tfoot td { padding: 6px 8px; }
+    .signature-block { width: 120px; }
     .toolbar {
         padding: 0 12px;
         flex-wrap: wrap;
@@ -296,54 +307,44 @@ window.onload = function() { window.print(); }
     </div>
 
     <div class="info-grid">
-        <div class="info-item">
-            <span class="info-label">Order No</span>
-            <span>: <?php echo htmlspecialchars($salnum); ?></span>
+        <div class="info-row">
+            <div class="info-item">
+                <span class="info-label">Order No</span>
+                <span>: <?php echo htmlspecialchars($salnum); ?></span>
+            </div>
+            <div class="info-item">
+                <span><?php echo htmlspecialchars($orderDate); ?>, <?php echo htmlspecialchars($orderTime); ?></span>
+            </div>
         </div>
-        <div class="info-item">
-            <span class="info-label">Date</span>
-            <span>: <?php echo htmlspecialchars($orderDate); ?></span>
-        </div>
-        <div class="info-item">
-            <span class="info-label">Type</span>
-            <span>: <?php echo htmlspecialchars($orderTypeLabel); ?></span>
-        </div>
-        <div class="info-item">
-            <span class="info-label">Time</span>
-            <span>: <?php echo htmlspecialchars($orderTime); ?></span>
-        </div>
-        <div class="info-item">
-            <span class="info-label">Staff</span>
-            <span>: <?php echo htmlspecialchars($orderInfo['NAME'] ?? '-'); ?></span>
+        <div class="info-row">
+            <div class="info-item">
+                <span class="info-label">Staff</span>
+                <span>: <?php echo htmlspecialchars($orderInfo['NAME'] ?? '-'); ?></span>
+            </div>
         </div>
         <?php if (!empty($orderInfo['TXTTO'])): ?>
-        <div class="info-item">
-            <span class="info-label">To</span>
-            <span>: <?php echo htmlspecialchars($orderInfo['TXTTO']); ?></span>
+        <div class="info-row">
+            <div class="info-item">
+                <span class="info-label">To</span>
+                <span>: <?php echo htmlspecialchars($orderInfo['TXTTO']); ?></span>
+            </div>
         </div>
         <?php endif; ?>
         <?php if (!empty($branchName)): ?>
-        <div class="info-item">
-            <span class="info-label">Branch</span>
-            <span>: <?php echo htmlspecialchars($branchName); ?></span>
+        <div class="info-row">
+            <div class="info-item">
+                <span class="info-label">Branch</span>
+                <span>: <?php echo htmlspecialchars($branchName); ?></span>
+            </div>
         </div>
         <?php endif; ?>
-        <div class="info-item">
-            <span class="info-label">Total Items</span>
-            <span>: <?php echo count($items); ?></span>
-        </div>
-        <div class="info-item">
-            <span class="info-label">Total Qty</span>
-            <span>: <?php echo $totalQty; ?></span>
-        </div>
     </div>
 
     <table class="items-table">
         <thead>
             <tr>
-                <th style="width:6%;" class="text-center">No</th>
-                <th style="width:18%;">Barcode</th>
-                <th style="width:52%;">Description</th>
+                <th style="width:8%;" class="text-center">No</th>
+                <th>Description</th>
                 <th style="width:12%;" class="text-center">Qty</th>
             </tr>
         </thead>
@@ -351,7 +352,6 @@ window.onload = function() { window.print(); }
             <?php foreach ($items as $idx => $item): ?>
             <tr>
                 <td class="text-center"><?php echo $idx + 1; ?></td>
-                <td><?php echo htmlspecialchars($item['BARCODE'] ?? ''); ?></td>
                 <td><?php echo htmlspecialchars($item['PDESC'] ?? ''); ?></td>
                 <td class="text-center"><?php echo intval($item['QTY']); ?></td>
             </tr>
@@ -359,7 +359,7 @@ window.onload = function() { window.print(); }
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="3" class="text-right">Total Quantity</td>
+                <td colspan="2" class="text-right">Total Quantity</td>
                 <td class="text-center"><?php echo $totalQty; ?></td>
             </tr>
         </tfoot>
