@@ -733,6 +733,27 @@ function savePO() {
     }
 
     var items = collectItems();
+
+    // DEBUG: Show what collectItems gathered
+    var debugRows = document.querySelectorAll('#itemsBody tr');
+    var debugInfo = 'Rows in table: ' + debugRows.length + '\n\n';
+    debugRows.forEach(function(tr, idx) {
+        var bi = tr.querySelector('.item-barcode');
+        var di = tr.querySelector('.item-desc');
+        var qi = tr.querySelector('.item-qty');
+        var ui = tr.querySelector('.item-uom');
+        var ne = tr.querySelector('.line-product-name');
+        debugInfo += 'Row ' + (idx+1) + ':\n';
+        debugInfo += '  data-barcode attr: "' + (tr.getAttribute('data-barcode') || '') + '"\n';
+        debugInfo += '  .item-barcode input: ' + (bi ? '"' + bi.value + '"' : 'NOT FOUND') + '\n';
+        debugInfo += '  .item-desc input: ' + (di ? '"' + di.value + '"' : 'NOT FOUND') + '\n';
+        debugInfo += '  .line-product-name text: ' + (ne ? '"' + ne.textContent.trim() + '"' : 'NOT FOUND') + '\n';
+        debugInfo += '  .item-qty input: ' + (qi ? '"' + qi.value + '"' : 'NOT FOUND') + '\n';
+        debugInfo += '  .item-uom input: ' + (ui ? '"' + ui.value + '"' : 'NOT FOUND') + '\n\n';
+    });
+    debugInfo += 'collectItems result (' + items.length + ' items):\n' + JSON.stringify(items, null, 2);
+    alert(debugInfo);
+
     if (items.length === 0) {
         Swal.fire({ icon: 'warning', text: 'Add at least one line item.' });
         return;
