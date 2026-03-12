@@ -101,6 +101,79 @@ if ($action === 'lookup_product') {
 
     echo json_encode(['products' => $products]);
 
+} elseif ($action === 'search_products_paginated') {
+    $search = trim($_POST['q'] ?? '');
+    $page = max(1, intval($_POST['page'] ?? 1));
+    $perPage = 20;
+
+    $where = "(p.`checked` != 'N' OR p.`checked` IS NULL)";
+    $params = [];
+    $types = "";
+
+    if ($search !== '') {
+        $normalizedSearch = $search;
+        $normalizedSearch = str_replace(["\u{201C}", "\u{201D}", "\u{2033}", "\u{FF02}"], '"', $normalizedSearch);
+        $normalizedSearch = str_replace(["\u{2018}", "\u{2019}", "\u{2032}", "\u{FF07}"], "'", $normalizedSearch);
+        $altSearch = str_replace('"', "''", $normalizedSearch);
+        $altSearch2 = str_replace("''", '"', $normalizedSearch);
+        $normalizedLike = '%' . $normalizedSearch . '%';
+        $altLike = '%' . $altSearch . '%';
+        $altLike2 = '%' . $altSearch2 . '%';
+
+        $where .= " AND (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?
+                   OR p.`barcode` LIKE ? OR p.`barcode` LIKE ? OR p.`barcode` LIKE ?)";
+        $params = [$normalizedLike, $altLike, $altLike2, $normalizedLike, $altLike, $altLike2];
+        $types = "ssssss";
+    }
+
+    // Count total
+    $countSql = "SELECT COUNT(DISTINCT p.`id`) AS cnt FROM `PRODUCTS` p WHERE $where";
+    $countStmt = $connect->prepare($countSql);
+    if ($types !== '') {
+        $countStmt->bind_param($types, ...$params);
+    }
+    $countStmt->execute();
+    $total = $countStmt->get_result()->fetch_assoc()['cnt'];
+    $countStmt->close();
+
+    $pages = max(1, ceil($total / $perPage));
+    $page = min($page, $pages);
+    $offset = ($page - 1) * $perPage;
+
+    $sql = "SELECT p.`id`, p.`barcode`, p.`name`, p.`img1` AS image, p.`uom`,
+                   COALESCE(p.`qoh`, 0) AS qoh, p.`cat_code`, p.`rack`,
+                   c.`cat_name` AS category_name
+            FROM `PRODUCTS` p
+            LEFT JOIN `category` c ON p.`cat_code` = c.`cat_code`
+            WHERE $where
+            ORDER BY p.`name` ASC
+            LIMIT ?, ?";
+    $stmt = $connect->prepare($sql);
+    $fetchTypes = $types . "ii";
+    $fetchParams = array_merge($params, [$offset, $perPage]);
+    $stmt->bind_param($fetchTypes, ...$fetchParams);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $products = [];
+    $seen = [];
+    while ($row = $result->fetch_assoc()) {
+        if (isset($seen[$row['id']])) continue;
+        $seen[$row['id']] = true;
+        $row['id'] = (int)$row['id'];
+        $row['qoh'] = (float)$row['qoh'];
+        $products[] = $row;
+    }
+    $stmt->close();
+
+    echo json_encode([
+        'products' => $products,
+        'total' => (int)$total,
+        'page' => (int)$page,
+        'pages' => (int)$pages,
+        'per_page' => (int)$perPage
+    ]);
+
 } elseif ($action === 'quick_create_product') {
     $name = trim($_POST['name'] ?? '');
     $uom = trim($_POST['uom'] ?? '');

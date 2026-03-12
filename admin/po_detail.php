@@ -103,32 +103,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .action-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
 .discrepancy { color: #d97706; font-weight: 600; }
 
-/* Product Search */
-.product-search-wrap { position: relative; }
-.product-search-input { width: 100%; padding: 8px 12px 8px 34px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color var(--transition); }
-.product-search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(200,16,46,0.1); }
-.product-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; pointer-events: none; }
-.product-search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.15); z-index: 1050; max-height: 320px; overflow-y: auto; display: none; margin-top: 4px; }
-.product-search-dropdown.active { display: block; }
-.ps-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; transition: background 0.15s; border-bottom: 1px solid #f3f4f6; }
-.ps-item:last-child { border-bottom: none; }
-.ps-item:hover { background: #f9fafb; }
-.ps-item-img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #f3f4f6; flex-shrink: 0; }
-.ps-item-noimg { width: 40px; height: 40px; border-radius: 6px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #d1d5db; font-size: 16px; }
-.ps-item-info { flex: 1; min-width: 0; }
-.ps-item-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ps-item-name mark { background: #fef3c7; border-radius: 2px; padding: 0 1px; }
-.ps-item-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
-.ps-item-meta .tag { background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: 10px; }
-.ps-item-qoh { font-size: 11px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
-.ps-item-qoh.in-stock { color: #16a34a; }
-.ps-item-qoh.out-stock { color: #dc2626; }
-.ps-empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
-.ps-loading { padding: 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
-.ps-create-new { display: flex; align-items: center; gap: 8px; padding: 10px 14px; cursor: pointer; background: #f0fdf4; color: #16a34a; font-weight: 600; font-size: 13px; border-top: 1px solid #dcfce7; transition: background 0.15s; }
-.ps-create-new:hover { background: #dcfce7; }
-.ps-create-new i { font-size: 14px; }
-
 /* Line item product cell with image */
 .line-product { display: flex; align-items: center; gap: 10px; }
 .line-product-img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; background: #f3f4f6; flex-shrink: 0; }
@@ -146,8 +120,48 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .img-preview-box .placeholder { text-align: center; color: var(--text-muted); font-size: 12px; }
 .img-preview-box .placeholder i { font-size: 24px; display: block; margin-bottom: 6px; }
 
+/* Product Picker Modal */
+.product-picker-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1060; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); }
+.product-picker-modal.active { display: flex; }
+.product-picker-box { background: var(--surface); border-radius: var(--radius); box-shadow: 0 12px 48px rgba(0,0,0,0.2); width: 95%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+.product-picker-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
+.product-picker-header h5 { font-family: 'Outfit', sans-serif; font-weight: 700; margin: 0; font-size: 16px; }
+.product-picker-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); padding: 4px 8px; border-radius: 6px; transition: all 0.15s; }
+.product-picker-close:hover { background: #f3f4f6; color: var(--text); }
+.product-picker-toolbar { padding: 12px 20px; border-bottom: 1px solid #f3f4f6; display: flex; gap: 10px; align-items: center; }
+.product-picker-search { flex: 1; position: relative; }
+.product-picker-search input { width: 100%; padding: 9px 14px 9px 36px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color var(--transition); }
+.product-picker-search input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(200,16,46,0.1); }
+.product-picker-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; }
+.product-picker-body { flex: 1; overflow-y: auto; padding: 0; }
+.pp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pp-table thead th { background: var(--text); color: #fff; font-weight: 600; font-size: 11px; text-transform: uppercase; padding: 8px 12px; text-align: left; position: sticky; top: 0; z-index: 2; }
+.pp-table tbody td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+.pp-table tbody tr { cursor: pointer; transition: background 0.15s; }
+.pp-table tbody tr:hover { background: #fef3c7; }
+.pp-table .pp-thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; background: #f3f4f6; }
+.pp-table .pp-thumb-empty { width: 36px; height: 36px; border-radius: 6px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #d1d5db; font-size: 14px; }
+.pp-table .pp-name { font-weight: 600; }
+.pp-table .pp-barcode { font-size: 11px; color: var(--text-muted); }
+.pp-table .pp-tag { background: #f3f4f6; padding: 2px 8px; border-radius: 4px; font-size: 11px; color: var(--text-muted); }
+.pp-qoh-in { color: #16a34a; font-weight: 600; }
+.pp-qoh-out { color: #dc2626; font-weight: 600; }
+.pp-empty { padding: 40px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.pp-empty i { font-size: 24px; display: block; margin-bottom: 8px; }
+.pp-loading { padding: 30px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.product-picker-footer { padding: 12px 20px; border-top: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pp-pagination-info { font-size: 12px; color: var(--text-muted); }
+.pp-pagination-btns { display: flex; gap: 4px; }
+.pp-pagination-btns button { padding: 5px 10px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); color: var(--text); }
+.pp-pagination-btns button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.pp-pagination-btns button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.pp-pagination-btns button:disabled { opacity: 0.4; cursor: default; }
+.pp-create-btn { background: #f0fdf4; color: #16a34a; border: 1px solid #dcfce7; padding: 7px 14px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+.pp-create-btn:hover { background: #dcfce7; border-color: #bbf7d0; }
+
 @media (max-width: 768px) {
     .page-content { padding: 16px; }
+    .product-picker-box { width: 98%; max-height: 95vh; }
 }
 </style>
 </head>
@@ -199,21 +213,16 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <?php endif; ?>
     </div>
 
-    <!-- Add Product Search (Draft only) -->
-    <?php if ($isDraft): ?>
-    <div class="card">
-        <div class="card-title">Add Product</div>
-        <div class="product-search-wrap" id="productSearchWrap">
-            <i class="fas fa-search product-search-icon"></i>
-            <input type="text" class="product-search-input" id="productSearchInput" placeholder="Search product by name..." autocomplete="off">
-            <div class="product-search-dropdown" id="productSearchDropdown"></div>
-        </div>
-    </div>
-    <?php endif; ?>
-
     <!-- Line Items -->
     <div class="card">
-        <div class="card-title">Line Items</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+            <div class="card-title" style="margin-bottom:0;">Line Items</div>
+            <?php if ($isDraft): ?>
+            <button type="button" class="btn-primary-action" onclick="openProductPicker();" style="padding:8px 18px;font-size:13px;">
+                <i class="fas fa-plus"></i> Add Product
+            </button>
+            <?php endif; ?>
+        </div>
         <div style="overflow-x:auto;">
             <table class="items-table" id="itemsTable">
                 <thead>
@@ -259,8 +268,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
         <?php if ($isDraft): ?>
         <div id="emptyHint" style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;<?php echo count($items) > 0 ? 'display:none;' : ''; ?>">
-            <i class="fas fa-search" style="font-size:20px;display:block;margin-bottom:8px;"></i>
-            Use the search above to add products to this order.
+            <i class="fas fa-box-open" style="font-size:20px;display:block;margin-bottom:8px;"></i>
+            Click "Add Product" to add products to this order.
         </div>
         <?php endif; ?>
     </div>
@@ -279,6 +288,44 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <?php if ($canCancel): ?>
         <button type="button" class="btn-danger-action" onclick="cancelPO();"><i class="fas fa-ban"></i> Cancel PO</button>
         <?php endif; ?>
+    </div>
+</div>
+
+<!-- Product Picker Modal -->
+<div class="product-picker-modal" id="productPickerModal">
+    <div class="product-picker-box">
+        <div class="product-picker-header">
+            <h5><i class="fas fa-boxes-stacked" style="color:var(--primary);margin-right:8px;"></i>Select Product</h5>
+            <button type="button" class="product-picker-close" onclick="closeProductPicker();">&times;</button>
+        </div>
+        <div class="product-picker-toolbar">
+            <div class="product-picker-search">
+                <i class="fas fa-search"></i>
+                <input type="text" id="ppSearchInput" placeholder="Search by product name or barcode..." autocomplete="off">
+            </div>
+            <button type="button" class="pp-create-btn" onclick="openNewProductModal('');"><i class="fas fa-plus-circle"></i> New Product</button>
+        </div>
+        <div class="product-picker-body">
+            <table class="pp-table">
+                <thead>
+                    <tr>
+                        <th style="width:50px">Img</th>
+                        <th>Product</th>
+                        <th>Barcode</th>
+                        <th>Category</th>
+                        <th style="width:70px">QOH</th>
+                        <th style="width:70px">UOM</th>
+                    </tr>
+                </thead>
+                <tbody id="ppTableBody">
+                    <tr><td colspan="6" class="pp-loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="product-picker-footer">
+            <div class="pp-pagination-info" id="ppPaginationInfo"></div>
+            <div class="pp-pagination-btns" id="ppPaginationBtns"></div>
+        </div>
     </div>
 </div>
 
@@ -338,13 +385,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (modalEl) newProductModal = new bootstrap.Modal(modalEl);
 });
 
-// ===================== PRODUCT SEARCH =====================
+// ===================== PRODUCT PICKER MODAL =====================
 
-var searchInput = document.getElementById('productSearchInput');
-var searchDropdown = document.getElementById('productSearchDropdown');
-var searchWrap = document.getElementById('productSearchWrap');
-var searchTimer = null;
-var searchXhr = null;
+var ppSearchTimer = null;
+var ppSearchXhr = null;
+var ppCurrentPage = 1;
 
 function escHtml(s) {
     var d = document.createElement('div');
@@ -352,101 +397,153 @@ function escHtml(s) {
     return d.innerHTML;
 }
 
-function highlightMatch(text, query) {
-    if (!query) return escHtml(text);
-    var escaped = escHtml(text);
-    var re = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
-    return escaped.replace(re, '<mark>$1</mark>');
+function openProductPicker() {
+    document.getElementById('productPickerModal').classList.add('active');
+    document.getElementById('ppSearchInput').value = '';
+    ppCurrentPage = 1;
+    fetchPickerProducts(1);
+    setTimeout(function() {
+        document.getElementById('ppSearchInput').focus();
+    }, 100);
 }
 
-function doProductSearch(q) {
-    if (!q || q.length < 1) {
-        searchDropdown.classList.remove('active');
-        searchDropdown.innerHTML = '';
-        return;
-    }
+function closeProductPicker() {
+    document.getElementById('productPickerModal').classList.remove('active');
+    if (ppSearchXhr) { ppSearchXhr.abort(); ppSearchXhr = null; }
+}
 
-    if (searchXhr) { searchXhr.abort(); searchXhr = null; }
+function fetchPickerProducts(page) {
+    ppCurrentPage = page;
+    var q = document.getElementById('ppSearchInput').value.trim();
+    var tbody = document.getElementById('ppTableBody');
 
-    searchDropdown.innerHTML = '<div class="ps-loading"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
-    searchDropdown.classList.add('active');
+    tbody.innerHTML = '<tr><td colspan="6" class="pp-loading"><i class="fas fa-spinner fa-spin"></i> Loading products...</td></tr>';
 
-    searchXhr = $.ajax({
-        type: 'POST', url: 'po_ajax.php', data: { action: 'search_products', q: q }, dataType: 'json',
+    if (ppSearchXhr) { ppSearchXhr.abort(); ppSearchXhr = null; }
+
+    ppSearchXhr = $.ajax({
+        type: 'POST', url: 'po_ajax.php',
+        data: { action: 'search_products_paginated', q: q, page: page },
+        dataType: 'json',
         success: function(data) {
-            searchXhr = null;
-            renderSearchResults(data.products || [], q);
+            ppSearchXhr = null;
+            renderPickerTable(data);
+            renderPickerPagination(data);
         },
-        error: function() {
-            searchXhr = null;
-            searchDropdown.classList.remove('active');
+        error: function(xhr, status) {
+            ppSearchXhr = null;
+            if (status !== 'abort') {
+                tbody.innerHTML = '<tr><td colspan="6" class="pp-empty"><i class="fas fa-exclamation-triangle"></i>Failed to load products</td></tr>';
+            }
         }
     });
 }
 
-function renderSearchResults(products, query) {
+function renderPickerTable(data) {
+    var tbody = document.getElementById('ppTableBody');
+    var products = data.products || [];
+
     if (products.length === 0) {
-        searchDropdown.innerHTML = '<div class="ps-empty"><i class="fas fa-search" style="display:block;margin-bottom:6px;font-size:16px;"></i>No products found for "' + escHtml(query) + '"</div>' +
-            '<div class="ps-create-new" onclick="openNewProductModal(\'' + escHtml(query).replace(/'/g, "\\'") + '\');"><i class="fas fa-plus-circle"></i> Create new product "' + escHtml(query) + '"</div>';
-        searchDropdown.classList.add('active');
+        tbody.innerHTML = '<tr><td colspan="6" class="pp-empty"><i class="fas fa-search"></i>No products found</td></tr>';
         return;
     }
 
-    var html = products.map(function(p) {
-        var imgHtml;
+    var html = '';
+    for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        var pJson = escHtml(JSON.stringify(p));
+
+        html += '<tr onclick=\'selectPickerProduct(' + JSON.stringify(p).replace(/'/g, "&#39;") + ')\'>';
+
+        // Image
         if (p.image) {
-            imgHtml = '<img class="ps-item-img" src="../img/' + escHtml(p.image) + '" alt="" loading="lazy">';
+            html += '<td><img class="pp-thumb" src="../img/' + escHtml(p.image) + '" alt="" loading="lazy"></td>';
         } else {
-            imgHtml = '<div class="ps-item-noimg"><i class="fas fa-image"></i></div>';
+            html += '<td><div class="pp-thumb-empty"><i class="fas fa-image"></i></div></td>';
         }
 
-        var qohClass = p.qoh > 0 ? 'in-stock' : 'out-stock';
-        var qohText = 'QOH: ' + p.qoh;
+        // Product name
+        html += '<td><div class="pp-name">' + escHtml(p.name) + '</div></td>';
 
-        return '<div class="ps-item" onclick=\'addProductLine(' + JSON.stringify(p).replace(/'/g, "&#39;") + ')\'>' +
-            imgHtml +
-            '<div class="ps-item-info">' +
-                '<div class="ps-item-name">' + highlightMatch(p.name, query) + '</div>' +
-                '<div class="ps-item-meta">' +
-                    (p.barcode ? '<span class="tag">' + escHtml(p.barcode) + '</span>' : '') +
-                    (p.category_name ? '<span class="tag">' + escHtml(p.category_name) + '</span>' : '') +
-                    (p.uom ? '<span class="tag">' + escHtml(p.uom) + '</span>' : '') +
-                '</div>' +
-            '</div>' +
-            '<span class="ps-item-qoh ' + qohClass + '">' + qohText + '</span>' +
-        '</div>';
-    }).join('');
+        // Barcode
+        html += '<td><span class="pp-barcode">' + escHtml(p.barcode || '-') + '</span></td>';
 
-    // Add "Create new" option at the bottom
-    html += '<div class="ps-create-new" onclick="openNewProductModal(\'' + escHtml(query).replace(/'/g, "\\'") + '\');"><i class="fas fa-plus-circle"></i> Create new product</div>';
+        // Category
+        html += '<td>' + (p.category_name ? '<span class="pp-tag">' + escHtml(p.category_name) + '</span>' : '<span style="color:#d1d5db;">-</span>') + '</td>';
 
-    searchDropdown.innerHTML = html;
-    searchDropdown.classList.add('active');
+        // QOH
+        var qohVal = p.qoh || 0;
+        html += '<td><span class="' + (qohVal > 0 ? 'pp-qoh-in' : 'pp-qoh-out') + '">' + qohVal + '</span></td>';
+
+        // UOM
+        html += '<td>' + escHtml(p.uom || '-') + '</td>';
+
+        html += '</tr>';
+    }
+    tbody.innerHTML = html;
 }
 
-if (searchInput) {
-    searchInput.addEventListener('input', function() {
-        var q = this.value.trim();
-        clearTimeout(searchTimer);
-        if (q.length < 1) {
-            if (searchXhr) { searchXhr.abort(); searchXhr = null; }
-            searchDropdown.classList.remove('active');
-            searchDropdown.innerHTML = '';
-            return;
-        }
-        searchTimer = setTimeout(function() { doProductSearch(q); }, 250);
-    });
+function renderPickerPagination(data) {
+    var info = document.getElementById('ppPaginationInfo');
+    var btns = document.getElementById('ppPaginationBtns');
 
-    searchInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            searchDropdown.classList.remove('active');
-        }
-    });
+    if (data.total === 0) {
+        info.textContent = '';
+        btns.innerHTML = '';
+        return;
+    }
 
-    document.addEventListener('click', function(e) {
-        if (searchWrap && !searchWrap.contains(e.target)) {
-            searchDropdown.classList.remove('active');
-        }
+    var start = (data.page - 1) * data.per_page + 1;
+    var end = Math.min(data.page * data.per_page, data.total);
+    info.textContent = 'Showing ' + start + '-' + end + ' of ' + data.total + ' products';
+
+    if (data.pages <= 1) {
+        btns.innerHTML = '';
+        return;
+    }
+
+    var html = '';
+    html += '<button ' + (data.page <= 1 ? 'disabled' : '') + ' onclick="fetchPickerProducts(' + (data.page - 1) + ');">&laquo;</button>';
+
+    var startPage = Math.max(1, data.page - 2);
+    var endPage = Math.min(data.pages, data.page + 2);
+    if (startPage > 1) {
+        html += '<button onclick="fetchPickerProducts(1);">1</button>';
+        if (startPage > 2) html += '<button disabled>...</button>';
+    }
+    for (var i = startPage; i <= endPage; i++) {
+        html += '<button class="' + (i === data.page ? 'active' : '') + '" onclick="fetchPickerProducts(' + i + ');">' + i + '</button>';
+    }
+    if (endPage < data.pages) {
+        if (endPage < data.pages - 1) html += '<button disabled>...</button>';
+        html += '<button onclick="fetchPickerProducts(' + data.pages + ');">' + data.pages + '</button>';
+    }
+    html += '<button ' + (data.page >= data.pages ? 'disabled' : '') + ' onclick="fetchPickerProducts(' + (data.page + 1) + ');">&raquo;</button>';
+    btns.innerHTML = html;
+}
+
+function selectPickerProduct(product) {
+    addProductLine(product);
+    closeProductPicker();
+}
+
+// Search input event
+var ppInput = document.getElementById('ppSearchInput');
+if (ppInput) {
+    ppInput.addEventListener('input', function() {
+        clearTimeout(ppSearchTimer);
+        ppSearchTimer = setTimeout(function() { fetchPickerProducts(1); }, 300);
+    });
+    ppInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeProductPicker();
+    });
+}
+
+// Close modal on backdrop click
+var ppModal = document.getElementById('productPickerModal');
+if (ppModal) {
+    ppModal.addEventListener('click', function(e) {
+        if (e.target === ppModal) closeProductPicker();
     });
 }
 
@@ -462,8 +559,6 @@ function addProductLine(product) {
             qtyInput.focus();
             qtyInput.select();
         }
-        searchDropdown.classList.remove('active');
-        searchInput.value = '';
         return;
     }
 
@@ -493,9 +588,6 @@ function addProductLine(product) {
     tr.querySelector('.item-qty').focus();
     tr.querySelector('.item-qty').select();
 
-    searchDropdown.classList.remove('active');
-    searchInput.value = '';
-
     // Hide empty hint
     var hint = document.getElementById('emptyHint');
     if (hint) hint.style.display = 'none';
@@ -504,7 +596,7 @@ function addProductLine(product) {
 // ===================== NEW PRODUCT MODAL =====================
 
 function openNewProductModal(prefillName) {
-    searchDropdown.classList.remove('active');
+    closeProductPicker();
     document.getElementById('npName').value = prefillName || '';
     document.getElementById('npUom').value = '';
     document.getElementById('npBarcode').value = '';
