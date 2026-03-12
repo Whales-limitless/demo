@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Mar 03, 2026 at 09:00 PM
+-- Generation Time: Mar 12, 2026 at 02:59 PM
 -- Server version: 10.3.39-MariaDB
--- PHP Version: 8.4.16
+-- PHP Version: 8.4.17
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -20,6 +20,19 @@ SET time_zone = "+00:00";
 --
 -- Database: `pw_main`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `branch`
+--
+
+CREATE TABLE `branch` (
+  `id` int(11) NOT NULL,
+  `code` varchar(20) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -49,7 +62,8 @@ CREATE TABLE `cat_group` (
   `cat_name` varchar(50) NOT NULL DEFAULT '',
   `cat_img` varchar(100) NOT NULL DEFAULT '',
   `main_page` varchar(10) NOT NULL DEFAULT '',
-  `sort_no` int(11) DEFAULT NULL
+  `sort_no` int(11) DEFAULT NULL,
+  `status` enum('ACTIVE','INACTIVE') NOT NULL DEFAULT 'ACTIVE'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
 
 -- --------------------------------------------------------
@@ -138,7 +152,9 @@ CREATE TABLE `del_orderlistdesc` (
   `ORDERNO` varchar(50) NOT NULL DEFAULT '',
   `PDESC` text NOT NULL,
   `QTY` double(10,2) NOT NULL,
-  `UOM` varchar(30) NOT NULL
+  `UOM` varchar(30) NOT NULL,
+  `INSTALL` varchar(1) NOT NULL DEFAULT '',
+  `INSTALL_IMG` varchar(200) NOT NULL DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 
 -- --------------------------------------------------------
@@ -257,6 +273,7 @@ CREATE TABLE `orderlist` (
   `ADMINRMK` varchar(500) DEFAULT '',
   `SOUND` varchar(5) DEFAULT '',
   `TXTTO` varchar(100) DEFAULT '',
+  `branch_code` varchar(20) DEFAULT NULL,
   `PURCHASEDATE` date DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -342,7 +359,8 @@ CREATE TABLE `PRODUCTS` (
   `uom` varchar(20) DEFAULT '',
   `checked` varchar(5) DEFAULT 'Y',
   `stkcode` varchar(50) DEFAULT '',
-  `rack` varchar(70) DEFAULT ''
+  `rack` varchar(70) DEFAULT '',
+  `rack_remark` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -487,7 +505,8 @@ CREATE TABLE `stockadj` (
   `PDESC` varchar(48) NOT NULL,
   `QTYADJ` double(8,2) NOT NULL,
   `REMARK` varchar(120) NOT NULL DEFAULT '',
-  `LOSS_REASON` enum('SPOILAGE','DAMAGE','THEFT','EXPIRED','OTHER','ADJUSTMENT') DEFAULT 'ADJUSTMENT'
+  `LOSS_REASON` enum('SPOILAGE','DAMAGE','THEFT','EXPIRED','OTHER','ADJUSTMENT') DEFAULT 'ADJUSTMENT',
+  `branch_code` varchar(20) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -502,6 +521,7 @@ CREATE TABLE `stock_take` (
   `description` varchar(200) DEFAULT '',
   `type` enum('FULL','PARTIAL') DEFAULT 'FULL',
   `filter_cat` varchar(50) DEFAULT NULL,
+  `filter_sub_cat` varchar(50) DEFAULT NULL,
   `filter_location` varchar(70) DEFAULT NULL,
   `status` enum('OPEN','IN_PROGRESS','COMPLETED','DRAFT','SUBMITTED','APPROVED') DEFAULT 'DRAFT',
   `created_by` varchar(50) DEFAULT '',
@@ -510,6 +530,7 @@ CREATE TABLE `stock_take` (
   `submitted_by` varchar(50) DEFAULT '',
   `submitted_at` datetime DEFAULT NULL,
   `approved_by` varchar(50) DEFAULT '',
+  `branch_code` varchar(20) DEFAULT NULL,
   `approved_at` datetime DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -529,6 +550,7 @@ CREATE TABLE `stock_take_item` (
   `counted_qty` double(8,2) DEFAULT NULL,
   `variance` double(8,2) DEFAULT NULL,
   `adj_applied` tinyint(1) DEFAULT 0,
+  `status` varchar(10) NOT NULL DEFAULT 'PENDING',
   `remark` varchar(200) DEFAULT '',
   `counted_by` varchar(50) DEFAULT '',
   `counted_at` datetime DEFAULT NULL
@@ -575,6 +597,13 @@ CREATE TABLE `sysfile` (
 --
 -- Indexes for dumped tables
 --
+
+--
+-- Indexes for table `branch`
+--
+ALTER TABLE `branch`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_branch_code` (`code`);
 
 --
 -- Indexes for table `category`
@@ -793,6 +822,12 @@ ALTER TABLE `sysfile`
 --
 -- AUTO_INCREMENT for dumped tables
 --
+
+--
+-- AUTO_INCREMENT for table `branch`
+--
+ALTER TABLE `branch`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `category`
