@@ -55,12 +55,28 @@ $currentPage = 'staff_grn';
 .modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
 .modal-footer { border-top: 1px solid #e5e7eb; }
 
-/* Product search */
-.product-search-wrap { position: relative; }
-.product-search-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #d1d5db; border-radius: 8px; max-height: 250px; overflow-y: auto; z-index: 1050; display: none; box-shadow: var(--shadow-md); }
-.product-search-results .item { padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
-.product-search-results .item:hover { background: #f0f9ff; }
-.product-search-results .item .barcode { color: var(--text-muted); font-size: 11px; }
+/* Product search modal grid */
+.psm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.psm-card { display: flex; flex-direction: column; align-items: center; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer; transition: all 0.15s; text-align: center; }
+.psm-card:hover { border-color: var(--primary); background: #fef2f2; box-shadow: 0 2px 8px rgba(200,16,46,0.1); }
+.psm-card-img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: #f3f4f6; margin-bottom: 8px; }
+.psm-card-noimg { width: 64px; height: 64px; border-radius: 8px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+.psm-card-noimg i { font-size: 20px; color: #d1d5db; }
+.psm-card-name { font-weight: 600; font-size: 12px; line-height: 1.3; margin-bottom: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+.psm-card-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.psm-card-qoh { font-size: 11px; font-weight: 700; }
+.psm-card-qoh.in { color: #16a34a; }
+.psm-card-qoh.out { color: #dc2626; }
+.psm-card-rack { font-size: 10px; color: var(--text-muted); }
+.psm-empty { text-align:center; padding:30px 20px; color:var(--text-muted); font-size:13px; }
+#psmResultsContainer { max-height: 450px; overflow-y: auto; }
+.psm-search-bar { display: flex; gap: 8px; }
+.psm-search-bar input { flex: 1; }
+.psm-search-btn { background: var(--primary); color: #fff; border: none; padding: 8px 20px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.psm-search-btn:hover { background: var(--primary-dark); }
+.psm-result-count { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+.psm-load-more { display: block; width: 100%; padding: 10px; margin-top: 12px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; text-align: center; transition: all 0.15s; }
+.psm-load-more:hover { background: #e5e7eb; border-color: var(--primary); color: var(--primary); }
 
 /* Line items table */
 .line-items-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
@@ -193,12 +209,11 @@ $currentPage = 'staff_grn';
                         <input type="text" id="fGrnRemark" class="form-control" placeholder="Optional remark">
                     </div>
 
-                    <!-- Direct mode: product search -->
+                    <!-- Direct mode: product search button -->
                     <div id="directProductSearch" style="display:none;">
-                        <label class="form-label fw-semibold">Add Products</label>
-                        <div class="product-search-wrap mb-2">
-                            <input type="text" id="grnProductSearch" class="form-control" placeholder="Search product by name or barcode...">
-                            <div class="product-search-results" id="grnProductResults"></div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <label class="form-label fw-semibold mb-0">Line Items</label>
+                            <button type="button" class="btn-add" onclick="openProductSearchModal();"><i class="fas fa-search"></i> Search Product</button>
                         </div>
                     </div>
 
@@ -248,19 +263,47 @@ $currentPage = 'staff_grn';
     </div>
 </div>
 
+<!-- Product Search Modal -->
+<div class="modal fade" id="productSearchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-search" style="color:var(--primary);margin-right:6px;"></i>Search Product</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="psm-search-bar mb-3">
+                    <input type="text" class="form-control" id="psmSearchInput" placeholder="Enter product name..." autocomplete="off">
+                    <button type="button" class="psm-search-btn" onclick="doProductSearch();"><i class="fas fa-search"></i> Search</button>
+                </div>
+                <div id="psmResultsContainer">
+                    <div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Enter a search term and click Search</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php include('mobile-bottombar.php'); ?>
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-var receiveModalObj = null, viewGrnModalObj = null;
+var receiveModalObj = null, viewGrnModalObj = null, productSearchModal = null;
 var grnLineIndex = 0;
-var grnSearchTimeout = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     receiveModalObj = new bootstrap.Modal(document.getElementById('receiveModal'));
     viewGrnModalObj = new bootstrap.Modal(document.getElementById('viewGrnModal'));
+    productSearchModal = new bootstrap.Modal(document.getElementById('productSearchModal'));
+    document.getElementById('productSearchModal').addEventListener('shown.bs.modal', function() {
+        document.getElementById('psmSearchInput').focus();
+    });
+    document.getElementById('productSearchModal').addEventListener('hidden.bs.modal', function() {
+        document.getElementById('psmSearchInput').value = '';
+        document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Enter a search term and click Search</div>';
+    });
     loadGRNs();
 });
 
@@ -451,48 +494,98 @@ function renumberGRNLines() {
     rows.forEach(function(r, i) { r.cells[0].textContent = i + 1; });
 }
 
-// ==================== DIRECT MODE PRODUCT SEARCH ====================
-document.getElementById('grnProductSearch').addEventListener('input', function() {
-    var q = this.value.trim();
-    clearTimeout(grnSearchTimeout);
-    if (q.length < 2) { document.getElementById('grnProductResults').style.display = 'none'; return; }
+// ==================== PRODUCT SEARCH MODAL ====================
+var psmSearchXhr = null;
+var psmCurrentQuery = '';
+var psmCurrentOffset = 0;
+var psmTotal = 0;
 
-    grnSearchTimeout = setTimeout(function() {
-        $.ajax({
-            type: 'POST', url: 'staff_grn_ajax.php', data: { action: 'search_products', q: q }, dataType: 'json',
-            success: function(data) {
-                var container = document.getElementById('grnProductResults');
-                var products = data.products || [];
-                if (products.length === 0) {
-                    container.innerHTML = '<div class="item text-muted">No products found</div>';
-                    container.style.display = 'block';
-                    return;
-                }
-                var html = '';
-                products.forEach(function(p) {
-                    html += '<div class="item" onclick="selectGRNProduct(\'' + escHtml(p.barcode) + '\', \'' + escHtml(p.name).replace(/'/g, "\\'") + '\', \'' + escHtml(p.rack || '') + '\');">';
-                    html += '<strong>' + escHtml(p.name) + '</strong><br><span class="barcode">' + escHtml(p.barcode) + ' | UOM: ' + escHtml(p.uom || '-') + '</span>';
-                    html += '</div>';
-                });
-                container.innerHTML = html;
-                container.style.display = 'block';
-            }
-        });
-    }, 300);
-});
-
-function selectGRNProduct(barcode, name, rack) {
-    document.getElementById('grnProductResults').style.display = 'none';
-    document.getElementById('grnProductSearch').value = '';
-    addGRNLine(null, barcode, name, null, 1, rack);
+function openProductSearchModal() {
+    productSearchModal.show();
 }
 
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('.product-search-wrap')) {
-        var el = document.getElementById('grnProductResults');
-        if (el) el.style.display = 'none';
-    }
+document.getElementById('psmSearchInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); doProductSearch(); }
 });
+
+function doProductSearch() {
+    var q = document.getElementById('psmSearchInput').value;
+    if (q.length === 0) {
+        document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Please enter a search term</div>';
+        return;
+    }
+    psmCurrentQuery = q;
+    psmCurrentOffset = 0;
+    psmTotal = 0;
+    loadProducts(false);
+}
+
+function loadMoreProducts() {
+    loadProducts(true);
+}
+
+function loadProducts(append) {
+    if (psmSearchXhr) { psmSearchXhr.abort(); }
+    var container = document.getElementById('psmResultsContainer');
+    if (!append) {
+        container.innerHTML = '<div class="psm-empty"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    } else {
+        var btn = document.getElementById('psmLoadMoreBtn');
+        if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+    }
+
+    psmSearchXhr = $.ajax({
+        type: 'POST', url: 'staff_grn_ajax.php', data: { action: 'search_products', q: psmCurrentQuery, offset: psmCurrentOffset }, dataType: 'json',
+        success: function(data) {
+            psmSearchXhr = null;
+            var products = data.products || [];
+            psmTotal = data.total || products.length;
+
+            if (!append && products.length === 0) {
+                container.innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>No products found for "' + escHtml(psmCurrentQuery) + '"</div>';
+                return;
+            }
+
+            var html = '';
+            products.forEach(function(p) {
+                var qohClass = (p.qoh || 0) > 0 ? 'in' : 'out';
+                var imgHtml = p.image ? '<img class="psm-card-img" src="../img/' + escHtml(p.image) + '" alt="" loading="lazy">' :
+                    '<div class="psm-card-noimg"><i class="fas fa-box"></i></div>';
+                html += '<div class="psm-card" onclick="selectProductFromModal(\'' + escHtml(p.barcode) + '\', \'' + escHtml(p.name).replace(/'/g, "\\'") + '\', \'' + escHtml(p.uom || '') + '\', \'' + escHtml(p.rack || '') + '\');">';
+                html += imgHtml;
+                html += '<div class="psm-card-name">' + escHtml(p.name) + '</div>';
+                html += '<div class="psm-card-meta">' + escHtml(p.barcode) + '</div>';
+                if (p.rack) { html += '<div class="psm-card-rack"><i class="fas fa-map-marker-alt"></i> ' + escHtml(p.rack) + '</div>'; }
+                html += '<div class="psm-card-qoh ' + qohClass + '">QOH: ' + (p.qoh || 0) + '</div>';
+                html += '</div>';
+            });
+
+            psmCurrentOffset += products.length;
+            var loaded = psmCurrentOffset;
+            var hasMore = loaded < psmTotal;
+
+            if (append) {
+                var grid = container.querySelector('.psm-grid');
+                if (grid) grid.insertAdjacentHTML('beforeend', html);
+                var oldBtn = document.getElementById('psmLoadMoreBtn');
+                if (oldBtn) oldBtn.remove();
+                var countEl = container.querySelector('.psm-result-count');
+                if (countEl) countEl.textContent = 'Showing ' + loaded + ' of ' + psmTotal + ' products';
+            } else {
+                container.innerHTML = '<div class="psm-result-count">Showing ' + loaded + ' of ' + psmTotal + ' products</div><div class="psm-grid">' + html + '</div>';
+            }
+
+            if (hasMore) {
+                container.insertAdjacentHTML('beforeend', '<button class="psm-load-more" id="psmLoadMoreBtn" onclick="loadMoreProducts();">Load More (' + (psmTotal - loaded) + ' remaining)</button>');
+            }
+        },
+        error: function() { psmSearchXhr = null; }
+    });
+}
+
+function selectProductFromModal(barcode, name, uom, rack) {
+    addGRNLine(null, barcode, name, null, 1, rack);
+}
 
 // ==================== SUBMIT RECEIVE ====================
 function submitReceive() {
