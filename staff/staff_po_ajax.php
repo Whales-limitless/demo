@@ -46,15 +46,14 @@ if ($action === 'search_products') {
     $altLike = '%' . $altSearch . '%';
     $altLike2 = '%' . $altSearch2 . '%';
 
-    // Get total count
+    // Get total count — search by product name only (same logic as navSearch)
     $cntStmt = $connect->prepare("
         SELECT COUNT(DISTINCT p.`id`) AS cnt
         FROM `PRODUCTS` p
-        WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?
-               OR p.`barcode` LIKE ? OR p.`barcode` LIKE ? OR p.`barcode` LIKE ?)
+        WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?)
           AND (p.`checked` != 'N' OR p.`checked` IS NULL)
     ");
-    $cntStmt->bind_param("ssssss", $normalizedLike, $altLike, $altLike2, $normalizedLike, $altLike, $altLike2);
+    $cntStmt->bind_param("sss", $normalizedLike, $altLike, $altLike2);
     $cntStmt->execute();
     $total = (int)$cntStmt->get_result()->fetch_assoc()['cnt'];
     $cntStmt->close();
@@ -65,13 +64,12 @@ if ($action === 'search_products') {
                c.`cat_name` AS category_name
         FROM `PRODUCTS` p
         LEFT JOIN `category` c ON p.`cat_code` = c.`cat_code`
-        WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?
-               OR p.`barcode` LIKE ? OR p.`barcode` LIKE ? OR p.`barcode` LIKE ?)
+        WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?)
           AND (p.`checked` != 'N' OR p.`checked` IS NULL)
         ORDER BY p.`name` ASC
         LIMIT ? OFFSET ?
     ");
-    $stmt->bind_param("ssssssii", $normalizedLike, $altLike, $altLike2, $normalizedLike, $altLike, $altLike2, $limit, $offset);
+    $stmt->bind_param("sssii", $normalizedLike, $altLike, $altLike2, $limit, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
 
