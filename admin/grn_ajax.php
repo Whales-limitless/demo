@@ -114,21 +114,35 @@ if ($action === 'list') {
         exit;
     }
 
-    $like = '%' . $search . '%';
+    // Normalize quote variants (same logic as navSearch)
+    $normalizedSearch = $search;
+    $normalizedSearch = str_replace(["\u{201C}", "\u{201D}", "\u{2033}", "\u{FF02}"], '"', $normalizedSearch);
+    $normalizedSearch = str_replace(["\u{2018}", "\u{2019}", "\u{2032}", "\u{FF07}"], "'", $normalizedSearch);
+    $altSearch = str_replace('"', "''", $normalizedSearch);
+    $altSearch2 = str_replace("''", '"', $normalizedSearch);
+    $normalizedLike = '%' . $normalizedSearch . '%';
+    $altLike = '%' . $altSearch . '%';
+    $altLike2 = '%' . $altSearch2 . '%';
+
     $stmt = $connect->prepare("
-        SELECT p.`id`, p.`barcode`, p.`name`, p.`uom`, COALESCE(p.`qoh`, 0) AS qoh, p.`rack`
+        SELECT DISTINCT p.`id`, p.`barcode`, p.`name`, p.`uom`, COALESCE(p.`qoh`, 0) AS qoh, p.`rack`,
+               c.`cat_name` AS category_name
         FROM `PRODUCTS` p
-        WHERE (p.`name` LIKE ? OR p.`barcode` LIKE ?)
+        INNER JOIN `category` c ON p.`cat_code` = c.`cat_code` AND p.`sub_code` = c.`sub_code`
+        WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?)
           AND (p.`checked` != 'N' OR p.`checked` IS NULL)
         ORDER BY p.`name` ASC
         LIMIT 20
     ");
-    $stmt->bind_param("ss", $like, $like);
+    $stmt->bind_param("sss", $normalizedLike, $altLike, $altLike2);
     $stmt->execute();
     $result = $stmt->get_result();
 
     $products = [];
+    $seen = [];
     while ($row = $result->fetch_assoc()) {
+        if (isset($seen[$row['id']])) continue;
+        $seen[$row['id']] = true;
         $products[] = $row;
     }
     $stmt->close();
