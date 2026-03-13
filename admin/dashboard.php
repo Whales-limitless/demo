@@ -27,25 +27,27 @@ $newOrderCount = 0;
 $q = $connect->query("SELECT COUNT(DISTINCT SALNUM) as cnt FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND SOUND = '0'");
 if ($q && $row = $q->fetch_assoc()) $newOrderCount = (int)$row['cnt'];
 
+// Build branch name lookup
+$branchNames = [];
+$brRes = $connect->query("SELECT code, name FROM `branch`");
+if ($brRes) { while ($br = $brRes->fetch_assoc()) $branchNames[$br['code']] = $br['name']; }
+
+// Build member HP lookup
+$memberHP = [];
+$mRes = $connect->query("SELECT ACCODE, HP FROM `MEMBER`");
+if ($mRes) { while ($m = $mRes->fetch_assoc()) $memberHP[$m['ACCODE']] = $m['HP']; }
+
+// Aggregate orders directly from orderlist - simple query, no JOINs
 $orders = [];
-$orderResult = $connect->query("
-    SELECT sub.SALNUM, sub.ACCODE, sub.NAME, sub.ADMINRMK, sub.TXTTO,
-           sub.SDATE, sub.TTIME, sub.SUMQTY, sub.PURCHASEDATE, sub.branch_code,
-           COALESCE(br.name, sub.branch_code) AS branch_name, g.HP
-    FROM (
-        SELECT SALNUM, ACCODE, MAX(NAME) AS NAME, MAX(ADMINRMK) AS ADMINRMK,
-               MAX(TXTTO) AS TXTTO, MAX(SDATE) AS SDATE, MAX(TTIME) AS TTIME,
-               SUM(QTY) AS SUMQTY, MAX(PURCHASEDATE) AS PURCHASEDATE,
-               MAX(branch_code) AS branch_code
-        FROM `orderlist`
-        WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT'
-        GROUP BY SALNUM, ACCODE
-    ) sub
-    LEFT JOIN `branch` br ON sub.branch_code = br.code
-    LEFT JOIN `MEMBER` g ON sub.ACCODE = g.ACCODE
-    ORDER BY sub.SALNUM DESC
-");
-if ($orderResult) { while ($r = $orderResult->fetch_assoc()) $orders[] = $r; }
+$orderResult = $connect->query("SELECT SALNUM, ACCODE, MAX(NAME) AS NAME, MAX(ADMINRMK) AS ADMINRMK, MAX(TXTTO) AS TXTTO, MAX(SDATE) AS SDATE, MAX(TTIME) AS TTIME, SUM(QTY) AS SUMQTY, MAX(PURCHASEDATE) AS PURCHASEDATE, MAX(branch_code) AS branch_code FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM, ACCODE ORDER BY SALNUM DESC");
+if ($orderResult) {
+    while ($r = $orderResult->fetch_assoc()) {
+        $bc = $r['branch_code'] ?? '';
+        $r['branch_name'] = $branchNames[$bc] ?? $bc;
+        $r['HP'] = $memberHP[$r['ACCODE'] ?? ''] ?? '';
+        $orders[] = $r;
+    }
+}
 
 $currentPage = 'dashboard';
 ?>
