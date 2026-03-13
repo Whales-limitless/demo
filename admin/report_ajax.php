@@ -227,21 +227,43 @@ if ($action === 'stock_movement') {
     $params = [$startDate, $endDate];
     $types = "ss";
 
+    // Check which lookup tables exist to avoid query failure
+    $hasOutlet = $connect->query("SHOW TABLES LIKE 'outlet'")->num_rows > 0;
+    $hasBranch = $connect->query("SHOW TABLES LIKE 'branch'")->num_rows > 0;
+
+    $branchCodeExpr = "COALESCE(NULLIF(o.OUTLET, ''), 'NO_BRANCH')";
+    $joins = "";
+    if ($hasOutlet && $hasBranch) {
+        $branchNameExpr = "COALESCE(ot.PDESC, b.name, IF(o.OUTLET = '' OR o.OUTLET IS NULL, 'No Branch', o.OUTLET))";
+        $joins = "LEFT JOIN `outlet` ot ON o.OUTLET = ot.CODE LEFT JOIN `branch` b ON o.OUTLET = b.code";
+    } elseif ($hasOutlet) {
+        $branchNameExpr = "COALESCE(ot.PDESC, IF(o.OUTLET = '' OR o.OUTLET IS NULL, 'No Branch', o.OUTLET))";
+        $joins = "LEFT JOIN `outlet` ot ON o.OUTLET = ot.CODE";
+    } elseif ($hasBranch) {
+        $branchNameExpr = "COALESCE(b.name, IF(o.OUTLET = '' OR o.OUTLET IS NULL, 'No Branch', o.OUTLET))";
+        $joins = "LEFT JOIN `branch` b ON o.OUTLET = b.code";
+    } else {
+        $branchNameExpr = "IF(o.OUTLET = '' OR o.OUTLET IS NULL, 'No Branch', o.OUTLET)";
+    }
+
     $sql = "SELECT
-                COALESCE(NULLIF(o.OUTLET, ''), 'MAIN') AS branch_code,
-                COALESCE(ot.PDESC, b.name, COALESCE(NULLIF(o.OUTLET, ''), 'MAIN')) AS branch_name,
+                $branchCodeExpr AS branch_code,
+                $branchNameExpr AS branch_name,
                 COUNT(DISTINCT o.SALNUM) AS total_orders,
                 SUM(o.QTY) AS total_qty,
                 COUNT(DISTINCT o.BARCODE) AS unique_products,
                 COUNT(DISTINCT o.NAME) AS staff_count
             FROM `orderlist` o
-            LEFT JOIN `outlet` ot ON o.OUTLET = ot.CODE
-            LEFT JOIN `branch` b ON o.OUTLET = b.code
+            $joins
             $where
-            GROUP BY branch_code
+            GROUP BY branch_code, branch_name
             ORDER BY total_qty DESC";
 
     $stmt = $connect->prepare($sql);
+    if (!$stmt) {
+        echo json_encode(['error' => 'Query error: ' . $connect->error]);
+        exit;
+    }
     $stmt->bind_param($types, ...$params);
     $stmt->execute();
     $result = $stmt->get_result();
