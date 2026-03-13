@@ -13,29 +13,33 @@ $connect->set_charset("utf8mb4");
 // Ensure PURCHASEDATE column exists on orderlist (run once, safe to repeat)
 $connect->query("ALTER TABLE `orderlist` ADD COLUMN `PURCHASEDATE` DATE DEFAULT NULL");
 
+$connect->query("CREATE TABLE IF NOT EXISTS `orderlist2` (
+  `ID` int(11) NOT NULL AUTO_INCREMENT,
+  `SALNUM` varchar(100) NOT NULL DEFAULT '',
+  `ACCODE` varchar(20) NOT NULL DEFAULT '',
+  `NAME` varchar(100) NOT NULL DEFAULT '',
+  `ADMINRMK` mediumtext DEFAULT NULL,
+  `TXTTO` varchar(200) NOT NULL DEFAULT '',
+  `SDATE` date DEFAULT NULL,
+  `TTIME` time DEFAULT NULL,
+  `SUMQTY` int(11) NOT NULL DEFAULT 0,
+  `HP` varchar(50) NOT NULL DEFAULT '',
+  `PURCHASEDATE` date DEFAULT NULL,
+  `branch_code` varchar(20) DEFAULT '',
+  PRIMARY KEY (`ID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+$connect->query("ALTER TABLE `orderlist2` ADD COLUMN `branch_code` VARCHAR(20) DEFAULT ''");
+
+$connect->query("TRUNCATE TABLE `orderlist2`");
+$connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY,PURCHASEDATE,branch_code) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY,PURCHASEDATE,branch_code FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
+$connect->query("UPDATE orderlist2 AS b INNER JOIN MEMBER AS g ON b.ACCODE = g.ACCODE SET b.HP = g.HP");
+
 $newOrderCount = 0;
 $q = $connect->query("SELECT COUNT(DISTINCT SALNUM) as cnt FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND SOUND = '0'");
 if ($q && $row = $q->fetch_assoc()) $newOrderCount = (int)$row['cnt'];
 
 $orders = [];
-$orderResult = $connect->query("
-    SELECT sub.*, COALESCE(br.name, sub.branch_code) AS branch_name, m.HP
-    FROM (
-        SELECT SALNUM, ACCODE, MAX(NAME) AS NAME, MAX(ADMINRMK) AS ADMINRMK,
-               MAX(TXTTO) AS TXTTO, MAX(SDATE) AS SDATE, MAX(TTIME) AS TTIME,
-               MAX(PURCHASEDATE) AS PURCHASEDATE, MAX(branch_code) AS branch_code,
-               SUM(QTY) AS SUMQTY
-        FROM `orderlist`
-        WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT'
-        GROUP BY SALNUM, ACCODE
-    ) sub
-    LEFT JOIN `branch` br ON sub.branch_code = br.code
-    LEFT JOIN `MEMBER` m ON sub.ACCODE = m.ACCODE
-    ORDER BY sub.SALNUM DESC
-");
-if (!$orderResult) {
-    error_log('Dashboard query error: ' . $connect->error);
-}
+$orderResult = $connect->query("SELECT o.*, COALESCE(br.name, o.branch_code) AS branch_name FROM `orderlist2` o LEFT JOIN `branch` br ON o.branch_code = br.code ORDER BY o.SALNUM DESC");
 if ($orderResult) { while ($r = $orderResult->fetch_assoc()) $orders[] = $r; }
 
 $currentPage = 'dashboard';
