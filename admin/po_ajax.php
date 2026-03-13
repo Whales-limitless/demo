@@ -79,7 +79,7 @@ if ($action === 'list') {
 
 // ==================== SEARCH PRODUCTS ====================
 } elseif ($action === 'search_products') {
-    $search = trim($_POST['q'] ?? '');
+    $search = $_POST['q'] ?? '';
     if ($search === '') {
         echo json_encode(['products' => [], 'total' => 0]);
         exit;
