@@ -32,15 +32,15 @@ $normalizedLike = '%' . $normalizedSearch . '%';
 $altLike = '%' . $altSearch . '%';
 $altLike2 = '%' . $altSearch2 . '%';
 
-// Search by product name only.
+// Search by product name only, must have valid category (same as All Products page).
 // No LOWER() wrapping — relies on utf8mb4_unicode_ci collation for case-insensitive matching.
-// LEFT JOIN directly on category table with indexed cat_code for fast lookups.
+// INNER JOIN on category table with cat_code + sub_code to only return categorized products.
 $stmt = $connect->prepare("
-    SELECT p.`id`, p.`barcode`, p.`name`, p.`stkcode`, p.`img1` AS image,
+    SELECT DISTINCT p.`id`, p.`barcode`, p.`name`, p.`stkcode`, p.`img1` AS image,
            p.`cat_code`, p.`rack`, COALESCE(p.`qoh`, 0) AS qoh,
            c.`cat_name` AS category_name
     FROM `PRODUCTS` p
-    LEFT JOIN `category` c ON p.`cat_code` = c.`cat_code`
+    INNER JOIN `category` c ON p.`cat_code` = c.`cat_code` AND p.`sub_code` = c.`sub_code`
     WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?)
       AND (p.`checked` != 'N' OR p.`checked` IS NULL)
     ORDER BY p.`name` ASC

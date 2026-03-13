@@ -46,12 +46,13 @@ if ($action === 'search_products') {
     $altLike = '%' . $altSearch . '%';
     $altLike2 = '%' . $altSearch2 . '%';
 
-    // Get total count — search by product name only (same logic as navSearch)
+    // Get total count — search by product name only, must have valid category (same as All Products page)
     $cntStmt = $connect->prepare("
         SELECT COUNT(DISTINCT p.`id`) AS cnt
         FROM `PRODUCTS` p
         WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?)
           AND (p.`checked` != 'N' OR p.`checked` IS NULL)
+          AND EXISTS (SELECT 1 FROM `category` c WHERE c.`cat_code` = p.`cat_code` AND c.`sub_code` = p.`sub_code`)
     ");
     $cntStmt->bind_param("sss", $normalizedLike, $altLike, $altLike2);
     $cntStmt->execute();
@@ -59,11 +60,11 @@ if ($action === 'search_products') {
     $cntStmt->close();
 
     $stmt = $connect->prepare("
-        SELECT p.`id`, p.`barcode`, p.`name`, p.`img1` AS image, p.`uom`,
+        SELECT DISTINCT p.`id`, p.`barcode`, p.`name`, p.`img1` AS image, p.`uom`,
                COALESCE(p.`qoh`, 0) AS qoh, p.`cat_code`, p.`rack`,
                c.`cat_name` AS category_name
         FROM `PRODUCTS` p
-        LEFT JOIN `category` c ON p.`cat_code` = c.`cat_code`
+        INNER JOIN `category` c ON p.`cat_code` = c.`cat_code` AND p.`sub_code` = c.`sub_code`
         WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?)
           AND (p.`checked` != 'N' OR p.`checked` IS NULL)
         ORDER BY p.`name` ASC
