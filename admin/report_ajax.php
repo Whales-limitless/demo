@@ -121,7 +121,7 @@ if ($action === 'stock_movement') {
             LEFT JOIN (
                 SELECT BARCODE,
                     SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') THEN QTY ELSE 0 END) AS qty_out,
-                    SUM(CASE WHEN PTYPE = 'STOCKIN' AND STATUS = 'DONE' THEN QTY ELSE 0 END) AS qty_stockin
+                    SUM(CASE WHEN PTYPE = 'STOCKIN' THEN QTY ELSE 0 END) AS qty_stockin
                 FROM `orderlist`
                 WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'
                 GROUP BY BARCODE
