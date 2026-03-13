@@ -175,19 +175,19 @@ if ($action === "done") {
     // Fetch orders directly from orderlist
     $orders = [];
     $orderResult = $connect->query("
-        SELECT o.SALNUM, o.ACCODE,
-               MAX(o.NAME) AS NAME, MAX(o.ADMINRMK) AS ADMINRMK, MAX(o.TXTTO) AS TXTTO,
-               MAX(o.SDATE) AS SDATE, MAX(o.TTIME) AS TTIME, MAX(o.PURCHASEDATE) AS PURCHASEDATE,
-               MAX(o.branch_code) AS branch_code,
-               SUM(o.QTY) AS SUMQTY,
-               COALESCE(MAX(br.name), MAX(o.branch_code)) AS branch_name,
-               MAX(m.HP) AS HP
-        FROM `orderlist` o
-        LEFT JOIN `branch` br ON o.branch_code = br.code
-        LEFT JOIN `MEMBER` m ON o.ACCODE = m.ACCODE
-        WHERE o.STATUS != 'DONE' AND o.STATUS != 'DELETED' AND o.BARCODE <> 'PT'
-        GROUP BY o.SALNUM, o.ACCODE
-        ORDER BY o.SALNUM DESC
+        SELECT sub.*, COALESCE(br.name, sub.branch_code) AS branch_name, m.HP
+        FROM (
+            SELECT SALNUM, ACCODE, MAX(NAME) AS NAME, MAX(ADMINRMK) AS ADMINRMK,
+                   MAX(TXTTO) AS TXTTO, MAX(SDATE) AS SDATE, MAX(TTIME) AS TTIME,
+                   MAX(PURCHASEDATE) AS PURCHASEDATE, MAX(branch_code) AS branch_code,
+                   SUM(QTY) AS SUMQTY
+            FROM `orderlist`
+            WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT'
+            GROUP BY SALNUM, ACCODE
+        ) sub
+        LEFT JOIN `branch` br ON sub.branch_code = br.code
+        LEFT JOIN `MEMBER` m ON sub.ACCODE = m.ACCODE
+        ORDER BY sub.SALNUM DESC
     ");
     if ($orderResult) {
         while ($r = $orderResult->fetch_assoc()) {
