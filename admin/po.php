@@ -86,6 +86,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .psm-search-bar input { flex: 1; }
 .psm-search-btn { background: var(--primary); color: #fff; border: none; padding: 8px 20px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .psm-search-btn:hover { background: var(--primary-dark); }
+.psm-result-count { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+.psm-load-more { display: block; width: 100%; padding: 10px; margin-top: 12px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; text-align: center; transition: all 0.15s; }
+.psm-load-more:hover { background: #e5e7eb; border-color: var(--primary); color: var(--primary); }
 
 /* Line items table */
 .line-items-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
@@ -445,6 +448,9 @@ function renumberLines() {
 
 // ==================== PRODUCT SEARCH MODAL ====================
 var psmSearchXhr = null;
+var psmCurrentQuery = '';
+var psmCurrentOffset = 0;
+var psmTotal = 0;
 
 function openProductSearchModal() {
     productSearchModal.show();
@@ -457,20 +463,39 @@ document.getElementById('psmSearchInput').addEventListener('keydown', function(e
 function doProductSearch() {
     var q = document.getElementById('psmSearchInput').value.trim();
     if (!q) { return; }
+    psmCurrentQuery = q;
+    psmCurrentOffset = 0;
+    psmTotal = 0;
+    loadProducts(false);
+}
+
+function loadMoreProducts() {
+    loadProducts(true);
+}
+
+function loadProducts(append) {
     if (psmSearchXhr) { psmSearchXhr.abort(); }
     var container = document.getElementById('psmResultsContainer');
-    container.innerHTML = '<div class="psm-empty"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    if (!append) {
+        container.innerHTML = '<div class="psm-empty"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    } else {
+        var btn = document.getElementById('psmLoadMoreBtn');
+        if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+    }
 
     psmSearchXhr = $.ajax({
-        type: 'POST', url: 'po_ajax.php', data: { action: 'search_products', q: q }, dataType: 'json',
+        type: 'POST', url: 'po_ajax.php', data: { action: 'search_products', q: psmCurrentQuery, offset: psmCurrentOffset }, dataType: 'json',
         success: function(data) {
             psmSearchXhr = null;
             var products = data.products || [];
-            if (products.length === 0) {
-                container.innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>No products found for "' + escHtml(q) + '"</div>';
+            psmTotal = data.total || 0;
+
+            if (!append && products.length === 0) {
+                container.innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>No products found for "' + escHtml(psmCurrentQuery) + '"</div>';
                 return;
             }
-            var html = '<div class="psm-grid">';
+
+            var html = '';
             products.forEach(function(p) {
                 var qohClass = (p.qoh || 0) > 0 ? 'in' : 'out';
                 var imgHtml = p.image ? '<img class="psm-card-img" src="../img/' + escHtml(p.image) + '" alt="" loading="lazy">' :
@@ -483,8 +508,25 @@ function doProductSearch() {
                 html += '<div class="psm-card-qoh ' + qohClass + '">QOH: ' + (p.qoh || 0) + '</div>';
                 html += '</div>';
             });
-            html += '</div>';
-            container.innerHTML = html;
+
+            psmCurrentOffset += products.length;
+            var loaded = psmCurrentOffset;
+            var hasMore = loaded < psmTotal;
+
+            if (append) {
+                var grid = container.querySelector('.psm-grid');
+                if (grid) grid.insertAdjacentHTML('beforeend', html);
+                var oldBtn = document.getElementById('psmLoadMoreBtn');
+                if (oldBtn) oldBtn.remove();
+                var countEl = container.querySelector('.psm-result-count');
+                if (countEl) countEl.textContent = 'Showing ' + loaded + ' of ' + psmTotal + ' products';
+            } else {
+                container.innerHTML = '<div class="psm-result-count">Showing ' + loaded + ' of ' + psmTotal + ' products</div><div class="psm-grid">' + html + '</div>';
+            }
+
+            if (hasMore) {
+                container.insertAdjacentHTML('beforeend', '<button class="psm-load-more" id="psmLoadMoreBtn" onclick="loadMoreProducts();">Load More (' + (psmTotal - loaded) + ' remaining)</button>');
+            }
         },
         error: function() { psmSearchXhr = null; }
     });

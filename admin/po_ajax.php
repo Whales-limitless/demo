@@ -81,9 +81,12 @@ if ($action === 'list') {
 } elseif ($action === 'search_products') {
     $search = trim($_POST['q'] ?? '');
     if ($search === '') {
-        echo json_encode(['products' => []]);
+        echo json_encode(['products' => [], 'total' => 0]);
         exit;
     }
+
+    $offset = max(0, intval($_POST['offset'] ?? 0));
+    $limit = 50;
 
     // Normalize quote variants
     $normalizedSearch = $search;
@@ -95,6 +98,19 @@ if ($action === 'list') {
     $altLike = '%' . $altSearch . '%';
     $altLike2 = '%' . $altSearch2 . '%';
 
+    // Get total count
+    $cntStmt = $connect->prepare("
+        SELECT COUNT(DISTINCT p.`id`) AS cnt
+        FROM `PRODUCTS` p
+        WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?
+               OR p.`barcode` LIKE ? OR p.`barcode` LIKE ? OR p.`barcode` LIKE ?)
+          AND (p.`checked` != 'N' OR p.`checked` IS NULL)
+    ");
+    $cntStmt->bind_param("ssssss", $normalizedLike, $altLike, $altLike2, $normalizedLike, $altLike, $altLike2);
+    $cntStmt->execute();
+    $total = (int)$cntStmt->get_result()->fetch_assoc()['cnt'];
+    $cntStmt->close();
+
     $stmt = $connect->prepare("
         SELECT p.`id`, p.`barcode`, p.`name`, p.`img1` AS image, p.`uom`,
                COALESCE(p.`qoh`, 0) AS qoh, p.`cat_code`, p.`rack`
@@ -103,9 +119,9 @@ if ($action === 'list') {
                OR p.`barcode` LIKE ? OR p.`barcode` LIKE ? OR p.`barcode` LIKE ?)
           AND (p.`checked` != 'N' OR p.`checked` IS NULL)
         ORDER BY p.`name` ASC
-        LIMIT 50
+        LIMIT ? OFFSET ?
     ");
-    $stmt->bind_param("ssssss", $normalizedLike, $altLike, $altLike2, $normalizedLike, $altLike, $altLike2);
+    $stmt->bind_param("ssssssii", $normalizedLike, $altLike, $altLike2, $normalizedLike, $altLike, $altLike2, $limit, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -119,7 +135,7 @@ if ($action === 'list') {
         $products[] = $row;
     }
     $stmt->close();
-    echo json_encode(['products' => $products]);
+    echo json_encode(['products' => $products, 'total' => $total]);
 
 // ==================== LIST SUPPLIERS ====================
 } elseif ($action === 'list_suppliers') {
