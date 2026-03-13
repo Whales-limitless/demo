@@ -53,7 +53,7 @@ if ($action === 'search_products') {
                OR p.`barcode` LIKE ? OR p.`barcode` LIKE ? OR p.`barcode` LIKE ?)
           AND (p.`checked` != 'N' OR p.`checked` IS NULL)
         ORDER BY p.`name` ASC
-        LIMIT 20
+        LIMIT 50
     ");
     $stmt->bind_param("ssssss", $normalizedLike, $altLike, $altLike2, $normalizedLike, $altLike, $altLike2);
     $stmt->execute();
