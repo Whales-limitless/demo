@@ -45,7 +45,19 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .branch-header .branch-stats { font-size: 12px; font-weight: 400; opacity: 0.9; }
 .staff-subheader { background: #f0f0f0; padding: 8px 16px; font-weight: 600; font-size: 13px; border-bottom: 1px solid #d1d5db; display: flex; justify-content: space-between; align-items: center; }
 .staff-subheader .staff-stats { font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.btn-print { padding: 7px 16px; background: #374151; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 12px; }
+.btn-print:hover { background: #1f2937; }
 @media (max-width: 768px) { .page-content { padding: 16px; } .table-card { padding: 12px; } }
+@media print {
+    body { background: #fff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .sidebar, .topbar, .filter-bar, .btn-print, .summary-cards { display: none !important; }
+    .page-content { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+    .table-card { box-shadow: none !important; padding: 0 !important; border-radius: 0 !important; }
+    .page-header { margin-bottom: 10px !important; }
+    .print-header { display: block !important; text-align: center; margin-bottom: 10px; font-size: 11px; color: #666; }
+    table { font-size: 10px !important; }
+    tr { page-break-inside: avoid; }
+}
 </style>
 </head>
 <body>
@@ -211,8 +223,13 @@ function renderDetailedTable(rows) {
         return branches[a].name.localeCompare(branches[b].name);
     });
 
+    // Print button + date range header (hidden on screen, shown on print)
+    var dateRange = document.getElementById('startDate').value + ' to ' + document.getElementById('endDate').value;
+    var html = '<div class="print-header" style="display:none;">Sales by Staff Report (Detailed) | ' + escHtml(dateRange) + '</div>' +
+        '<button class="btn-print" onclick="window.print();"><i class="fas fa-print"></i> Print</button>';
+
     // Single table for consistent column alignment
-    var html = '<table class="table table-sm mb-0" style="width:100%;font-size:12px;table-layout:fixed;">' +
+    html += '<table class="table table-sm mb-0" style="width:100%;font-size:12px;table-layout:fixed;">' +
         '<colgroup><col style="width:5%"><col style="width:20%"><col style="width:10%"><col style="width:15%"><col style="width:40%"><col style="width:10%"></colgroup>' +
         '<thead><tr style="background:#f9fafb;"><th>No</th><th>Order No</th><th>Date</th><th>Barcode</th><th>Product</th><th class="text-end">Qty</th></tr></thead><tbody>';
 
