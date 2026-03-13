@@ -114,79 +114,6 @@ body {
 .online-indicator.online .dot { background: #16a34a; }
 .online-indicator.offline .dot { background: #dc2626; }
 
-.cache-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.stat-box {
-  background: #f9fafb;
-  border-radius: 10px;
-  padding: 14px 12px;
-  text-align: center;
-}
-
-.stat-num {
-  font-family: 'Outfit', sans-serif;
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--primary);
-  line-height: 1;
-}
-
-.stat-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 600;
-  margin-top: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.cache-page-list {
-  background: #f9fafb;
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-bottom: 16px;
-}
-
-.cache-page-list h4 {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 8px;
-}
-
-.page-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.page-tag {
-  display: inline-block;
-  background: #dbeafe;
-  color: #2563eb;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 12px;
-}
-
-.cache-message {
-  font-size: 13px;
-  color: var(--text-muted);
-  text-align: center;
-  padding: 8px 0;
-  line-height: 1.5;
-}
-
-.cache-message strong { color: var(--text); }
-
 /* Download for Offline */
 .download-section {
   margin-top: 16px;
@@ -423,8 +350,6 @@ body {
 @media (max-width: 480px) {
   .welcome-card { padding: 32px 20px; }
   .welcome-card h1 { font-size: 22px; }
-  .cache-stats { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-  .stat-num { font-size: 20px; }
 }
 </style>
 </head>
@@ -438,7 +363,8 @@ body {
     <p>You are logged in as <?php echo $portalLabel; ?>.</p>
   </div>
 
-  <!-- Offline Ready Status -->
+  <?php if ($indexType === 'D' || $indexType === 'A'): ?>
+  <!-- Offline Ready Status (delivery users only) -->
   <div class="offline-status-card" id="offlineStatusCard">
     <div class="offline-status-header">
       <h3>
@@ -449,30 +375,6 @@ body {
         <span class="dot"></span>
         <span id="onlineText">Checking...</span>
       </span>
-    </div>
-
-    <div class="cache-stats">
-      <div class="stat-box">
-        <div class="stat-num" id="statPages">-</div>
-        <div class="stat-label">Pages</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-num" id="statAssets">-</div>
-        <div class="stat-label">Assets</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-num" id="statSize">-</div>
-        <div class="stat-label">Downloaded</div>
-      </div>
-    </div>
-
-    <div class="cache-page-list" id="cachePageList" style="display:none;">
-      <h4>Pages available offline</h4>
-      <div class="page-tags" id="pageTags"></div>
-    </div>
-
-    <div class="cache-message" id="cacheMessage">
-      Loading offline status...
     </div>
 
     <div class="download-section">
@@ -491,7 +393,7 @@ body {
     </div>
   </div>
 
-  <!-- Sync Activity -->
+  <!-- Sync Activity (delivery users only) -->
   <div class="sync-section" id="syncSection">
     <div class="sync-header">
       <h3>
@@ -516,12 +418,14 @@ body {
       <div class="sync-empty">No sync activity yet. Actions performed offline (photo uploads, signatures, job completions) will appear here.</div>
     </div>
   </div>
+  <?php endif; ?>
 </main>
 
 <?php include('mobile-bottombar.php'); ?>
 
 <script>
 (function() {
+  <?php if ($indexType === 'D' || $indexType === 'A'): ?>
   // ==================== ONLINE/OFFLINE INDICATOR ====================
   function updateOnlineIndicator() {
     var ind = document.getElementById('onlineIndicator');
@@ -537,113 +441,6 @@ body {
   updateOnlineIndicator();
   window.addEventListener('online', updateOnlineIndicator);
   window.addEventListener('offline', updateOnlineIndicator);
-
-  // ==================== CACHE STATS ====================
-  function formatSize(bytes) {
-    if (bytes === 0) return '0 B';
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  }
-
-  function friendlyPageName(filename) {
-    var names = {
-      'index.php': 'Home',
-      'login.php': 'Login',
-      'account.php': 'Account',
-      'category.php': 'Categories',
-      'products.php': 'Products',
-      'all_products.php': 'All Products',
-      'all_products_ajax.php': 'Products AJAX',
-      'cart.php': 'Cart',
-      'confirm.php': 'Confirm Order',
-      'submit_order.php': 'Submit Order',
-      'icon.php': 'Icon',
-      'del_dashboard.php': 'My Deliveries',
-      'del_dashboard_ajax.php': 'Deliveries AJAX',
-      'del_work.php': 'Upload Photos',
-      'del_work_ajax.php': 'Upload AJAX',
-      'del_vieworder.php': 'View Order',
-      'del_sign.php': 'Signature',
-      'del_sign_ajax.php': 'Signature AJAX',
-      'del_history.php': 'Delivery History',
-      'del_report.php': 'Delivery Reports',
-      'del_report_ajax.php': 'Reports AJAX',
-      'staff_stock_take.php': 'Stock Take',
-      'staff_stock_take_ajax.php': 'Stock Take AJAX',
-      'staff_stock_loss.php': 'Stock Loss',
-      'staff_stock_loss_ajax.php': 'Stock Loss AJAX',
-      'product_rack_ajax.php': 'Product Rack AJAX',
-      'product_search_ajax.php': 'Product Search AJAX',
-      'navbar.php': 'Navbar',
-      'mobile-bottombar.php': 'Bottom Bar',
-      'offline_download.php': 'Offline Data',
-      'offline.html': 'Offline Page'
-    };
-    return names[filename] || filename;
-  }
-
-  function loadCacheStats() {
-    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-      document.getElementById('cacheMessage').innerHTML = '<strong>Service worker not active.</strong> Refresh the page to enable offline support.';
-      return;
-    }
-
-    var msgChannel = new MessageChannel();
-    msgChannel.port1.onmessage = function(event) {
-      var stats = event.data;
-      if (!stats) return;
-
-      document.getElementById('statPages').textContent = stats.pages;
-      document.getElementById('statAssets').textContent = stats.assets;
-      document.getElementById('statSize').textContent = formatSize(stats.totalSize);
-
-      // Show page list
-      if (stats.pageList && stats.pageList.length > 0) {
-        var tagsEl = document.getElementById('pageTags');
-        var html = '';
-        var seen = {};
-        for (var i = 0; i < stats.pageList.length; i++) {
-          var p = stats.pageList[i];
-          if (seen[p]) continue;
-          seen[p] = true;
-          html += '<span class="page-tag">' + escHtml(friendlyPageName(p)) + '</span>';
-        }
-        tagsEl.innerHTML = html;
-        document.getElementById('cachePageList').style.display = '';
-      }
-
-      // Update message
-      var msg = '';
-      if (stats.pages > 0) {
-        msg = '<strong>' + stats.pages + ' page' + (stats.pages > 1 ? 's' : '') + '</strong> and <strong>' + stats.assets + ' asset' + (stats.assets > 1 ? 's' : '') + '</strong> (' + formatSize(stats.totalSize) + ') downloaded for offline use.';
-        if (stats.pages <= 2) {
-          msg += ' Visit more pages while online to make them available offline.';
-        }
-      } else {
-        msg = 'No pages cached yet. Browse the app while online to download pages for offline use.';
-      }
-      document.getElementById('cacheMessage').innerHTML = msg;
-    };
-
-    navigator.serviceWorker.controller.postMessage({ type: 'GET_CACHE_STATS' }, [msgChannel.port2]);
-  }
-
-  // Listen for cache updates from SW
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', function(event) {
-      if (event.data && event.data.type === 'cache-updated') {
-        loadCacheStats();
-      }
-    });
-  }
-
-  // Load stats on page load
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() { setTimeout(loadCacheStats, 500); });
-  } else {
-    setTimeout(loadCacheStats, 500);
-  }
 
   // ==================== SYNC ACTIVITY TABLE ====================
   var typeIcons = {
@@ -877,9 +674,6 @@ body {
       }
       result.textContent = msg;
 
-      // Refresh cache stats
-      setTimeout(loadCacheStats, 1000);
-
       // Update last download time
       var now = new Date();
       var timeStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -919,6 +713,7 @@ body {
       }
     });
   }
+  <?php endif; ?>
 })();
 </script>
 
