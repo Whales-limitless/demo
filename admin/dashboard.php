@@ -30,9 +30,14 @@ $connect->query("ALTER TABLE `orderlist` ADD COLUMN `PURCHASEDATE` DATE DEFAULT 
 // Ensure PURCHASEDATE column exists on orderlist2
 $connect->query("ALTER TABLE `orderlist2` ADD COLUMN `PURCHASEDATE` DATE DEFAULT NULL");
 
+// Ensure branch_code column exists on orderlist2
+$connect->query("ALTER TABLE `orderlist2` ADD COLUMN `branch_code` VARCHAR(20) DEFAULT ''");
+$connect->query("ALTER TABLE `orderlist2` ADD COLUMN `branch_name` VARCHAR(100) DEFAULT ''");
+
 $connect->query("TRUNCATE TABLE `orderlist2`");
-$connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY,PURCHASEDATE) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY,PURCHASEDATE FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
+$connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY,PURCHASEDATE,branch_code) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY,PURCHASEDATE,branch_code FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
 $connect->query("UPDATE orderlist2 AS b INNER JOIN MEMBER AS g ON b.ACCODE = g.ACCODE SET b.HP = g.HP");
+$connect->query("UPDATE orderlist2 AS o LEFT JOIN `branch` AS br ON o.branch_code = br.code SET o.branch_name = COALESCE(br.name, o.branch_code)");
 
 $newOrderCount = 0;
 $q = $connect->query("SELECT COUNT(DISTINCT SALNUM) as cnt FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND SOUND = '0'");
@@ -232,7 +237,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>Qty</th>
                         <th>To / Remark</th>
                         <th>Admin Remark</th>
-                        <th>Purchase Date</th>
+                        <th>Branch</th>
                         <th style="width:1%">Action</th>
                     </tr>
                 </thead>
@@ -252,11 +257,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <td><?php echo htmlspecialchars($order['SUMQTY'] ?? '0'); ?></td>
                         <td><?php echo htmlspecialchars($order['TXTTO'] ?? ''); ?></td>
                         <td><?php echo htmlspecialchars($order['ADMINRMK'] ?? ''); ?></td>
-                        <td><?php echo !empty($order['PURCHASEDATE']) ? date('d/m/Y', strtotime($order['PURCHASEDATE'])) : ''; ?></td>
+                        <td><?php echo htmlspecialchars($order['branch_name'] ?? $order['branch_code'] ?? ''); ?></td>
                         <td style="white-space:nowrap">
                             <a href="order_detail.php?salnum=<?php echo $salnum; ?>" class="btn-action btn-view"><i class="fas fa-eye"></i></a>
                             <button type="button" onclick="openEditModal('<?php echo $salnum; ?>', '<?php echo htmlspecialchars($order['ADMINRMK'] ?? '', ENT_QUOTES); ?>', '<?php echo $order['PURCHASEDATE'] ?? ''; ?>');" class="btn-action btn-edit"><i class="fas fa-pen"></i></button>
+                            <?php if (($_SESSION['admin_type'] ?? '') === 'A'): ?>
                             <button type="button" onclick="donebtn('<?php echo $salnum; ?>');" class="btn-action btn-done"><i class="fas fa-check"></i></button>
+                            <?php endif; ?>
                             <button type="button" onclick="deletebtn('<?php echo $salnum; ?>');" class="btn-action btn-delete"><i class="fas fa-trash"></i></button>
                         </td>
                     </tr>
@@ -304,6 +311,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
+var isAdminType = <?php echo json_encode(($_SESSION['admin_type'] ?? '') === 'A'); ?>;
 // =====================================================================
 // PRODUCTION-READY LIVE VIEW (Table)
 // - AJAX polling every 15s (no page reload)
@@ -438,8 +446,7 @@ function renderTable(orders) {
         var qty     = esc((o.SUMQTY || '0') + '');
         var txtto   = esc(o.TXTTO || '');
         var rmk     = esc(o.ADMINRMK || '');
-        var pdate   = formatDate(o.PURCHASEDATE);
-        var pdateRaw = o.PURCHASEDATE || '';
+        var branch  = esc(o.branch_name || o.branch_code || '');
         var isNew   = !knownSalnums[o.SALNUM];
 
         var searchStr = ((o.SALNUM||'') + ' ' + (o.NAME||'') + ' ' + (o.TXTTO||'') + ' ' + (o.ADMINRMK||'') + ' ' + (o.SDATE||'')).toLowerCase();
@@ -456,11 +463,13 @@ function renderTable(orders) {
         html += '<td>' + qty + '</td>';
         html += '<td>' + txtto + '</td>';
         html += '<td>' + rmk + '</td>';
-        html += '<td>' + pdate + '</td>';
+        html += '<td>' + branch + '</td>';
         html += '<td style="white-space:nowrap">';
         html += '<a href="order_detail.php?salnum=' + salnum + '" class="btn-action btn-view"><i class="fas fa-eye"></i></a>';
-        html += '<button type="button" onclick="openEditModal(\'' + salnum.replace(/'/g, "\\'") + '\', \'' + (o.ADMINRMK||'').replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\', \'' + pdateRaw + '\');" class="btn-action btn-edit"><i class="fas fa-pen"></i></button>';
-        html += '<button type="button" onclick="donebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-done"><i class="fas fa-check"></i></button>';
+        html += '<button type="button" onclick="openEditModal(\'' + salnum.replace(/'/g, "\\'") + '\', \'' + (o.ADMINRMK||'').replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\', \'' + (o.PURCHASEDATE||'') + '\');" class="btn-action btn-edit"><i class="fas fa-pen"></i></button>';
+        if (isAdminType) {
+            html += '<button type="button" onclick="donebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-done"><i class="fas fa-check"></i></button>';
+        }
         html += '<button type="button" onclick="deletebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-delete"><i class="fas fa-trash"></i></button>';
         html += '</td></tr>';
     }
