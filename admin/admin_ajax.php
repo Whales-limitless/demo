@@ -175,10 +175,13 @@ if ($action === "done") {
     // Fetch orders directly from orderlist
     $orders = [];
     $orderResult = $connect->query("
-        SELECT o.SALNUM, o.ACCODE, o.NAME, o.ADMINRMK, o.TXTTO, o.SDATE, o.TTIME, o.PURCHASEDATE, o.branch_code,
+        SELECT o.SALNUM, o.ACCODE,
+               MAX(o.NAME) AS NAME, MAX(o.ADMINRMK) AS ADMINRMK, MAX(o.TXTTO) AS TXTTO,
+               MAX(o.SDATE) AS SDATE, MAX(o.TTIME) AS TTIME, MAX(o.PURCHASEDATE) AS PURCHASEDATE,
+               MAX(o.branch_code) AS branch_code,
                SUM(o.QTY) AS SUMQTY,
-               COALESCE(br.name, o.branch_code) AS branch_name,
-               m.HP
+               COALESCE(MAX(br.name), MAX(o.branch_code)) AS branch_name,
+               MAX(m.HP) AS HP
         FROM `orderlist` o
         LEFT JOIN `branch` br ON o.branch_code = br.code
         LEFT JOIN `MEMBER` m ON o.ACCODE = m.ACCODE
