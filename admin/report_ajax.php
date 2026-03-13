@@ -235,13 +235,13 @@ if ($action === 'stock_movement') {
     $joins = "";
     if ($hasOutlet && $hasBranch) {
         $branchNameExpr = "COALESCE(ot.PDESC, b.name, IF(o.OUTLET = '' OR o.OUTLET IS NULL, 'No Branch', o.OUTLET))";
-        $joins = "LEFT JOIN `outlet` ot ON o.OUTLET = ot.CODE LEFT JOIN `branch` b ON o.OUTLET = b.code";
+        $joins = "LEFT JOIN `outlet` ot ON o.OUTLET COLLATE utf8mb4_unicode_ci = ot.CODE COLLATE utf8mb4_unicode_ci LEFT JOIN `branch` b ON o.OUTLET COLLATE utf8mb4_unicode_ci = b.code COLLATE utf8mb4_unicode_ci";
     } elseif ($hasOutlet) {
         $branchNameExpr = "COALESCE(ot.PDESC, IF(o.OUTLET = '' OR o.OUTLET IS NULL, 'No Branch', o.OUTLET))";
-        $joins = "LEFT JOIN `outlet` ot ON o.OUTLET = ot.CODE";
+        $joins = "LEFT JOIN `outlet` ot ON o.OUTLET COLLATE utf8mb4_unicode_ci = ot.CODE COLLATE utf8mb4_unicode_ci";
     } elseif ($hasBranch) {
         $branchNameExpr = "COALESCE(b.name, IF(o.OUTLET = '' OR o.OUTLET IS NULL, 'No Branch', o.OUTLET))";
-        $joins = "LEFT JOIN `branch` b ON o.OUTLET = b.code";
+        $joins = "LEFT JOIN `branch` b ON o.OUTLET COLLATE utf8mb4_unicode_ci = b.code COLLATE utf8mb4_unicode_ci";
     } else {
         $branchNameExpr = "IF(o.OUTLET = '' OR o.OUTLET IS NULL, 'No Branch', o.OUTLET)";
     }
