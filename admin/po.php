@@ -462,7 +462,10 @@ document.getElementById('psmSearchInput').addEventListener('keydown', function(e
 
 function doProductSearch() {
     var q = document.getElementById('psmSearchInput').value.trim();
-    if (!q) { return; }
+    if (!q) {
+        document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Please enter a search term</div>';
+        return;
+    }
     psmCurrentQuery = q;
     psmCurrentOffset = 0;
     psmTotal = 0;
