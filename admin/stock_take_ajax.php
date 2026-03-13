@@ -32,11 +32,16 @@ if ($action === 'load_products') {
 
     // Join with stock_take_item + stock_take to get last stock take date per product
     // Only consider sessions that are SUBMITTED or APPROVED (meaningful counts)
+    // Also flag products that are in active (DRAFT/SUBMITTED) sessions as in_active_session
     $query = "SELECT p.`barcode`, p.`name`, COALESCE(p.`qoh`, 0) AS qoh,
-              MAX(st.`created_at`) AS last_stock_take
+              MAX(st.`created_at`) AS last_stock_take,
+              MAX(CASE WHEN ast.`id` IS NOT NULL THEN 1 ELSE 0 END) AS in_active_session,
+              GROUP_CONCAT(DISTINCT ast_s.`session_code` ORDER BY ast_s.`session_code` SEPARATOR ', ') AS active_session_codes
               FROM `PRODUCTS` p
               LEFT JOIN `stock_take_item` sti ON sti.`barcode` = p.`barcode`
               LEFT JOIN `stock_take` st ON st.`id` = sti.`stock_take_id` AND st.`status` IN ('SUBMITTED', 'APPROVED')
+              LEFT JOIN `stock_take_item` ast ON ast.`barcode` = p.`barcode`
+              LEFT JOIN `stock_take` ast_s ON ast_s.`id` = ast.`stock_take_id` AND ast_s.`status` IN ('DRAFT', 'SUBMITTED')
               WHERE p.`checked` = 'Y'";
     $params = [];
     $types = '';
@@ -52,7 +57,7 @@ if ($action === 'load_products') {
         $types .= 's';
     }
 
-    $query .= " GROUP BY p.`barcode`, p.`name`, p.`qoh` ORDER BY last_stock_take ASC, p.`name` ASC";
+    $query .= " GROUP BY p.`barcode`, p.`name`, p.`qoh` ORDER BY in_active_session ASC, last_stock_take ASC, p.`name` ASC";
 
     $products = [];
     if (!empty($params)) {
@@ -119,6 +124,36 @@ if ($action === 'load_products') {
         exit;
     }
 
+    // Check for products already in active (DRAFT/SUBMITTED) stock take sessions
+    $allBarcodes = array_column($products, 'barcode');
+    $placeholdersChk = implode(',', array_fill(0, count($allBarcodes), '?'));
+    $chkStmt = $connect->prepare("SELECT DISTINCT sti.`barcode`, st.`session_code`
+        FROM `stock_take_item` sti
+        INNER JOIN `stock_take` st ON st.`id` = sti.`stock_take_id` AND st.`status` IN ('DRAFT', 'SUBMITTED')
+        WHERE sti.`barcode` IN ($placeholdersChk)");
+    $chkTypes = str_repeat('s', count($allBarcodes));
+    $chkStmt->bind_param($chkTypes, ...$allBarcodes);
+    $chkStmt->execute();
+    $chkResult = $chkStmt->get_result();
+    $conflicting = [];
+    while ($r = $chkResult->fetch_assoc()) {
+        $conflicting[$r['barcode']] = $r['session_code'];
+    }
+    $chkStmt->close();
+
+    if (!empty($conflicting)) {
+        // Remove conflicting products from the list
+        $products = array_filter($products, function($p) use ($conflicting) {
+            return !isset($conflicting[$p['barcode']]);
+        });
+        $products = array_values($products);
+
+        if (count($products) === 0) {
+            echo json_encode(['error' => 'All selected products are already in active stock take sessions. Please complete or approve existing sessions first.']);
+            exit;
+        }
+    }
+
     $connect->begin_transaction();
 
     try {
@@ -155,7 +190,11 @@ if ($action === 'load_products') {
         $itemStmt->close();
 
         $connect->commit();
-        echo json_encode(['success' => 'Session ' . $sessionCode . ' created with ' . $itemCount . ' items.', 'session_id' => $sessionId]);
+        $msg = 'Session ' . $sessionCode . ' created with ' . $itemCount . ' items.';
+        if (!empty($conflicting)) {
+            $msg .= ' (' . count($conflicting) . ' product(s) skipped - already in active stock take)';
+        }
+        echo json_encode(['success' => $msg, 'session_id' => $sessionId, 'skipped' => count($conflicting)]);
 
     } catch (Exception $e) {
         $connect->rollback();

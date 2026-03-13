@@ -211,7 +211,62 @@ function updateType() {
 }
 
 function handleConfirmClick() {
-  finishOrder();
+  // Check for active stock take before proceeding
+  checkStockTakeAndSubmit();
+}
+
+function checkStockTakeAndSubmit() {
+  var btn = document.getElementById('btnConfirm');
+  var btnText = document.getElementById('btnText');
+  btnText.textContent = 'Checking…';
+  btn.disabled = true;
+
+  var barcodes = items.map(function(item) { return item.barcode; });
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', 'check_stock_take.php', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4) {
+      btn.disabled = false;
+      updateType();
+
+      if (xhr.status === 200) {
+        try {
+          var resp = JSON.parse(xhr.responseText);
+          if (resp.blocked && resp.blocked_items && resp.blocked_items.length > 0) {
+            var listHtml = '<div style="text-align:left;max-height:200px;overflow-y:auto;margin-top:10px;">';
+            resp.blocked_items.forEach(function(item) {
+              listHtml += '<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:13px;">' +
+                '<strong>' + item.name + '</strong><br>' +
+                '<span style="color:#b45309;font-size:12px;">Session: ' + item.session_code + '</span></div>';
+            });
+            listHtml += '</div>';
+
+            var alertDiv = document.createElement('div');
+            alertDiv.id = 'stockTakeAlert';
+            alertDiv.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:14px 16px;margin-bottom:16px;';
+            alertDiv.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+              '<svg style="width:20px;height:20px;fill:none;stroke:#b45309;stroke-width:2;flex-shrink:0;"><circle cx="10" cy="10" r="9"/><line x1="10" y1="6" x2="10" y2="11"/><circle cx="10" cy="14" r="0.5" fill="#b45309"/></svg>' +
+              '<strong style="color:#92400e;font-size:14px;">Stock Take In Progress</strong></div>' +
+              '<p style="font-size:13px;color:#92400e;margin:0;">The following product(s) are currently under active stock take and cannot be stock in / purchased:</p>' +
+              listHtml;
+
+            var existing = document.getElementById('stockTakeAlert');
+            if (existing) existing.remove();
+            var mainEl = document.querySelector('.main');
+            mainEl.insertBefore(alertDiv, mainEl.children[1]);
+
+            return;
+          }
+        } catch(e) {}
+      }
+
+      // No blocked items, proceed with order
+      finishOrder();
+    }
+  };
+  xhr.send(JSON.stringify({ barcodes: barcodes }));
 }
 
 function finishOrder() {

@@ -202,6 +202,34 @@ if ($action === 'list') {
         }
     }
 
+    // Check if any items are in active stock take sessions (DRAFT/SUBMITTED)
+    $grnBarcodes = array_map(function($item) { return trim($item['barcode'] ?? ''); }, $items);
+    $grnBarcodes = array_filter($grnBarcodes, function($b) { return $b !== ''; });
+
+    if (!empty($grnBarcodes)) {
+        $stPlaceholders = implode(',', array_fill(0, count($grnBarcodes), '?'));
+        $stStmt = $connect->prepare("SELECT DISTINCT sti.`barcode`, p.`name`, st.`session_code`
+            FROM `stock_take_item` sti
+            INNER JOIN `stock_take` st ON st.`id` = sti.`stock_take_id` AND st.`status` IN ('DRAFT', 'SUBMITTED')
+            LEFT JOIN `PRODUCTS` p ON p.`barcode` = sti.`barcode`
+            WHERE sti.`barcode` IN ($stPlaceholders)");
+        $stTypes = str_repeat('s', count($grnBarcodes));
+        $stValues = array_values($grnBarcodes);
+        $stStmt->bind_param($stTypes, ...$stValues);
+        $stStmt->execute();
+        $stResult = $stStmt->get_result();
+        $blockedItems = [];
+        while ($r = $stResult->fetch_assoc()) {
+            $blockedItems[] = ($r['name'] ?? $r['barcode']) . ' (' . $r['session_code'] . ')';
+        }
+        $stStmt->close();
+
+        if (!empty($blockedItems)) {
+            echo json_encode(['error' => 'Cannot confirm good receiving. The following product(s) are currently under active stock take: ' . implode(', ', $blockedItems) . '. Please complete or approve the stock take session first.']);
+            exit;
+        }
+    }
+
     $connect->begin_transaction();
 
     try {
