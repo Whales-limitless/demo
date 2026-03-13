@@ -28,7 +28,7 @@ function generatePONumber($connect) {
 
 // ==================== PRODUCT SEARCH ====================
 if ($action === 'search_products') {
-    $search = $_POST['q'] ?? '';
+    $search = trim($_POST['q'] ?? '');
     if ($search === '') {
         echo json_encode(['products' => [], 'total' => 0]);
         exit;
