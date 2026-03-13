@@ -697,7 +697,7 @@ function renderProductTable(products) {
         var inActive = parseInt(p.in_active_session) === 1;
         var rowStyle = inActive ? ' style="opacity:0.5;background:#fff3cd;"' : '';
         var cbDisabled = inActive ? ' disabled title="Already in active session: ' + escapeAttr(p.active_session_codes || '') + '"' : ' checked';
-        var activeLabel = inActive ? '<span style="color:#b45309;font-size:11px;font-weight:600;" title="' + escapeAttr(p.active_session_codes || '') + '">In Active Session</span>' : '';
+        var activeLabel = inActive ? '<br><span style="color:#b45309;font-size:11px;font-weight:600;">In Active Session: ' + escapeHtml(p.active_session_codes || '') + '</span>' : '';
         html += '<tr data-name="' + (p.name || '').toLowerCase() + '" data-barcode="' + escapeAttr(p.barcode) + '" data-last="' + (p.last_stock_take || '') + '" data-active="' + (inActive ? '1' : '0') + '"' + rowStyle + '>' +
             '<td><input type="checkbox" class="product-cb" value="' + escapeAttr(p.barcode) + '"' + cbDisabled + ' onchange="updateSelectionCount();"></td>' +
             '<td>' + escapeHtml(p.barcode) + '</td>' +
