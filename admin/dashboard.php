@@ -10,41 +10,26 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 include('../staff/dbconnection.php');
 $connect->set_charset("utf8mb4");
 
-$connect->query("CREATE TABLE IF NOT EXISTS `orderlist2` (
-  `ID` int(11) NOT NULL AUTO_INCREMENT,
-  `SALNUM` varchar(100) NOT NULL DEFAULT '',
-  `ACCODE` varchar(20) NOT NULL DEFAULT '',
-  `NAME` varchar(100) NOT NULL DEFAULT '',
-  `ADMINRMK` mediumtext DEFAULT NULL,
-  `TXTTO` varchar(200) NOT NULL DEFAULT '',
-  `SDATE` date DEFAULT NULL,
-  `TTIME` time DEFAULT NULL,
-  `SUMQTY` int(11) NOT NULL DEFAULT 0,
-  `HP` varchar(50) NOT NULL DEFAULT '',
-  `PURCHASEDATE` date DEFAULT NULL,
-  PRIMARY KEY (`ID`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
 // Ensure PURCHASEDATE column exists on orderlist (run once, safe to repeat)
 $connect->query("ALTER TABLE `orderlist` ADD COLUMN `PURCHASEDATE` DATE DEFAULT NULL");
-// Ensure PURCHASEDATE column exists on orderlist2
-$connect->query("ALTER TABLE `orderlist2` ADD COLUMN `PURCHASEDATE` DATE DEFAULT NULL");
-
-// Ensure branch_code column exists on orderlist2
-$connect->query("ALTER TABLE `orderlist2` ADD COLUMN `branch_code` VARCHAR(20) DEFAULT ''");
-$connect->query("ALTER TABLE `orderlist2` ADD COLUMN `branch_name` VARCHAR(100) DEFAULT ''");
-
-$connect->query("TRUNCATE TABLE `orderlist2`");
-$connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY,PURCHASEDATE,branch_code) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY,PURCHASEDATE,branch_code FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
-$connect->query("UPDATE orderlist2 AS b INNER JOIN MEMBER AS g ON b.ACCODE = g.ACCODE SET b.HP = g.HP");
-$connect->query("UPDATE orderlist2 AS o LEFT JOIN `branch` AS br ON o.branch_code = br.code SET o.branch_name = COALESCE(br.name, o.branch_code)");
 
 $newOrderCount = 0;
 $q = $connect->query("SELECT COUNT(DISTINCT SALNUM) as cnt FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND SOUND = '0'");
 if ($q && $row = $q->fetch_assoc()) $newOrderCount = (int)$row['cnt'];
 
 $orders = [];
-$orderResult = $connect->query("SELECT * FROM `orderlist2` ORDER BY SALNUM DESC");
+$orderResult = $connect->query("
+    SELECT o.SALNUM, o.ACCODE, o.NAME, o.ADMINRMK, o.TXTTO, o.SDATE, o.TTIME, o.PURCHASEDATE, o.branch_code,
+           SUM(o.QTY) AS SUMQTY,
+           COALESCE(br.name, o.branch_code) AS branch_name,
+           m.HP
+    FROM `orderlist` o
+    LEFT JOIN `branch` br ON o.branch_code = br.code
+    LEFT JOIN `MEMBER` m ON o.ACCODE = m.ACCODE
+    WHERE o.STATUS != 'DONE' AND o.STATUS != 'DELETED' AND o.BARCODE <> 'PT'
+    GROUP BY o.SALNUM, o.ACCODE
+    ORDER BY o.SALNUM DESC
+");
 if ($orderResult) { while ($r = $orderResult->fetch_assoc()) $orders[] = $r; }
 
 $currentPage = 'dashboard';
