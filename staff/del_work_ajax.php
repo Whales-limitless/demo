@@ -64,8 +64,12 @@ function processImageData($imageData, $prefix, $uploadDir) {
 
     $fileName = $prefix . uniqid() . '.jpg';
     $filePath = $uploadDir . $fileName;
-    imagejpeg($src, $filePath, 85);
+    $writeOk = imagejpeg($src, $filePath, 85);
     imagedestroy($src);
+
+    if (!$writeOk || !file_exists($filePath)) {
+        return null;
+    }
 
     return $fileName;
 }

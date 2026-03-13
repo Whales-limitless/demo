@@ -41,7 +41,12 @@ if ($action === 'save') {
     // Save file
     $safeOrdno = preg_replace('/[\/\\\\:*?"<>|]/', '_', $ordno);
     $filePath = $sigDir . $safeOrdno . '.png';
-    file_put_contents($filePath, $decodedData);
+    $bytesWritten = file_put_contents($filePath, $decodedData);
+
+    if ($bytesWritten === false || !file_exists($filePath)) {
+        echo json_encode(['error' => 'Failed to save signature file.']);
+        exit;
+    }
 
     // Insert/update del_sign record
     $stmt = $connect->prepare("SELECT `ORDNO` FROM `del_sign` WHERE `ORDNO` = ? LIMIT 1");
