@@ -37,14 +37,13 @@ $connect->query("ALTER TABLE `orderlist2` ADD COLUMN `branch_name` VARCHAR(100) 
 $connect->query("TRUNCATE TABLE `orderlist2`");
 $connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY,PURCHASEDATE,branch_code) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY,PURCHASEDATE,branch_code FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
 $connect->query("UPDATE orderlist2 AS b INNER JOIN MEMBER AS g ON b.ACCODE = g.ACCODE SET b.HP = g.HP");
-$connect->query("UPDATE orderlist2 AS o LEFT JOIN `branch` AS br ON o.branch_code = br.code SET o.branch_name = COALESCE(br.name, o.branch_code)");
 
 $newOrderCount = 0;
 $q = $connect->query("SELECT COUNT(DISTINCT SALNUM) as cnt FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND SOUND = '0'");
 if ($q && $row = $q->fetch_assoc()) $newOrderCount = (int)$row['cnt'];
 
 $orders = [];
-$orderResult = $connect->query("SELECT * FROM `orderlist2` ORDER BY SALNUM DESC");
+$orderResult = $connect->query("SELECT o.*, COALESCE(br.name, o.branch_code) AS branch_name FROM `orderlist2` o LEFT JOIN `branch` br ON o.branch_code = br.code ORDER BY o.SALNUM DESC");
 if ($orderResult) { while ($r = $orderResult->fetch_assoc()) $orders[] = $r; }
 
 $currentPage = 'dashboard';
