@@ -124,17 +124,34 @@ if ($action === 'list') {
     $altLike = '%' . $altSearch . '%';
     $altLike2 = '%' . $altSearch2 . '%';
 
+    $offset = max(0, intval($_POST['offset'] ?? 0));
+    $limit = 50;
+
+    // Get total count
+    $cntStmt = $connect->prepare("
+        SELECT COUNT(DISTINCT p.`id`) AS cnt
+        FROM `PRODUCTS` p
+        WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?)
+          AND (p.`checked` != 'N' OR p.`checked` IS NULL)
+          AND EXISTS (SELECT 1 FROM `category` c WHERE c.`cat_code` = p.`cat_code` AND c.`sub_code` = p.`sub_code`)
+    ");
+    $cntStmt->bind_param("sss", $normalizedLike, $altLike, $altLike2);
+    $cntStmt->execute();
+    $total = (int)$cntStmt->get_result()->fetch_assoc()['cnt'];
+    $cntStmt->close();
+
     $stmt = $connect->prepare("
-        SELECT DISTINCT p.`id`, p.`barcode`, p.`name`, p.`uom`, COALESCE(p.`qoh`, 0) AS qoh, p.`rack`,
+        SELECT DISTINCT p.`id`, p.`barcode`, p.`name`, p.`img1` AS image, p.`uom`,
+               COALESCE(p.`qoh`, 0) AS qoh, p.`cat_code`, p.`rack`,
                c.`cat_name` AS category_name
         FROM `PRODUCTS` p
         INNER JOIN `category` c ON p.`cat_code` = c.`cat_code` AND p.`sub_code` = c.`sub_code`
         WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?)
           AND (p.`checked` != 'N' OR p.`checked` IS NULL)
         ORDER BY p.`name` ASC
-        LIMIT 20
+        LIMIT ? OFFSET ?
     ");
-    $stmt->bind_param("sss", $normalizedLike, $altLike, $altLike2);
+    $stmt->bind_param("sssii", $normalizedLike, $altLike, $altLike2, $limit, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -143,10 +160,12 @@ if ($action === 'list') {
     while ($row = $result->fetch_assoc()) {
         if (isset($seen[$row['id']])) continue;
         $seen[$row['id']] = true;
+        $row['id'] = (int)$row['id'];
+        $row['qoh'] = (float)$row['qoh'];
         $products[] = $row;
     }
     $stmt->close();
-    echo json_encode(['products' => $products]);
+    echo json_encode(['products' => $products, 'total' => $total]);
 
 // ==================== RECEIVE GRN ====================
 } elseif ($action === 'receive') {
