@@ -184,7 +184,23 @@ if ($action === "done") {
 
     // Query orderlist directly with aggregation (no orderlist2 needed)
     $orders = [];
-    $orderResult = $connect->query("SELECT o.SALNUM, o.ACCODE, o.NAME, MAX(o.ADMINRMK) AS ADMINRMK, MAX(o.TXTTO) AS TXTTO, o.SDATE, MAX(o.TTIME) AS TTIME, SUM(o.QTY) AS SUMQTY, MAX(o.PURCHASEDATE) AS PURCHASEDATE, MAX(o.branch_code) AS branch_code, COALESCE(MAX(br.name), MAX(o.branch_code)) AS branch_name, MAX(g.HP) AS HP FROM `orderlist` o LEFT JOIN `branch` br ON o.branch_code = br.code LEFT JOIN `MEMBER` g ON o.ACCODE = g.ACCODE WHERE o.STATUS != 'DONE' AND o.STATUS != 'DELETED' AND o.BARCODE <> 'PT' GROUP BY o.SALNUM, o.ACCODE, o.NAME, o.SDATE ORDER BY o.SALNUM DESC");
+    $orderResult = $connect->query("
+        SELECT sub.SALNUM, sub.ACCODE, sub.NAME, sub.ADMINRMK, sub.TXTTO,
+               sub.SDATE, sub.TTIME, sub.SUMQTY, sub.PURCHASEDATE, sub.branch_code,
+               COALESCE(br.name, sub.branch_code) AS branch_name, g.HP
+        FROM (
+            SELECT SALNUM, ACCODE, MAX(NAME) AS NAME, MAX(ADMINRMK) AS ADMINRMK,
+                   MAX(TXTTO) AS TXTTO, MAX(SDATE) AS SDATE, MAX(TTIME) AS TTIME,
+                   SUM(QTY) AS SUMQTY, MAX(PURCHASEDATE) AS PURCHASEDATE,
+                   MAX(branch_code) AS branch_code
+            FROM `orderlist`
+            WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT'
+            GROUP BY SALNUM, ACCODE
+        ) sub
+        LEFT JOIN `branch` br ON sub.branch_code = br.code
+        LEFT JOIN `MEMBER` g ON sub.ACCODE = g.ACCODE
+        ORDER BY sub.SALNUM DESC
+    ");
     if ($orderResult) {
         while ($r = $orderResult->fetch_assoc()) {
             $orders[] = $r;
@@ -198,12 +214,16 @@ if ($action === "done") {
         $newCount = (int)$row['cnt'];
     }
 
-    echo json_encode([
+    $response = [
         'orders' => $orders,
         'new_count' => $newCount,
         'total' => count($orders),
         'ts' => time()
-    ]);
+    ];
+    if (!$orderResult) {
+        $response['sql_error'] = $connect->error;
+    }
+    echo json_encode($response);
 
 // ===================== ACKNOWLEDGE SOUND =====================
 } elseif ($action === "noted") {
