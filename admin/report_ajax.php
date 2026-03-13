@@ -336,6 +336,92 @@ if ($action === 'stock_movement') {
     $stmt->close();
     echo json_encode(['rows' => $rows]);
 
+// ── Sales by Staff Detailed Report (grouped by branch, itemized orders) ──
+} elseif ($action === 'sales_by_staff_detailed') {
+    $where = "WHERE o.SDATE >= ? AND o.SDATE <= ? AND o.STATUS = 'DONE' AND o.BARCODE <> 'PT'";
+    $params = [$startDate, $endDate];
+    $types = "ss";
+
+    $hasBranch = $connect->query("SHOW TABLES LIKE 'branch'")->num_rows > 0;
+
+    if ($hasBranch) {
+        $branchNameExpr = "COALESCE(b.name, IF(o.branch_code = '' OR o.branch_code IS NULL, 'No Branch', o.branch_code))";
+        $joins = "LEFT JOIN `branch` b ON o.branch_code COLLATE utf8mb4_unicode_ci = b.code COLLATE utf8mb4_unicode_ci";
+    } else {
+        $branchNameExpr = "IF(o.branch_code = '' OR o.branch_code IS NULL, 'No Branch', o.branch_code)";
+        $joins = "";
+    }
+
+    $sql = "SELECT
+                COALESCE(NULLIF(o.branch_code, ''), 'NO_BRANCH') AS branch_code,
+                $branchNameExpr AS branch_name,
+                o.NAME AS staff_name,
+                o.SALNUM AS order_no,
+                o.SDATE AS sale_date,
+                o.BARCODE AS barcode,
+                o.PDESC AS product_desc,
+                o.QTY AS qty
+            FROM `orderlist` o
+            $joins
+            $where
+            ORDER BY branch_name ASC, o.NAME ASC, o.SALNUM ASC, o.PDESC ASC";
+
+    $stmt = $connect->prepare($sql);
+    if (!$stmt) {
+        echo json_encode(['error' => 'Query error: ' . $connect->error]);
+        exit;
+    }
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $rows = [];
+    while ($r = $result->fetch_assoc()) { $rows[] = $r; }
+    $stmt->close();
+    echo json_encode(['rows' => $rows]);
+
+// ── Sales by Branch Detailed Report (grouped by branch, itemized orders) ──
+} elseif ($action === 'sales_by_branch_detailed') {
+    $where = "WHERE o.SDATE >= ? AND o.SDATE <= ? AND o.STATUS = 'DONE' AND o.BARCODE <> 'PT'";
+    $params = [$startDate, $endDate];
+    $types = "ss";
+
+    $hasBranch = $connect->query("SHOW TABLES LIKE 'branch'")->num_rows > 0;
+
+    if ($hasBranch) {
+        $branchNameExpr = "COALESCE(b.name, IF(o.branch_code = '' OR o.branch_code IS NULL, 'No Branch', o.branch_code))";
+        $joins = "LEFT JOIN `branch` b ON o.branch_code COLLATE utf8mb4_unicode_ci = b.code COLLATE utf8mb4_unicode_ci";
+    } else {
+        $branchNameExpr = "IF(o.branch_code = '' OR o.branch_code IS NULL, 'No Branch', o.branch_code)";
+        $joins = "";
+    }
+
+    $sql = "SELECT
+                COALESCE(NULLIF(o.branch_code, ''), 'NO_BRANCH') AS branch_code,
+                $branchNameExpr AS branch_name,
+                o.SALNUM AS order_no,
+                o.SDATE AS sale_date,
+                o.NAME AS staff_name,
+                o.BARCODE AS barcode,
+                o.PDESC AS product_desc,
+                o.QTY AS qty
+            FROM `orderlist` o
+            $joins
+            $where
+            ORDER BY branch_name ASC, o.SALNUM ASC, o.PDESC ASC";
+
+    $stmt = $connect->prepare($sql);
+    if (!$stmt) {
+        echo json_encode(['error' => 'Query error: ' . $connect->error]);
+        exit;
+    }
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $rows = [];
+    while ($r = $result->fetch_assoc()) { $rows[] = $r; }
+    $stmt->close();
+    echo json_encode(['rows' => $rows]);
+
 } else {
     echo json_encode(['error' => 'Invalid action.']);
 }
