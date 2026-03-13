@@ -172,14 +172,9 @@ if ($action === "done") {
 } elseif ($action === "poll") {
     header('Content-Type: application/json; charset=utf-8');
 
-    // Rebuild orderlist2 summary
-    $connect->query("TRUNCATE TABLE `orderlist2`");
-    $connect->query("INSERT INTO `orderlist2` (SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUMQTY,PURCHASEDATE,branch_code) SELECT SALNUM,ACCODE,NAME,ADMINRMK,TXTTO,SDATE,TTIME,SUM(QTY) AS SUMQTY,PURCHASEDATE,branch_code FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM,ACCODE ORDER BY SALNUM DESC");
-    $connect->query("UPDATE orderlist2 AS b INNER JOIN MEMBER AS g ON b.ACCODE = g.ACCODE SET b.HP = g.HP");
-
-    // Fetch orders with branch name via JOIN
+    // Query orderlist directly with aggregation (no orderlist2 needed)
     $orders = [];
-    $orderResult = $connect->query("SELECT o.*, COALESCE(br.name, o.branch_code) AS branch_name FROM `orderlist2` o LEFT JOIN `branch` br ON o.branch_code = br.code ORDER BY o.SALNUM DESC");
+    $orderResult = $connect->query("SELECT o.SALNUM, o.ACCODE, o.NAME, o.ADMINRMK, o.TXTTO, o.SDATE, o.TTIME, SUM(o.QTY) AS SUMQTY, o.PURCHASEDATE, o.branch_code, COALESCE(br.name, o.branch_code) AS branch_name, g.HP FROM `orderlist` o LEFT JOIN `branch` br ON o.branch_code = br.code LEFT JOIN `MEMBER` g ON o.ACCODE = g.ACCODE WHERE o.STATUS != 'DONE' AND o.STATUS != 'DELETED' AND o.BARCODE <> 'PT' GROUP BY o.SALNUM, o.ACCODE ORDER BY o.SALNUM DESC");
     if ($orderResult) {
         while ($r = $orderResult->fetch_assoc()) {
             $orders[] = $r;
