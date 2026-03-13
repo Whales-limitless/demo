@@ -23,7 +23,7 @@ if ($action === "done") {
 
         // Check if any products in this order are in active stock take sessions
         $orderBarcodes = [];
-        $barcodeQuery = $connect->query("SELECT DISTINCT BARCODE FROM `orderlist` WHERE SALNUM = '$delid' AND BARCODE <> 'PT' AND PTYPE <> 'STOCKIN' AND QTY > 0");
+        $barcodeQuery = $connect->query("SELECT DISTINCT BARCODE FROM `orderlist` WHERE SALNUM = '$delid' AND BARCODE <> 'PT' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') AND QTY > 0");
         if ($barcodeQuery) {
             while ($br = $barcodeQuery->fetch_assoc()) {
                 if (!empty(trim($br['BARCODE']))) {
