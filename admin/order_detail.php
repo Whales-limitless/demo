@@ -25,7 +25,7 @@ if (isset($_POST["submit_print"])) {
 $raccode = $roworderid = $rowdate = $rowtrack = $rowname = $rowoutlet = '';
 $rowttime = $rowptype = $rowstatus = $rowto = $rowphone = $rowemail = $rowaddress = '';
 $mer_name = $mer_addr = $mer_cont = '';
-$rowpurchasedate = '';
+$rowbranchname = '';
 
 
 $getdata = $connect->query("SELECT * FROM `orderlist` WHERE SALNUM = '$get_id' LIMIT 1");
@@ -42,7 +42,17 @@ if ($getdata && $getdata->num_rows > 0) {
     $rowptype   = $row['PTYPE'] ?? '';
     $rowstatus  = $row['STATUS'] ?? '';
     $rowto      = $row['TXTTO'] ?? '';
-    $rowpurchasedate = $row['PURCHASEDATE'] ?? '';
+    $rowbranchcode = $row['branch_code'] ?? '';
+
+    // Get branch name
+    if ($rowbranchcode !== '') {
+        $br_q = $connect->query("SELECT `name` FROM `branch` WHERE `code` = '" . $connect->real_escape_string($rowbranchcode) . "' LIMIT 1");
+        if ($br_q && $br_row = $br_q->fetch_assoc()) {
+            $rowbranchname = $br_row['name'];
+        } else {
+            $rowbranchname = $rowbranchcode;
+        }
+    }
 
     // Get member contact
     $query_contact = $connect->query("SELECT * FROM MEMBER WHERE ACCODE = '$raccode'");
@@ -299,9 +309,9 @@ body {
                 <td><strong><?php echo htmlspecialchars($roworderid); ?></strong></td>
             </tr>
             <tr>
-                <td class="label">Purchase Date</td>
+                <td class="label">Branch</td>
                 <td class="sep">:</td>
-                <td><?php echo !empty($rowpurchasedate) ? date('d/m/Y', strtotime($rowpurchasedate)) : ''; ?></td>
+                <td><?php echo htmlspecialchars($rowbranchname); ?></td>
             </tr>
             <tr>
                 <td class="label">Delivery Date</td>
