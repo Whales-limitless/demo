@@ -37,6 +37,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .summary-card { flex: 1; min-width: 140px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-md); padding: 16px; text-align: center; }
 .summary-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
 .summary-card .value { font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 700; }
+.toggle-bar { display: flex; gap: 4px; background: #e5e7eb; border-radius: 8px; padding: 3px; width: fit-content; }
+.toggle-bar button { padding: 6px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; color: var(--text-muted); transition: var(--transition); }
+.toggle-bar button.active { background: var(--primary); color: #fff; }
+.branch-group { margin-bottom: 24px; }
+.branch-header { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; padding: 12px 16px; border-radius: var(--radius) var(--radius) 0 0; font-weight: 700; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+.branch-header .branch-stats { font-size: 12px; font-weight: 400; opacity: 0.9; }
 @media (max-width: 768px) { .page-content { padding: 16px; } .table-card { padding: 12px; } }
 </style>
 </head>
@@ -52,6 +58,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="filter-bar">
         <label>Start Date:</label><input type="date" id="startDate" value="<?php echo date('Y-m-01'); ?>">
         <label>End Date:</label><input type="date" id="endDate" value="<?php echo date('Y-m-d'); ?>">
+        <div class="toggle-bar">
+            <button id="btnSummary" class="active" onclick="setMode('summary')">Summary</button>
+            <button id="btnDetailed" onclick="setMode('detailed')">Detailed</button>
+        </div>
         <button onclick="generateReport();"><i class="fas fa-search"></i> Generate</button>
     </div>
 
@@ -95,11 +105,19 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
 <script>
 var dtTable = null;
+var reportMode = 'summary';
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+function setMode(mode) {
+    reportMode = mode;
+    document.getElementById('btnSummary').classList.toggle('active', mode === 'summary');
+    document.getElementById('btnDetailed').classList.toggle('active', mode === 'detailed');
+}
+
 function generateReport() {
+    var action = reportMode === 'detailed' ? 'sales_by_branch_detailed' : 'sales_by_branch';
     var postData = {
-        action: 'sales_by_branch',
+        action: action,
         start_date: document.getElementById('startDate').value,
         end_date: document.getElementById('endDate').value
     };
@@ -110,7 +128,11 @@ function generateReport() {
         type: 'POST', url: 'report_ajax.php', data: postData, dataType: 'json',
         success: function(data) {
             if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
-            renderTable(data.rows || []);
+            if (reportMode === 'detailed') {
+                renderDetailedTable(data.rows || []);
+            } else {
+                renderTable(data.rows || []);
+            }
         },
         error: function() { Swal.fire({ icon: 'error', text: 'Failed to load report.' }); }
     });
@@ -154,6 +176,84 @@ function renderTable(rows) {
     document.getElementById('sumStaff').textContent = totalStaff;
 
     initDataTable();
+}
+
+function renderDetailedTable(rows) {
+    if (rows.length === 0) {
+        document.getElementById('reportContent').innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px;">No sales data found for the selected period.</p>';
+        document.getElementById('summaryCards').style.display = 'none';
+        return;
+    }
+
+    // Group by branch -> itemized orders
+    var branches = {};
+    var totalQty = 0;
+    var allOrderNos = {};
+    var allStaff = {};
+
+    rows.forEach(function(r) {
+        var bName = r.branch_name || 'No Branch';
+        var bCode = r.branch_code || 'NO_BRANCH';
+        if (!branches[bCode]) branches[bCode] = { name: bName, items: [], qty: 0, orders: {}, staff: {} };
+        var qty = parseFloat(r.qty) || 0;
+        branches[bCode].items.push(r);
+        branches[bCode].qty += qty;
+        branches[bCode].orders[r.order_no] = true;
+        branches[bCode].staff[r.staff_name] = true;
+        allOrderNos[r.order_no] = true;
+        allStaff[r.staff_name] = true;
+        totalQty += qty;
+    });
+    var totalOrders = Object.keys(allOrderNos).length;
+
+    var html = '';
+    var branchKeys = Object.keys(branches).sort(function(a, b) {
+        return branches[a].name.localeCompare(branches[b].name);
+    });
+
+    branchKeys.forEach(function(bCode) {
+        var branch = branches[bCode];
+        var branchOrderCount = Object.keys(branch.orders).length;
+        var branchStaffCount = Object.keys(branch.staff).length;
+        html += '<div class="branch-group">';
+        html += '<div class="branch-header"><span><i class="fas fa-store"></i> ' + escHtml(branch.name) + '</span>' +
+            '<span class="branch-stats">' + branchStaffCount + ' Staff | ' + branchOrderCount + ' Orders | Qty: ' + branch.qty.toFixed(2) + '</span></div>';
+
+        html += '<table class="table table-sm table-striped mb-0" style="font-size:12px;">' +
+            '<thead style="background:#f9fafb;"><tr><th>No</th><th>Order No</th><th>Date</th><th>Staff</th><th>Barcode</th><th>Product</th><th class="text-end">Qty</th></tr></thead><tbody>';
+
+        branch.items.forEach(function(item, idx) {
+            var saleDate = item.sale_date ? new Date(item.sale_date + 'T00:00:00').toLocaleDateString('en-GB') : '';
+            html += '<tr>' +
+                '<td>' + (idx + 1) + '</td>' +
+                '<td>' + escHtml(item.order_no || '') + '</td>' +
+                '<td>' + escHtml(saleDate) + '</td>' +
+                '<td>' + escHtml(item.staff_name || '') + '</td>' +
+                '<td>' + escHtml(item.barcode || '') + '</td>' +
+                '<td>' + escHtml(item.product_desc || '') + '</td>' +
+                '<td class="text-end fw-bold">' + (parseFloat(item.qty) || 0).toFixed(2) + '</td>' +
+                '</tr>';
+        });
+
+        html += '<tr style="font-weight:700;background:#f0f0f0;"><td colspan="6">Subtotal (' + escHtml(branch.name) + ')</td><td class="text-end">' + branch.qty.toFixed(2) + '</td></tr>';
+        html += '</tbody></table>';
+        html += '</div>';
+    });
+
+    // Grand total
+    html += '<div style="background:var(--primary);color:#fff;padding:12px 16px;border-radius:var(--radius);font-weight:700;display:flex;justify-content:space-between;margin-top:8px;">' +
+        '<span>GRAND TOTAL</span><span>' + branchKeys.length + ' Branches | ' + Object.keys(allStaff).length + ' Staff | ' + totalOrders + ' Orders | Qty: ' + totalQty.toFixed(2) + '</span></div>';
+
+    document.getElementById('reportContent').innerHTML = html;
+
+    document.getElementById('summaryCards').style.display = 'flex';
+    document.getElementById('sumBranches').textContent = branchKeys.length;
+    document.getElementById('sumOrders').textContent = totalOrders;
+    document.getElementById('sumQty').textContent = totalQty.toFixed(2);
+    document.getElementById('sumStaff').textContent = Object.keys(allStaff).length;
+
+    // No DataTable for detailed view as it uses grouped layout
+    if (dtTable) { dtTable.destroy(); dtTable = null; }
 }
 
 function initDataTable() {
