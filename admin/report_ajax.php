@@ -46,6 +46,8 @@ if ($action === 'stock_movement') {
         $adjSearchTypes = "ss";
     }
 
+    $collate = "COLLATE utf8mb4_unicode_ci";
+
     $sql = "SELECT
                 combined.BARCODE,
                 combined.description,
@@ -54,25 +56,25 @@ if ($action === 'stock_movement') {
                 COALESCE(adj.adj_in, 0) AS adj_in,
                 COALESCE(adj.adj_out, 0) AS adj_out
             FROM (
-                SELECT BARCODE, PDESC AS description FROM `orderlist`
+                SELECT BARCODE $collate AS BARCODE, PDESC AS description FROM `orderlist`
                 WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'
                 " . ($search !== '' ? "AND (BARCODE LIKE ? OR PDESC LIKE ?)" : "") . "
                 GROUP BY BARCODE, PDESC
                 UNION
-                SELECT sa.BARCODE, COALESCE(p2.pdesc, sa.BARCODE) AS description FROM `stockadj` sa
-                LEFT JOIN `PRODUCTS` p2 ON sa.BARCODE = p2.barcode
+                SELECT sa.BARCODE $collate AS BARCODE, COALESCE(p2.pdesc, sa.BARCODE) AS description FROM `stockadj` sa
+                LEFT JOIN `PRODUCTS` p2 ON sa.BARCODE $collate = p2.barcode $collate
                 WHERE sa.SDATE >= ? AND sa.SDATE <= ?
                 $adjSearchWhere
                 GROUP BY sa.BARCODE
             ) combined
-            LEFT JOIN `PRODUCTS` p ON combined.BARCODE = p.barcode
+            LEFT JOIN `PRODUCTS` p ON combined.BARCODE $collate = p.barcode $collate
             LEFT JOIN (
                 SELECT BARCODE,
                     SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' THEN QTY ELSE 0 END) AS qty_out
                 FROM `orderlist`
                 WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'
                 GROUP BY BARCODE
-            ) orders ON combined.BARCODE = orders.BARCODE
+            ) orders ON combined.BARCODE $collate = orders.BARCODE $collate
             LEFT JOIN (
                 SELECT BARCODE,
                     SUM(CASE WHEN QTYADJ > 0 THEN QTYADJ ELSE 0 END) AS adj_in,
@@ -80,7 +82,7 @@ if ($action === 'stock_movement') {
                 FROM `stockadj`
                 WHERE SDATE >= ? AND SDATE <= ?
                 GROUP BY BARCODE
-            ) adj ON combined.BARCODE = adj.BARCODE
+            ) adj ON combined.BARCODE $collate = adj.BARCODE $collate
             ORDER BY combined.description ASC";
 
     // Build params: combined(orderlist dates + search, stockadj dates + search), orders dates, adj dates
@@ -107,6 +109,10 @@ if ($action === 'stock_movement') {
     $allTypes .= "ss";
 
     $stmt = $connect->prepare($sql);
+    if (!$stmt) {
+        echo json_encode(['error' => 'Query error: ' . $connect->error]);
+        exit;
+    }
     $stmt->bind_param($allTypes, ...$allParams);
     $stmt->execute();
     $result = $stmt->get_result();
