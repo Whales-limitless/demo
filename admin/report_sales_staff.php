@@ -185,7 +185,7 @@ function renderDetailedTable(rows) {
 
     // Group by branch -> staff -> orders
     var branches = {};
-    var totalOrders = 0, totalQty = 0;
+    var totalQty = 0;
     var allStaff = {};
     var allOrderNos = {};
 
@@ -205,53 +205,69 @@ function renderDetailedTable(rows) {
         allOrderNos[r.order_no] = true;
         totalQty += qty;
     });
-    totalOrders = Object.keys(allOrderNos).length;
+    var totalOrders = Object.keys(allOrderNos).length;
 
-    var html = '';
     var branchKeys = Object.keys(branches).sort(function(a, b) {
         return branches[a].name.localeCompare(branches[b].name);
     });
 
+    // Single table for consistent column alignment
+    var html = '<table class="table table-sm mb-0" style="width:100%;font-size:12px;table-layout:fixed;">' +
+        '<colgroup><col style="width:5%"><col style="width:20%"><col style="width:10%"><col style="width:15%"><col style="width:40%"><col style="width:10%"></colgroup>' +
+        '<thead><tr style="background:#f9fafb;"><th>No</th><th>Order No</th><th>Date</th><th>Barcode</th><th>Product</th><th class="text-end">Qty</th></tr></thead><tbody>';
+
+    var rowNum = 0;
     branchKeys.forEach(function(bCode) {
         var branch = branches[bCode];
         var branchOrderCount = Object.keys(branch.orders).length;
         var staffCount = Object.keys(branch.staff).length;
-        html += '<div class="branch-group">';
-        html += '<div class="branch-header"><span><i class="fas fa-store"></i> ' + escHtml(branch.name) + '</span>' +
-            '<span class="branch-stats">' + staffCount + ' Staff | ' + branchOrderCount + ' Orders | Qty: ' + branch.qty.toFixed(2) + '</span></div>';
+
+        // Branch header row
+        html += '<tr><td colspan="6" style="padding:0;border:none;">' +
+            '<div style="background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;padding:10px 16px;font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;' +
+            (rowNum > 0 ? 'margin-top:16px;' : '') + 'border-radius:var(--radius) var(--radius) 0 0;">' +
+            '<span><i class="fas fa-store"></i> ' + escHtml(branch.name) + '</span>' +
+            '<span style="font-size:12px;font-weight:400;opacity:0.9;">' + staffCount + ' Staff | ' + branchOrderCount + ' Orders | Qty: ' + branch.qty.toFixed(2) + '</span>' +
+            '</div></td></tr>';
 
         var staffKeys = Object.keys(branch.staff).sort();
         staffKeys.forEach(function(staffName) {
             var staffData = branch.staff[staffName];
             var staffOrderCount = Object.keys(staffData.orders).length;
-            html += '<div class="staff-subheader"><span><i class="fas fa-user"></i> ' + escHtml(staffName) + '</span>' +
-                '<span class="staff-stats">' + staffOrderCount + ' Orders | Qty: ' + staffData.qty.toFixed(2) + '</span></div>';
 
-            html += '<table class="table table-sm table-striped mb-0" style="font-size:12px;">' +
-                '<thead style="background:#f9fafb;"><tr><th>No</th><th>Order No</th><th>Date</th><th>Barcode</th><th>Product</th><th class="text-end">Qty</th></tr></thead><tbody>';
+            // Staff subheader row
+            html += '<tr><td colspan="6" style="padding:0;border:none;">' +
+                '<div style="background:#f0f0f0;padding:7px 16px;font-weight:600;font-size:13px;border-bottom:1px solid #d1d5db;display:flex;justify-content:space-between;align-items:center;">' +
+                '<span><i class="fas fa-user"></i> ' + escHtml(staffName) + '</span>' +
+                '<span style="font-size:12px;font-weight:400;color:var(--text-muted);">' + staffOrderCount + ' Orders | Qty: ' + staffData.qty.toFixed(2) + '</span>' +
+                '</div></td></tr>';
 
             staffData.items.forEach(function(item, idx) {
                 var saleDate = item.sale_date ? new Date(item.sale_date + 'T00:00:00').toLocaleDateString('en-GB') : '';
                 html += '<tr>' +
                     '<td>' + (idx + 1) + '</td>' +
-                    '<td>' + escHtml(item.order_no || '') + '</td>' +
+                    '<td style="word-break:break-all;">' + escHtml(item.order_no || '') + '</td>' +
                     '<td>' + escHtml(saleDate) + '</td>' +
-                    '<td>' + escHtml(item.barcode || '') + '</td>' +
-                    '<td>' + escHtml(item.product_desc || '') + '</td>' +
+                    '<td style="word-break:break-all;">' + escHtml(item.barcode || '') + '</td>' +
+                    '<td style="word-break:break-word;">' + escHtml(item.product_desc || '') + '</td>' +
                     '<td class="text-end fw-bold">' + (parseFloat(item.qty) || 0).toFixed(2) + '</td>' +
                     '</tr>';
             });
 
+            // Staff subtotal row
             html += '<tr style="font-weight:700;background:#f0f0f0;"><td colspan="5">Subtotal (' + escHtml(staffName) + ')</td><td class="text-end">' + staffData.qty.toFixed(2) + '</td></tr>';
-            html += '</tbody></table>';
         });
 
-        html += '</div>';
+        rowNum++;
     });
 
-    // Grand total
-    html += '<div style="background:var(--primary);color:#fff;padding:12px 16px;border-radius:var(--radius);font-weight:700;display:flex;justify-content:space-between;margin-top:8px;">' +
-        '<span>GRAND TOTAL</span><span>' + Object.keys(allStaff).length + ' Staff | ' + totalOrders + ' Orders | Qty: ' + totalQty.toFixed(2) + '</span></div>';
+    // Grand total row
+    html += '<tr><td colspan="6" style="padding:0;border:none;">' +
+        '<div style="background:var(--primary);color:#fff;padding:12px 16px;border-radius:var(--radius);font-weight:700;display:flex;justify-content:space-between;margin-top:8px;">' +
+        '<span>GRAND TOTAL</span><span>' + Object.keys(allStaff).length + ' Staff | ' + totalOrders + ' Orders | Qty: ' + totalQty.toFixed(2) + '</span>' +
+        '</div></td></tr>';
+
+    html += '</tbody></table>';
 
     document.getElementById('reportContent').innerHTML = html;
 
@@ -260,7 +276,6 @@ function renderDetailedTable(rows) {
     document.getElementById('sumOrders').textContent = totalOrders;
     document.getElementById('sumQty').textContent = totalQty.toFixed(2);
 
-    // No DataTable for detailed view as it uses grouped layout
     if (dtTable) { dtTable.destroy(); dtTable = null; }
 }
 
