@@ -694,10 +694,14 @@ function renderProductTable(products) {
     products.forEach(function(p) {
         var lastCount = p.last_stock_take ? formatDate(p.last_stock_take) : '';
         var lastCountLabel = p.last_stock_take ? lastCount : '<span style="color:#dc2626;font-size:11px;">Never</span>';
-        html += '<tr data-name="' + (p.name || '').toLowerCase() + '" data-barcode="' + escapeAttr(p.barcode) + '" data-last="' + (p.last_stock_take || '') + '">' +
-            '<td><input type="checkbox" class="product-cb" value="' + escapeAttr(p.barcode) + '" checked onchange="updateSelectionCount();"></td>' +
+        var inActive = parseInt(p.in_active_session) === 1;
+        var rowStyle = inActive ? ' style="opacity:0.5;background:#fff3cd;"' : '';
+        var cbDisabled = inActive ? ' disabled title="Already in active session: ' + escapeAttr(p.active_session_codes || '') + '"' : ' checked';
+        var activeLabel = inActive ? '<span style="color:#b45309;font-size:11px;font-weight:600;" title="' + escapeAttr(p.active_session_codes || '') + '">In Active Session</span>' : '';
+        html += '<tr data-name="' + (p.name || '').toLowerCase() + '" data-barcode="' + escapeAttr(p.barcode) + '" data-last="' + (p.last_stock_take || '') + '" data-active="' + (inActive ? '1' : '0') + '"' + rowStyle + '>' +
+            '<td><input type="checkbox" class="product-cb" value="' + escapeAttr(p.barcode) + '"' + cbDisabled + ' onchange="updateSelectionCount();"></td>' +
             '<td>' + escapeHtml(p.barcode) + '</td>' +
-            '<td>' + escapeHtml(p.name) + '</td>' +
+            '<td>' + escapeHtml(p.name) + (activeLabel ? ' ' + activeLabel : '') + '</td>' +
             '<td>' + parseFloat(p.qoh || 0) + '</td>' +
             '<td>' + lastCountLabel + '</td>' +
         '</tr>';
@@ -708,8 +712,10 @@ function renderProductTable(products) {
 
     // Auto-apply smart select with default N
     var neverCount = products.filter(function(p) { return !p.last_stock_take; }).length;
+    var activeCount = products.filter(function(p) { return parseInt(p.in_active_session) === 1; }).length;
     var infoHtml = '<i class="fas fa-info-circle"></i> ' + products.length + ' total items';
     if (neverCount > 0) infoHtml += ', <b>' + neverCount + ' never counted</b>';
+    if (activeCount > 0) infoHtml += ', <span style="color:#b45309;font-weight:600;">' + activeCount + ' in active session (unavailable)</span>';
     document.getElementById('smartSelectInfo').innerHTML = infoHtml;
     document.getElementById('smartSelectInfo').style.display = 'block';
 
@@ -731,14 +737,15 @@ function smartSelect(mode) {
     if (checkboxes.length === 0) return;
 
     if (mode === 'all') {
-        checkboxes.forEach(function(cb) { cb.checked = true; });
+        checkboxes.forEach(function(cb) { if (!cb.disabled) cb.checked = true; });
         document.getElementById('selectAll').checked = true;
     } else if (mode === 'none') {
-        checkboxes.forEach(function(cb) { cb.checked = false; });
+        checkboxes.forEach(function(cb) { if (!cb.disabled) cb.checked = false; });
         document.getElementById('selectAll').checked = false;
     } else if (mode === 'never') {
         // Select only items that have never been stock taken
         checkboxes.forEach(function(cb) {
+            if (cb.disabled) return;
             var row = cb.closest('tr');
             var lastDate = row.getAttribute('data-last') || '';
             cb.checked = (lastDate === '');
@@ -748,8 +755,13 @@ function smartSelect(mode) {
         // Select top N items sorted by: never first, then oldest date
         var n = parseInt(document.getElementById('smartSelectN').value) || 50;
         // Products are already sorted from server (NULL/never first, then oldest)
-        // Just select first N
-        checkboxes.forEach(function(cb, idx) { cb.checked = (idx < n); });
+        // Just select first N, skip disabled (in active session)
+        var count = 0;
+        checkboxes.forEach(function(cb) {
+            if (cb.disabled) { cb.checked = false; return; }
+            cb.checked = (count < n);
+            count++;
+        });
         document.getElementById('selectAll').checked = false;
     }
 
@@ -768,6 +780,7 @@ function filterProductTable() {
 function toggleSelectAll(el) {
     var checkboxes = document.querySelectorAll('#productBody .product-cb');
     checkboxes.forEach(function(cb) {
+        if (cb.disabled) return;
         var row = cb.closest('tr');
         if (row.style.display !== 'none') {
             cb.checked = el.checked;
