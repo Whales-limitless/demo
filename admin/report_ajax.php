@@ -48,13 +48,62 @@ if ($action === 'stock_movement') {
 
     $collate = "COLLATE utf8mb4_unicode_ci";
 
+    // Check if grn/grn_item tables exist
+    $hasGrn = $connect->query("SHOW TABLES LIKE 'grn'")->num_rows > 0
+           && $connect->query("SHOW TABLES LIKE 'grn_item'")->num_rows > 0;
+
+    // Build GRN subqueries for the UNION and the qty_in sum
+    $grnUnion = "";
+    $grnJoin = "";
+    $grnSelect = "0 AS qty_grn_in";
+    $grnUnionParams = [];
+    $grnUnionTypes = "";
+    $grnJoinParams = [];
+    $grnJoinTypes = "";
+
+    if ($hasGrn) {
+        $grnSearchWhere = "";
+        if ($search !== '') {
+            $grnSearchWhere = "AND (gi.barcode LIKE ? OR gi.product_desc LIKE ?)";
+        }
+        $grnUnion = "UNION
+                SELECT gi.barcode $collate AS BARCODE, COALESCE(p3.name, gi.product_desc, gi.barcode) AS description
+                FROM `grn_item` gi
+                LEFT JOIN `grn` g ON gi.grn_id = g.id
+                LEFT JOIN `PRODUCTS` p3 ON gi.barcode $collate = p3.barcode $collate
+                WHERE g.receive_date >= ? AND g.receive_date <= ?
+                $grnSearchWhere
+                GROUP BY gi.barcode";
+        $grnUnionParams = [$startDate, $endDate];
+        $grnUnionTypes = "ss";
+        if ($search !== '') {
+            $grnUnionParams[] = $searchParam;
+            $grnUnionParams[] = $searchParam;
+            $grnUnionTypes .= "ss";
+        }
+
+        $grnSelect = "COALESCE(grn_in.qty_grn_in, 0) AS qty_grn_in";
+        $grnJoin = "LEFT JOIN (
+                SELECT gi.barcode AS BARCODE,
+                    SUM(gi.qty_received) AS qty_grn_in
+                FROM `grn_item` gi
+                LEFT JOIN `grn` g ON gi.grn_id = g.id
+                WHERE g.receive_date >= ? AND g.receive_date <= ?
+                GROUP BY gi.barcode
+            ) grn_in ON combined.BARCODE $collate = grn_in.BARCODE $collate";
+        $grnJoinParams = [$startDate, $endDate];
+        $grnJoinTypes = "ss";
+    }
+
     $sql = "SELECT
                 combined.BARCODE,
                 combined.description,
                 COALESCE(p.qoh, 0) AS current_qoh,
                 COALESCE(orders.qty_out, 0) AS qty_out,
+                COALESCE(orders.qty_stockin, 0) AS qty_stockin,
                 COALESCE(adj.adj_in, 0) AS adj_in,
-                COALESCE(adj.adj_out, 0) AS adj_out
+                COALESCE(adj.adj_out, 0) AS adj_out,
+                $grnSelect
             FROM (
                 SELECT BARCODE $collate AS BARCODE, PDESC AS description FROM `orderlist`
                 WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'
@@ -66,11 +115,13 @@ if ($action === 'stock_movement') {
                 WHERE sa.SDATE >= ? AND sa.SDATE <= ?
                 $adjSearchWhere
                 GROUP BY sa.BARCODE
+                $grnUnion
             ) combined
             LEFT JOIN `PRODUCTS` p ON combined.BARCODE $collate = p.barcode $collate
             LEFT JOIN (
                 SELECT BARCODE,
-                    SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' THEN QTY ELSE 0 END) AS qty_out
+                    SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') THEN QTY ELSE 0 END) AS qty_out,
+                    SUM(CASE WHEN PTYPE = 'STOCKIN' AND STATUS = 'DONE' THEN QTY ELSE 0 END) AS qty_stockin
                 FROM `orderlist`
                 WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'
                 GROUP BY BARCODE
@@ -83,9 +134,10 @@ if ($action === 'stock_movement') {
                 WHERE SDATE >= ? AND SDATE <= ?
                 GROUP BY BARCODE
             ) adj ON combined.BARCODE $collate = adj.BARCODE $collate
+            $grnJoin
             ORDER BY combined.description ASC";
 
-    // Build params: combined(orderlist dates + search, stockadj dates + search), orders dates, adj dates
+    // Build params: combined(orderlist + stockadj + grn unions), then orders, adj, grn joins
     $allParams = [$startDate, $endDate];
     $allTypes = "ss";
     if ($search !== '') {
@@ -93,6 +145,7 @@ if ($action === 'stock_movement') {
         $allParams[] = $searchParam;
         $allTypes .= "ss";
     }
+    // stockadj union dates + search
     $allParams[] = $startDate;
     $allParams[] = $endDate;
     $allTypes .= "ss";
@@ -101,12 +154,20 @@ if ($action === 'stock_movement') {
         $allParams[] = $searchParam;
         $allTypes .= "ss";
     }
+    // grn union params
+    foreach ($grnUnionParams as $p) { $allParams[] = $p; }
+    $allTypes .= $grnUnionTypes;
+    // orders subquery dates
     $allParams[] = $startDate;
     $allParams[] = $endDate;
     $allTypes .= "ss";
+    // adj subquery dates
     $allParams[] = $startDate;
     $allParams[] = $endDate;
     $allTypes .= "ss";
+    // grn join params
+    foreach ($grnJoinParams as $p) { $allParams[] = $p; }
+    $allTypes .= $grnJoinTypes;
 
     $stmt = $connect->prepare($sql);
     if (!$stmt) {
@@ -119,17 +180,20 @@ if ($action === 'stock_movement') {
     $rows = [];
     while ($r = $result->fetch_assoc()) {
         $out = floatval($r['qty_out']);
+        $stockIn = floatval($r['qty_stockin']);
+        $grnIn = floatval($r['qty_grn_in']);
         $adjIn = floatval($r['adj_in']);
         $adjOut = floatval($r['adj_out']);
         $currentQoh = floatval($r['current_qoh']);
-        // Opening = current_qoh + out - in + adj_out - adj_in
-        $opening = $currentQoh + $out - $adjIn + $adjOut;
-        $closing = $opening - $out + $adjIn - $adjOut;
+        $totalIn = $stockIn + $grnIn + $adjIn;
+        // Opening = current_qoh + out - totalIn + adj_out
+        $opening = $currentQoh + $out - $totalIn + $adjOut;
+        $closing = $opening + $totalIn - $out - $adjOut;
 
         $rows[] = [
             'description' => $r['description'] ?: $r['BARCODE'],
             'opening' => $opening,
-            'in' => $adjIn,
+            'in' => $totalIn,
             'out' => $out,
             'adj' => $adjIn - $adjOut,
             'closing' => $closing
