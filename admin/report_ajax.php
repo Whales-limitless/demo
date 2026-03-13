@@ -227,27 +227,21 @@ if ($action === 'stock_movement') {
     $params = [$startDate, $endDate];
     $types = "ss";
 
-    // Check which lookup tables exist to avoid query failure
-    $hasOutlet = $connect->query("SHOW TABLES LIKE 'outlet'")->num_rows > 0;
+    // Orders store the actual branch in `branch_code` column (e.g. BR0001),
+    // while `OUTLET` is just the sales channel (always 'WEB').
+    // Join via branch_code to get the real branch name.
     $hasBranch = $connect->query("SHOW TABLES LIKE 'branch'")->num_rows > 0;
 
-    $branchCodeExpr = "COALESCE(NULLIF(o.OUTLET, ''), 'NO_BRANCH')";
-    $joins = "";
-    if ($hasOutlet && $hasBranch) {
-        $branchNameExpr = "COALESCE(ot.PDESC, b.name, IF(o.OUTLET = '' OR o.OUTLET IS NULL, 'No Branch', o.OUTLET))";
-        $joins = "LEFT JOIN `outlet` ot ON o.OUTLET COLLATE utf8mb4_unicode_ci = ot.CODE COLLATE utf8mb4_unicode_ci LEFT JOIN `branch` b ON o.OUTLET COLLATE utf8mb4_unicode_ci = b.code COLLATE utf8mb4_unicode_ci";
-    } elseif ($hasOutlet) {
-        $branchNameExpr = "COALESCE(ot.PDESC, IF(o.OUTLET = '' OR o.OUTLET IS NULL, 'No Branch', o.OUTLET))";
-        $joins = "LEFT JOIN `outlet` ot ON o.OUTLET COLLATE utf8mb4_unicode_ci = ot.CODE COLLATE utf8mb4_unicode_ci";
-    } elseif ($hasBranch) {
-        $branchNameExpr = "COALESCE(b.name, IF(o.OUTLET = '' OR o.OUTLET IS NULL, 'No Branch', o.OUTLET))";
-        $joins = "LEFT JOIN `branch` b ON o.OUTLET COLLATE utf8mb4_unicode_ci = b.code COLLATE utf8mb4_unicode_ci";
+    if ($hasBranch) {
+        $branchNameExpr = "COALESCE(b.name, IF(o.branch_code = '' OR o.branch_code IS NULL, 'No Branch', o.branch_code))";
+        $joins = "LEFT JOIN `branch` b ON o.branch_code COLLATE utf8mb4_unicode_ci = b.code COLLATE utf8mb4_unicode_ci";
     } else {
-        $branchNameExpr = "IF(o.OUTLET = '' OR o.OUTLET IS NULL, 'No Branch', o.OUTLET)";
+        $branchNameExpr = "IF(o.branch_code = '' OR o.branch_code IS NULL, 'No Branch', o.branch_code)";
+        $joins = "";
     }
 
     $sql = "SELECT
-                $branchCodeExpr AS branch_code,
+                COALESCE(NULLIF(o.branch_code, ''), 'NO_BRANCH') AS branch_code,
                 $branchNameExpr AS branch_name,
                 COUNT(DISTINCT o.SALNUM) AS total_orders,
                 SUM(o.QTY) AS total_qty,
