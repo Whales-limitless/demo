@@ -32,19 +32,47 @@ if ($action === 'stock_movement') {
     }
 
     // Get stock movements grouped by product
-    // Opening = QOH + total OUT in period - total IN in period (reverse calculation)
-    // In = positive qty with STATUS = DONE
-    // Out = negative qty or sales
+    // Uses UNION of orderlist and stockadj to capture ALL products with movement
+    // Opening = current_qoh + out - adj_in + adj_out (reverse from current)
+    // Closing = opening - out + adj_in - adj_out
+
+    // Build search condition for stockadj subquery too
+    $adjSearchWhere = "";
+    $adjSearchParams = [];
+    $adjSearchTypes = "";
+    if ($search !== '') {
+        $adjSearchWhere = " AND (sa.BARCODE LIKE ? OR sa.BARCODE LIKE ?)";
+        $adjSearchParams = [$searchParam, $searchParam];
+        $adjSearchTypes = "ss";
+    }
+
     $sql = "SELECT
-                o.BARCODE,
-                o.PDESC AS description,
+                combined.BARCODE,
+                combined.description,
                 COALESCE(p.qoh, 0) AS current_qoh,
-                SUM(CASE WHEN o.QTY > 0 AND o.STATUS = 'DONE' THEN o.QTY ELSE 0 END) AS qty_out,
-                0 AS qty_in,
+                COALESCE(orders.qty_out, 0) AS qty_out,
                 COALESCE(adj.adj_in, 0) AS adj_in,
                 COALESCE(adj.adj_out, 0) AS adj_out
-            FROM `orderlist` o
-            LEFT JOIN `PRODUCTS` p ON o.BARCODE = p.barcode
+            FROM (
+                SELECT BARCODE, PDESC AS description FROM `orderlist`
+                WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'
+                " . ($search !== '' ? "AND (BARCODE LIKE ? OR PDESC LIKE ?)" : "") . "
+                GROUP BY BARCODE, PDESC
+                UNION
+                SELECT sa.BARCODE, COALESCE(p2.pdesc, sa.BARCODE) AS description FROM `stockadj` sa
+                LEFT JOIN `PRODUCTS` p2 ON sa.BARCODE = p2.barcode
+                WHERE sa.SDATE >= ? AND sa.SDATE <= ?
+                $adjSearchWhere
+                GROUP BY sa.BARCODE
+            ) combined
+            LEFT JOIN `PRODUCTS` p ON combined.BARCODE = p.barcode
+            LEFT JOIN (
+                SELECT BARCODE,
+                    SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' THEN QTY ELSE 0 END) AS qty_out
+                FROM `orderlist`
+                WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'
+                GROUP BY BARCODE
+            ) orders ON combined.BARCODE = orders.BARCODE
             LEFT JOIN (
                 SELECT BARCODE,
                     SUM(CASE WHEN QTYADJ > 0 THEN QTYADJ ELSE 0 END) AS adj_in,
@@ -52,14 +80,31 @@ if ($action === 'stock_movement') {
                 FROM `stockadj`
                 WHERE SDATE >= ? AND SDATE <= ?
                 GROUP BY BARCODE
-            ) adj ON o.BARCODE = adj.BARCODE
-            $where
-            GROUP BY o.BARCODE, o.PDESC
-            ORDER BY o.PDESC ASC
-            LIMIT 1000";
+            ) adj ON combined.BARCODE = adj.BARCODE
+            ORDER BY combined.description ASC";
 
-    $allParams = [$startDate, $endDate, ...$params];
-    $allTypes = "ss" . $types;
+    // Build params: combined(orderlist dates + search, stockadj dates + search), orders dates, adj dates
+    $allParams = [$startDate, $endDate];
+    $allTypes = "ss";
+    if ($search !== '') {
+        $allParams[] = $searchParam;
+        $allParams[] = $searchParam;
+        $allTypes .= "ss";
+    }
+    $allParams[] = $startDate;
+    $allParams[] = $endDate;
+    $allTypes .= "ss";
+    if ($search !== '') {
+        $allParams[] = $searchParam;
+        $allParams[] = $searchParam;
+        $allTypes .= "ss";
+    }
+    $allParams[] = $startDate;
+    $allParams[] = $endDate;
+    $allTypes .= "ss";
+    $allParams[] = $startDate;
+    $allParams[] = $endDate;
+    $allTypes .= "ss";
 
     $stmt = $connect->prepare($sql);
     $stmt->bind_param($allTypes, ...$allParams);
