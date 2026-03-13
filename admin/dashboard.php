@@ -13,12 +13,22 @@ $connect->set_charset("utf8mb4");
 // Ensure PURCHASEDATE column exists on orderlist (run once, safe to repeat)
 $connect->query("ALTER TABLE `orderlist` ADD COLUMN `PURCHASEDATE` DATE DEFAULT NULL");
 
+// Ensure branch table exists
+$connect->query("CREATE TABLE IF NOT EXISTS `branch` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT,
+    `code` VARCHAR(20) NOT NULL,
+    `name` VARCHAR(100) NOT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_branch_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 $newOrderCount = 0;
 $q = $connect->query("SELECT COUNT(DISTINCT SALNUM) as cnt FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND SOUND = '0'");
 if ($q && $row = $q->fetch_assoc()) $newOrderCount = (int)$row['cnt'];
 
 $orders = [];
-$orderResult = $connect->query("SELECT o.SALNUM, o.ACCODE, o.NAME, o.ADMINRMK, o.TXTTO, o.SDATE, o.TTIME, SUM(o.QTY) AS SUMQTY, o.PURCHASEDATE, o.branch_code, COALESCE(br.name, o.branch_code) AS branch_name, g.HP FROM `orderlist` o LEFT JOIN `branch` br ON o.branch_code = br.code LEFT JOIN `MEMBER` g ON o.ACCODE = g.ACCODE WHERE o.STATUS != 'DONE' AND o.STATUS != 'DELETED' AND o.BARCODE <> 'PT' GROUP BY o.SALNUM, o.ACCODE ORDER BY o.SALNUM DESC");
+$orderResult = $connect->query("SELECT o.SALNUM, o.ACCODE, o.NAME, MAX(o.ADMINRMK) AS ADMINRMK, MAX(o.TXTTO) AS TXTTO, o.SDATE, MAX(o.TTIME) AS TTIME, SUM(o.QTY) AS SUMQTY, MAX(o.PURCHASEDATE) AS PURCHASEDATE, MAX(o.branch_code) AS branch_code, COALESCE(MAX(br.name), MAX(o.branch_code)) AS branch_name, MAX(g.HP) AS HP FROM `orderlist` o LEFT JOIN `branch` br ON o.branch_code = br.code LEFT JOIN `MEMBER` g ON o.ACCODE = g.ACCODE WHERE o.STATUS != 'DONE' AND o.STATUS != 'DELETED' AND o.BARCODE <> 'PT' GROUP BY o.SALNUM, o.ACCODE, o.NAME, o.SDATE ORDER BY o.SALNUM DESC");
 if ($orderResult) { while ($r = $orderResult->fetch_assoc()) $orders[] = $r; }
 
 $currentPage = 'dashboard';
