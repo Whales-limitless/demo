@@ -20,6 +20,42 @@ if ($action === "done") {
 
     if ($sqlord && $sqlord->num_rows > 0) {
         $row = $sqlord->fetch_assoc();
+
+        // Check if any products in this order are in active stock take sessions
+        $orderBarcodes = [];
+        $barcodeQuery = $connect->query("SELECT DISTINCT BARCODE FROM `orderlist` WHERE SALNUM = '$delid' AND BARCODE <> 'PT' AND PTYPE <> 'STOCKIN' AND QTY > 0");
+        if ($barcodeQuery) {
+            while ($br = $barcodeQuery->fetch_assoc()) {
+                if (!empty(trim($br['BARCODE']))) {
+                    $orderBarcodes[] = trim($br['BARCODE']);
+                }
+            }
+        }
+
+        if (!empty($orderBarcodes)) {
+            $stPlaceholders = implode(',', array_fill(0, count($orderBarcodes), '?'));
+            $stStmt = $connect->prepare("SELECT DISTINCT sti.`barcode`, p.`name`, st.`session_code`
+                FROM `stock_take_item` sti
+                INNER JOIN `stock_take` st ON st.`id` = sti.`stock_take_id` AND st.`status` IN ('DRAFT', 'SUBMITTED')
+                LEFT JOIN `PRODUCTS` p ON p.`barcode` = sti.`barcode`
+                WHERE sti.`barcode` IN ($stPlaceholders)");
+            $stTypes = str_repeat('s', count($orderBarcodes));
+            $stValues = array_values($orderBarcodes);
+            $stStmt->bind_param($stTypes, ...$stValues);
+            $stStmt->execute();
+            $stResult = $stStmt->get_result();
+            $blockedItems = [];
+            while ($r = $stResult->fetch_assoc()) {
+                $blockedItems[] = ($r['name'] ?? $r['barcode']) . ' (' . $r['session_code'] . ')';
+            }
+            $stStmt->close();
+
+            if (!empty($blockedItems)) {
+                echo "STOCK_TAKE_BLOCKED:" . json_encode($blockedItems);
+                exit;
+            }
+        }
+
         $status = 'DONE';
 
         $result1 = $connect->query("UPDATE `orderlist` SET STATUS = '$status' WHERE SALNUM = '$delid'");

@@ -540,10 +540,20 @@ function donebtn(id) {
     }).then(function(r) {
         if (r.isConfirmed) {
             $.post('admin_ajax.php', { id: id, action: 'done' }, function(data) {
-                if (data.trim() === 'Saved.') {
+                var trimmed = data.trim();
+                if (trimmed === 'Saved.') {
                     Swal.fire({ icon: 'success', text: 'Marked as Done', timer: 1500, showConfirmButton: false });
                     doPoll();
-                } else Swal.fire({ icon: 'error', title: 'Error', text: data });
+                } else if (trimmed.indexOf('STOCK_TAKE_BLOCKED:') === 0) {
+                    var items = JSON.parse(trimmed.substring('STOCK_TAKE_BLOCKED:'.length));
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Cannot Mark as Done',
+                        html: 'The following product(s) are currently under active stock take:<br><br><strong>' + items.join('<br>') + '</strong><br><br>Please complete or approve the stock take session first.'
+                    });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: trimmed });
+                }
             });
         }
     });
