@@ -61,7 +61,7 @@ if ($action === 'stock_movement') {
                 " . ($search !== '' ? "AND (BARCODE LIKE ? OR PDESC LIKE ?)" : "") . "
                 GROUP BY BARCODE, PDESC
                 UNION
-                SELECT sa.BARCODE $collate AS BARCODE, COALESCE(p2.pdesc, sa.BARCODE) AS description FROM `stockadj` sa
+                SELECT sa.BARCODE $collate AS BARCODE, COALESCE(p2.name, sa.BARCODE) AS description FROM `stockadj` sa
                 LEFT JOIN `PRODUCTS` p2 ON sa.BARCODE $collate = p2.barcode $collate
                 WHERE sa.SDATE >= ? AND sa.SDATE <= ?
                 $adjSearchWhere
