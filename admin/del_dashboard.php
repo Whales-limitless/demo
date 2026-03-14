@@ -110,7 +110,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>Order No</th>
                         <th>Driver</th>
                         <th>Customer</th>
-                        <th>Location</th>
+                        <th>Address</th>
                         <th>Distance</th>
                         <th>Commission</th>
                         <th>Status</th>
@@ -205,7 +205,7 @@ function renderTable(orders) {
             '<td><strong>' + escHtml(o.ORDNO || '') + '</strong></td>' +
             '<td>' + escHtml(o.DRIVER || '-') + '</td>' +
             '<td>' + escHtml(o.CUSTOMER || '') + '</td>' +
-            '<td>' + escHtml(o.LOCATION || '') + '</td>' +
+            '<td>' + escHtml(o.CUST_ADDRESS || '') + '</td>' +
             '<td>' + escHtml(o.DISTANT || '') + '</td>' +
             '<td>' + escHtml(o.RETAIL || '') + '</td>' +
             '<td><span class="badge-status ' + (badgeMap[o.STATUS] || '') + '">' + (statusMap[o.STATUS] || o.STATUS) + '</span></td>' +

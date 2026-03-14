@@ -118,11 +118,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             <div class="modal-body">
                 <input type="hidden" id="editId" value="">
                 <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-semibold">Customer Code <span class="text-danger">*</span></label>
-                        <input type="text" id="fCode" class="form-control" placeholder="e.g. CUST001">
-                    </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-12 mb-3">
                         <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
                         <input type="text" id="fName" class="form-control" placeholder="Customer name">
                     </div>
@@ -177,10 +173,9 @@ document.getElementById('searchInput').addEventListener('input', function() {
 
 function clearForm() {
     document.getElementById('editId').value = '';
-    document.getElementById('fCode').value = ''; document.getElementById('fName').value = '';
+    document.getElementById('fName').value = '';
     document.getElementById('fLocation').value = ''; document.getElementById('fPhone').value = '';
     document.getElementById('fAddress').value = ''; document.getElementById('fEmail').value = '';
-    document.getElementById('fCode').disabled = false;
 }
 
 function openCreateModal() { clearForm(); document.getElementById('modalTitle').innerHTML = '<i class="fas fa-address-book"></i> Add Customer'; modal.show(); }
@@ -189,12 +184,10 @@ function openEditModal(id) {
     clearForm();
     document.getElementById('modalTitle').innerHTML = '<i class="fas fa-address-book"></i> Edit Customer';
     document.getElementById('editId').value = id;
-    document.getElementById('fCode').disabled = true;
     $.ajax({
         type: 'POST', url: 'del_customer_ajax.php', data: { action: 'get', id: id }, dataType: 'json',
         success: function(data) {
             if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
-            document.getElementById('fCode').value = data.CODE || '';
             document.getElementById('fName').value = data.NAME || '';
             document.getElementById('fLocation').value = data.LOCATION || '';
             document.getElementById('fPhone').value = data.HP || '';
@@ -207,11 +200,10 @@ function openEditModal(id) {
 
 function saveItem() {
     var editId = document.getElementById('editId').value;
-    var code = document.getElementById('fCode').value.trim();
     var name = document.getElementById('fName').value.trim();
     if (name === '') { Swal.fire({ icon: 'warning', text: 'Customer name is required.' }); return; }
     var postData = {
-        action: editId ? 'update' : 'create', code: code, name: name,
+        action: editId ? 'update' : 'create', name: name,
         location: document.getElementById('fLocation').value, phone: document.getElementById('fPhone').value.trim(),
         address: document.getElementById('fAddress').value.trim(), email: document.getElementById('fEmail').value.trim()
     };
@@ -235,7 +227,7 @@ function deleteItem(id, name) {
     });
 }
 
-document.getElementById('formModal').addEventListener('shown.bs.modal', function() { var el = document.getElementById('fCode'); if (!el.disabled) el.focus(); else document.getElementById('fName').focus(); });
+document.getElementById('formModal').addEventListener('shown.bs.modal', function() { document.getElementById('fName').focus(); });
 </script>
 </body>
 </html>

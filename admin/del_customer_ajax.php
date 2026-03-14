@@ -24,7 +24,6 @@ if ($action === 'get') {
     $stmt->close();
 
 } elseif ($action === 'create') {
-    $code = trim($_POST['code'] ?? '');
     $name = trim($_POST['name'] ?? '');
     $location = trim($_POST['location'] ?? '');
     $address = trim($_POST['address'] ?? '');
@@ -32,6 +31,28 @@ if ($action === 'get') {
     $phone = trim($_POST['phone'] ?? '');
 
     if ($name === '') { echo json_encode(['error' => 'Name is required.']); exit; }
+
+    // Auto-generate unique customer code
+    $r = $connect->query("SELECT CODE FROM `del_customer` WHERE CODE LIKE 'CUST%' ORDER BY ID DESC LIMIT 1");
+    $nextNum = 1;
+    if ($r && $r->num_rows > 0) {
+        $lastCode = $r->fetch_assoc()['CODE'];
+        $num = intval(substr($lastCode, 4));
+        if ($num > 0) $nextNum = $num + 1;
+    }
+    $code = 'CUST' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+
+    // Ensure uniqueness
+    $chk = $connect->prepare("SELECT ID FROM `del_customer` WHERE `CODE` = ? LIMIT 1");
+    $chk->bind_param("s", $code);
+    $chk->execute();
+    while ($chk->get_result()->num_rows > 0) {
+        $nextNum++;
+        $code = 'CUST' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        $chk->bind_param("s", $code);
+        $chk->execute();
+    }
+    $chk->close();
 
     $stmt = $connect->prepare("INSERT INTO `del_customer` (`CODE`,`NAME`,`LOCATION`,`ADDRESS`,`EMAIL`,`HP`) VALUES (?,?,?,?,?,?)");
     $stmt->bind_param("ssssss", $code, $name, $location, $address, $email, $phone);
