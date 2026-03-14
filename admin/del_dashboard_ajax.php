@@ -22,14 +22,12 @@ if ($action === 'list') {
     $params = [$status];
     $types = "s";
 
-    if ($status === 'C') {
-        $startDate = $_POST['start_date'] ?? date('Y-m-d', strtotime('-7 days'));
-        $endDate = $_POST['end_date'] ?? date('Y-m-d');
-        $where .= " AND o.DELDATE >= ? AND o.DELDATE <= ?";
-        $params[] = $startDate;
-        $params[] = $endDate;
-        $types .= "ss";
-    }
+    $startDate = $_POST['start_date'] ?? date('Y-m-d', strtotime('-30 days'));
+    $endDate = $_POST['end_date'] ?? date('Y-m-d');
+    $where .= " AND o.DELDATE >= ? AND o.DELDATE <= ?";
+    $params[] = $startDate;
+    $params[] = $endDate;
+    $types .= "ss";
 
     $sql = "SELECT o.*, c.HP AS CUSTOMER_PHONE, c.ADDRESS AS CUST_ADDRESS FROM `del_orderlist` o LEFT JOIN `del_customer` c ON o.CUSTOMERCODE = c.CODE $where ORDER BY o.DELDATE DESC, o.ID DESC";
     $stmt = $connect->prepare($sql);
@@ -42,18 +40,20 @@ if ($action === 'list') {
     }
     $stmt->close();
 
-    // Get counts for all tabs
+    // Get counts for all tabs within the date range
     $counts = ['order' => 0, 'assigned' => 0, 'done' => 0, 'completed' => 0];
-    $cntResult = $connect->query("SELECT STATUS, COUNT(*) AS cnt FROM `del_orderlist` GROUP BY STATUS");
-    if ($cntResult) {
-        while ($cr = $cntResult->fetch_assoc()) {
-            $s = $cr['STATUS'];
-            if ($s === '') $counts['order'] = (int)$cr['cnt'];
-            elseif ($s === 'A') $counts['assigned'] = (int)$cr['cnt'];
-            elseif ($s === 'D') $counts['done'] = (int)$cr['cnt'];
-            elseif ($s === 'C') $counts['completed'] = (int)$cr['cnt'];
-        }
+    $cntStmt = $connect->prepare("SELECT STATUS, COUNT(*) AS cnt FROM `del_orderlist` WHERE DELDATE >= ? AND DELDATE <= ? GROUP BY STATUS");
+    $cntStmt->bind_param("ss", $startDate, $endDate);
+    $cntStmt->execute();
+    $cntResult = $cntStmt->get_result();
+    while ($cr = $cntResult->fetch_assoc()) {
+        $s = $cr['STATUS'];
+        if ($s === '') $counts['order'] = (int)$cr['cnt'];
+        elseif ($s === 'A') $counts['assigned'] = (int)$cr['cnt'];
+        elseif ($s === 'D') $counts['done'] = (int)$cr['cnt'];
+        elseif ($s === 'C') $counts['completed'] = (int)$cr['cnt'];
     }
+    $cntStmt->close();
 
     echo json_encode(['orders' => $orders, 'counts' => $counts]);
 

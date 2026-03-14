@@ -57,6 +57,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .date-filter.show { display: flex; }
 .date-filter input[type="date"] { padding: 7px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; }
 .date-filter button { padding: 7px 16px; background: var(--primary); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.qf-btn { padding: 6px 14px; border: 1.5px solid #d1d5db; border-radius: 8px; background: #fff; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all var(--transition); }
+.qf-btn:hover { border-color: var(--primary); color: var(--primary); }
+.qf-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
 .empty-state i { font-size: 36px; margin-bottom: 12px; display: block; }
 
@@ -92,12 +95,21 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <button class="status-tab" data-status="C" onclick="switchTab(this, 'C')">Completed <span class="tab-count" id="countCompleted">0</span></button>
     </div>
 
-    <div class="date-filter" id="dateFilter">
-        <label style="font-size:13px;font-weight:600;">From:</label>
-        <input type="date" id="startDate" value="<?php echo date('Y-m-d', strtotime('-7 days')); ?>">
-        <label style="font-size:13px;font-weight:600;">To:</label>
-        <input type="date" id="endDate" value="<?php echo date('Y-m-d'); ?>">
-        <button onclick="loadData()"><i class="fas fa-filter"></i> Filter</button>
+    <div class="date-filter show" id="dateFilter">
+        <div class="quick-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+            <button class="qf-btn active" onclick="quickFilter('today', this)">Today</button>
+            <button class="qf-btn" onclick="quickFilter('tomorrow', this)">Tomorrow</button>
+            <button class="qf-btn" onclick="quickFilter('week', this)">This Week</button>
+            <button class="qf-btn" onclick="quickFilter('month', this)">This Month</button>
+            <button class="qf-btn" onclick="quickFilter('custom', this)">Custom</button>
+        </div>
+        <div id="customDateRange" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;">
+            <label style="font-size:13px;font-weight:600;">From:</label>
+            <input type="date" id="startDate" value="<?php echo date('Y-m-d', strtotime('-30 days')); ?>">
+            <label style="font-size:13px;font-weight:600;">To:</label>
+            <input type="date" id="endDate" value="<?php echo date('Y-m-d'); ?>">
+            <button onclick="loadData()"><i class="fas fa-filter"></i> Filter</button>
+        </div>
     </div>
 
     <div class="table-card">
@@ -144,28 +156,75 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script>
 var currentStatus = '';
 var imgModal = null;
+var currentQuickFilter = 'today';
 
 document.addEventListener('DOMContentLoaded', function() {
     imgModal = new bootstrap.Modal(document.getElementById('imgModal'));
-    loadData();
+    quickFilter('today', document.querySelector('.qf-btn.active'));
     // Auto-refresh every 15 seconds for active tabs
     setInterval(function() { if (currentStatus !== 'C') loadData(); }, 15000);
 });
+
+function quickFilter(type, btn) {
+    document.querySelectorAll('.qf-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    currentQuickFilter = type;
+
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, '0');
+    var dd = String(today.getDate()).padStart(2, '0');
+    var todayStr = yyyy + '-' + mm + '-' + dd;
+
+    var startDate = todayStr, endDate = todayStr;
+
+    if (type === 'today') {
+        startDate = todayStr;
+        endDate = todayStr;
+    } else if (type === 'tomorrow') {
+        var tmr = new Date(today);
+        tmr.setDate(tmr.getDate() + 1);
+        var tStr = tmr.getFullYear() + '-' + String(tmr.getMonth() + 1).padStart(2, '0') + '-' + String(tmr.getDate()).padStart(2, '0');
+        startDate = tStr;
+        endDate = tStr;
+    } else if (type === 'week') {
+        var day = today.getDay();
+        var diffMon = day === 0 ? -6 : 1 - day;
+        var mon = new Date(today);
+        mon.setDate(today.getDate() + diffMon);
+        var sun = new Date(mon);
+        sun.setDate(mon.getDate() + 6);
+        startDate = mon.getFullYear() + '-' + String(mon.getMonth() + 1).padStart(2, '0') + '-' + String(mon.getDate()).padStart(2, '0');
+        endDate = sun.getFullYear() + '-' + String(sun.getMonth() + 1).padStart(2, '0') + '-' + String(sun.getDate()).padStart(2, '0');
+    } else if (type === 'month') {
+        startDate = yyyy + '-' + mm + '-01';
+        var lastDay = new Date(yyyy, today.getMonth() + 1, 0).getDate();
+        endDate = yyyy + '-' + mm + '-' + String(lastDay).padStart(2, '0');
+    } else if (type === 'custom') {
+        document.getElementById('customDateRange').style.display = 'flex';
+        return;
+    }
+
+    document.getElementById('startDate').value = startDate;
+    document.getElementById('endDate').value = endDate;
+    document.getElementById('customDateRange').style.display = 'none';
+    loadData();
+}
 
 function switchTab(el, status) {
     document.querySelectorAll('.status-tab').forEach(function(t) { t.classList.remove('active'); });
     el.classList.add('active');
     currentStatus = status;
-    document.getElementById('dateFilter').classList.toggle('show', status === 'C');
     loadData();
 }
 
 function loadData() {
-    var postData = { action: 'list', status: currentStatus };
-    if (currentStatus === 'C') {
-        postData.start_date = document.getElementById('startDate').value;
-        postData.end_date = document.getElementById('endDate').value;
-    }
+    var postData = {
+        action: 'list',
+        status: currentStatus,
+        start_date: document.getElementById('startDate').value,
+        end_date: document.getElementById('endDate').value
+    };
 
     $.ajax({
         type: 'POST', url: 'del_dashboard_ajax.php', data: postData, dataType: 'json',
