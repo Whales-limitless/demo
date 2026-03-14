@@ -1,5 +1,6 @@
 <?php
 session_start();
+date_default_timezone_set("Asia/Kuala_Lumpur");
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true) {
     http_response_code(403);
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);
@@ -33,8 +34,9 @@ if ($action === 'update_rack') {
     }
 
     // Update the PRODUCTS.rack field and rack_updated_at
-    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = NOW() WHERE `id` = ?");
-    $stmt->bind_param("si", $rack, $id);
+    $nowMY = date('Y-m-d H:i:s');
+    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = ? WHERE `id` = ?");
+    $stmt->bind_param("ssi", $rack, $nowMY, $id);
     $updated = $stmt->execute();
     $stmt->close();
 
@@ -54,8 +56,8 @@ if ($action === 'update_rack') {
             $rackStmt->close();
 
             if ($rackRow) {
-                $insStmt = $connect->prepare("INSERT INTO `rack_product` (`rack_id`, `barcode`, `assigned_at`) VALUES (?, ?, NOW())");
-                $insStmt->bind_param("is", $rackRow['id'], $barcode);
+                $insStmt = $connect->prepare("INSERT INTO `rack_product` (`rack_id`, `barcode`, `assigned_at`) VALUES (?, ?, ?)");
+                $insStmt->bind_param("iss", $rackRow['id'], $barcode, $nowMY);
                 $insStmt->execute();
                 $insStmt->close();
             }
