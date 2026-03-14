@@ -14,6 +14,25 @@ $connect->set_charset("utf8mb4");
 
 $action = $_POST['action'] ?? '';
 
+// Ensure grn_item has UOM conversion columns
+$chkCol = $connect->query("SHOW COLUMNS FROM `grn_item` LIKE 'receive_uom'");
+if ($chkCol && $chkCol->num_rows === 0) {
+    $connect->query("ALTER TABLE `grn_item` ADD COLUMN `receive_uom` VARCHAR(20) DEFAULT NULL AFTER `qty_rejected`");
+    $connect->query("ALTER TABLE `grn_item` ADD COLUMN `qty_converted` DOUBLE(8,2) DEFAULT NULL AFTER `receive_uom`");
+    $connect->query("ALTER TABLE `grn_item` ADD COLUMN `inventory_uom` VARCHAR(20) DEFAULT NULL AFTER `qty_converted`");
+}
+
+// Ensure uom_conversion table exists
+$connect->query("CREATE TABLE IF NOT EXISTS `uom_conversion` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `barcode` VARCHAR(50) NOT NULL,
+    `from_uom` VARCHAR(20) NOT NULL,
+    `to_uom` VARCHAR(20) NOT NULL,
+    `conversion_factor` DOUBLE(10,4) NOT NULL DEFAULT 1.0000,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_barcode_from_to` (`barcode`, `from_uom`, `to_uom`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 function generateGRNNumber($connect) {
     $prefix = 'GRN-' . date('Ym') . '-';
     $result = $connect->query("SELECT `grn_number` FROM `grn` WHERE `grn_number` LIKE '" . $connect->real_escape_string($prefix) . "%' ORDER BY `grn_number` DESC LIMIT 1");
@@ -217,7 +236,7 @@ if ($action === 'list') {
         $grnId = $connect->insert_id;
         $stmt->close();
 
-        $grnItemStmt = $connect->prepare("INSERT INTO `grn_item` (`grn_id`,`po_item_id`,`barcode`,`product_desc`,`qty_received`,`qty_rejected`,`unit_cost`,`batch_no`,`exp_date`,`rack_location`) VALUES (?,?,?,?,?,?,0,?,?,?)");
+        $grnItemStmt = $connect->prepare("INSERT INTO `grn_item` (`grn_id`,`po_item_id`,`barcode`,`product_desc`,`qty_received`,`qty_rejected`,`receive_uom`,`qty_converted`,`inventory_uom`,`unit_cost`,`batch_no`,`exp_date`,`rack_location`) VALUES (?,?,?,?,?,?,?,?,?,0,?,?,?)");
         $updateQohStmt = $connect->prepare("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) + ? WHERE `barcode` = ?");
         $updatePoItemStmt = $connect->prepare("UPDATE `purchase_order_item` SET `qty_received` = COALESCE(`qty_received`, 0) + ? WHERE `id` = ?");
 
@@ -227,20 +246,34 @@ if ($action === 'list') {
             $desc = trim($item['product_desc'] ?? '');
             $qtyReceived = floatval($item['qty_received'] ?? 0);
             $qtyRejected = floatval($item['qty_rejected'] ?? 0);
+            $receiveUom = trim($item['receive_uom'] ?? '');
+            $convFactor = floatval($item['conversion_factor'] ?? 1);
+            $qtyConverted = floatval($item['qty_converted'] ?? $qtyReceived);
+            $inventoryUom = trim($item['inventory_uom'] ?? '');
             $batchNo = trim($item['batch_no'] ?? '');
             $expDate = trim($item['exp_date'] ?? '') !== '' ? trim($item['exp_date']) : null;
             $rackLoc = trim($item['rack_location'] ?? '');
 
-            $grnItemStmt->bind_param("iissddsss", $grnId, $poItemId, $barcode, $desc, $qtyReceived, $qtyRejected, $batchNo, $expDate, $rackLoc);
+            if ($qtyConverted <= 0) {
+                $qtyConverted = $qtyReceived;
+            }
+            $receiveUomVal = $receiveUom !== '' ? $receiveUom : null;
+            $inventoryUomVal = $inventoryUom !== '' ? $inventoryUom : null;
+            $qtyConvertedVal = $qtyConverted > 0 ? $qtyConverted : null;
+
+            $grnItemStmt->bind_param("iissddsdssss", $grnId, $poItemId, $barcode, $desc, $qtyReceived, $qtyRejected, $receiveUomVal, $qtyConvertedVal, $inventoryUomVal, $batchNo, $expDate, $rackLoc);
             if (!$grnItemStmt->execute()) {
                 throw new Exception('Failed to insert GRN item: ' . $connect->error);
             }
 
-            if ($qtyReceived > 0 && $barcode !== '') {
-                $updateQohStmt->bind_param("ds", $qtyReceived, $barcode);
+            // Use converted qty for inventory update (base UOM)
+            $stockQty = $qtyConverted > 0 ? $qtyConverted : $qtyReceived;
+            if ($stockQty > 0 && $barcode !== '') {
+                $updateQohStmt->bind_param("ds", $stockQty, $barcode);
                 $updateQohStmt->execute();
             }
 
+            // PO item tracking stays in PO UOM
             if ($poItemId && $qtyReceived > 0) {
                 $updatePoItemStmt->bind_param("di", $qtyReceived, $poItemId);
                 $updatePoItemStmt->execute();
@@ -270,6 +303,46 @@ if ($action === 'list') {
     } catch (Exception $e) {
         $connect->rollback();
         echo json_encode(['error' => $e->getMessage()]);
+    }
+
+// ==================== UOM CONVERSION LOOKUP ====================
+} elseif ($action === 'uom_conversion_lookup') {
+    $barcode = trim($_POST['barcode'] ?? '');
+    $fromUom = trim($_POST['from_uom'] ?? '');
+    if ($barcode === '' || $fromUom === '') {
+        echo json_encode(['found' => false]);
+        exit;
+    }
+
+    // Get product base UOM
+    $pStmt = $connect->prepare("SELECT `uom` FROM `PRODUCTS` WHERE `barcode` = ? LIMIT 1");
+    $pStmt->bind_param("s", $barcode);
+    $pStmt->execute();
+    $pRow = $pStmt->get_result()->fetch_assoc();
+    $pStmt->close();
+    $baseUom = $pRow ? trim($pRow['uom'] ?? '') : '';
+
+    if ($fromUom === $baseUom || $baseUom === '') {
+        echo json_encode(['found' => false, 'base_uom' => $baseUom]);
+        exit;
+    }
+
+    $cStmt = $connect->prepare("SELECT `conversion_factor`, `to_uom` FROM `uom_conversion` WHERE `barcode` = ? AND `from_uom` = ? AND `to_uom` = ? LIMIT 1");
+    $cStmt->bind_param("sss", $barcode, $fromUom, $baseUom);
+    $cStmt->execute();
+    $cRow = $cStmt->get_result()->fetch_assoc();
+    $cStmt->close();
+
+    if ($cRow) {
+        echo json_encode([
+            'found' => true,
+            'from_uom' => $fromUom,
+            'to_uom' => $cRow['to_uom'],
+            'conversion_factor' => floatval($cRow['conversion_factor']),
+            'base_uom' => $baseUom
+        ]);
+    } else {
+        echo json_encode(['found' => false, 'base_uom' => $baseUom]);
     }
 
 } else {

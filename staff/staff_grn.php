@@ -225,8 +225,10 @@ $currentPage = 'staff_grn';
                                     <th>Product</th>
                                     <th>Barcode</th>
                                     <th style="width:80px">Ordered</th>
+                                    <th style="width:70px">UOM</th>
                                     <th style="width:90px">Receive Qty</th>
                                     <th style="width:80px">Rejected</th>
+                                    <th style="width:130px">Inv. Qty</th>
                                     <th style="width:100px">Batch No</th>
                                     <th style="width:120px">Exp Date</th>
                                     <th style="width:100px">Location</th>
@@ -458,29 +460,75 @@ function loadPOItems() {
             grnLineIndex = 0;
             (data.items || []).forEach(function(item) {
                 if (item.qty_pending > 0) {
-                    addGRNLine(item.id, item.barcode, item.product_desc, item.qty_ordered, item.qty_pending, item.rack || '');
+                    addGRNLine(item.id, item.barcode, item.product_desc, item.qty_ordered, item.qty_pending, item.rack || '', item.uom || '');
                 }
             });
         }
     });
 }
 
-function addGRNLine(poItemId, barcode, desc, qtyOrdered, qtyPending, rack) {
+// UOM conversion cache
+var uomConversionCache = {};
+
+function addGRNLine(poItemId, barcode, desc, qtyOrdered, qtyPending, rack, poUom) {
     grnLineIndex++;
     var idx = grnLineIndex;
+    var uomDisplay = poUom || '';
     var html = '<tr id="gline_' + idx + '">';
     html += '<td>' + idx + '</td>';
-    html += '<td>' + escHtml(desc) + '<input type="hidden" class="gi-po-item-id" value="' + (poItemId || '') + '"><input type="hidden" class="gi-barcode" value="' + escHtml(barcode) + '"><input type="hidden" class="gi-desc" value="' + escHtml(desc) + '"></td>';
+    html += '<td>' + escHtml(desc) + '<input type="hidden" class="gi-po-item-id" value="' + (poItemId || '') + '"><input type="hidden" class="gi-barcode" value="' + escHtml(barcode) + '"><input type="hidden" class="gi-desc" value="' + escHtml(desc) + '"><input type="hidden" class="gi-receive-uom" value="' + escHtml(uomDisplay) + '"><input type="hidden" class="gi-inv-uom" value=""><input type="hidden" class="gi-conv-factor" value="1"><input type="hidden" class="gi-qty-converted" value="0"></td>';
     html += '<td><small class="text-muted">' + escHtml(barcode) + '</small></td>';
     html += '<td>' + (qtyOrdered !== null ? parseFloat(qtyOrdered).toFixed(0) : '-') + '</td>';
-    html += '<td><input type="number" class="gi-qty" value="' + (parseFloat(qtyPending) || 0) + '" min="0" step="any"></td>';
+    html += '<td><small>' + escHtml(uomDisplay || '-') + '</small></td>';
+    html += '<td><input type="number" class="gi-qty" value="' + (parseFloat(qtyPending) || 0) + '" min="0" step="any" onchange="recalcConversion(this);" oninput="recalcConversion(this);"></td>';
     html += '<td><input type="number" class="gi-rejected" value="0" min="0" step="any"></td>';
+    html += '<td class="gi-converted-cell"><span class="gi-converted-display" style="font-size:12px;color:var(--text-muted);">-</span></td>';
     html += '<td><input type="text" class="gi-batch" value="" placeholder="Batch"></td>';
     html += '<td><input type="date" class="gi-exp" value=""></td>';
     html += '<td><input type="text" class="gi-rack" value="' + escHtml(rack) + '" placeholder="Rack"></td>';
     html += '<td><button class="btn-remove-line" onclick="removeGRNLine(' + idx + ');"><i class="fas fa-times"></i></button></td>';
     html += '</tr>';
     document.getElementById('grnLineItems').insertAdjacentHTML('beforeend', html);
+
+    // Lookup conversion for this barcode + UOM
+    if (barcode && uomDisplay) {
+        lookupConversion(idx, barcode, uomDisplay);
+    }
+}
+
+function lookupConversion(lineIdx, barcode, fromUom) {
+    $.post('staff_grn_ajax.php', { action: 'uom_conversion_lookup', barcode: barcode, from_uom: fromUom }, function(data) {
+        var row = document.getElementById('gline_' + lineIdx);
+        if (!row) return;
+        if (data.found) {
+            row.querySelector('.gi-conv-factor').value = data.conversion_factor;
+            row.querySelector('.gi-inv-uom').value = data.to_uom;
+            recalcConversion(row.querySelector('.gi-qty'));
+        } else {
+            row.querySelector('.gi-conv-factor').value = 1;
+            row.querySelector('.gi-inv-uom').value = data.base_uom || fromUom;
+            recalcConversion(row.querySelector('.gi-qty'));
+        }
+    }, 'json');
+}
+
+function recalcConversion(qtyInput) {
+    var row = qtyInput.closest('tr');
+    var qty = parseFloat(qtyInput.value) || 0;
+    var factor = parseFloat(row.querySelector('.gi-conv-factor').value) || 1;
+    var invUom = row.querySelector('.gi-inv-uom').value || '';
+    var receiveUom = row.querySelector('.gi-receive-uom').value || '';
+    var converted = qty * factor;
+    row.querySelector('.gi-qty-converted').value = converted;
+
+    var displayEl = row.querySelector('.gi-converted-display');
+    if (factor !== 1 && invUom && receiveUom !== invUom) {
+        displayEl.innerHTML = '<strong style="color:#16a34a;">' + converted.toFixed(2) + ' ' + escHtml(invUom) + '</strong>';
+    } else if (invUom) {
+        displayEl.innerHTML = converted.toFixed(2) + ' ' + escHtml(invUom);
+    } else {
+        displayEl.textContent = '-';
+    }
 }
 
 function removeGRNLine(idx) {
@@ -584,7 +632,7 @@ function loadProducts(append) {
 }
 
 function selectProductFromModal(barcode, name, uom, rack) {
-    addGRNLine(null, barcode, name, null, 1, rack);
+    addGRNLine(null, barcode, name, null, 1, rack, uom);
 }
 
 // ==================== SUBMIT RECEIVE ====================
@@ -611,6 +659,10 @@ function submitReceive() {
                 product_desc: row.querySelector('.gi-desc').value,
                 qty_received: qty,
                 qty_rejected: parseFloat(row.querySelector('.gi-rejected').value) || 0,
+                receive_uom: row.querySelector('.gi-receive-uom').value || '',
+                conversion_factor: parseFloat(row.querySelector('.gi-conv-factor').value) || 1,
+                qty_converted: parseFloat(row.querySelector('.gi-qty-converted').value) || qty,
+                inventory_uom: row.querySelector('.gi-inv-uom').value || '',
                 batch_no: row.querySelector('.gi-batch').value,
                 exp_date: row.querySelector('.gi-exp').value,
                 rack_location: row.querySelector('.gi-rack').value
@@ -673,14 +725,22 @@ function viewGRN(id) {
             html += '</div>';
 
             html += '<table class="line-items-table">';
-            html += '<thead><tr><th>#</th><th>Product</th><th>Barcode</th><th>Received</th><th>Rejected</th><th>Batch No</th><th>Exp Date</th><th>Location</th></tr></thead>';
+            html += '<thead><tr><th>#</th><th>Product</th><th>Barcode</th><th>Received</th><th>Inv. Qty</th><th>Rejected</th><th>Batch No</th><th>Exp Date</th><th>Location</th></tr></thead>';
             html += '<tbody>';
             items.forEach(function(item, i) {
+                var recvUom = item.receive_uom || '';
+                var invUom = item.inventory_uom || '';
+                var qtyConv = item.qty_converted ? parseFloat(item.qty_converted) : null;
                 html += '<tr>';
                 html += '<td>' + (i + 1) + '</td>';
                 html += '<td>' + escHtml(item.product_desc) + '</td>';
                 html += '<td><small class="text-muted">' + escHtml(item.barcode) + '</small></td>';
-                html += '<td>' + parseFloat(item.qty_received || 0).toFixed(2) + '</td>';
+                html += '<td>' + parseFloat(item.qty_received || 0).toFixed(2) + (recvUom ? ' <small class="text-muted">' + escHtml(recvUom) + '</small>' : '') + '</td>';
+                if (qtyConv !== null && invUom) {
+                    html += '<td><strong style="color:#16a34a;">' + qtyConv.toFixed(2) + ' ' + escHtml(invUom) + '</strong></td>';
+                } else {
+                    html += '<td>-</td>';
+                }
                 html += '<td>' + parseFloat(item.qty_rejected || 0).toFixed(2) + '</td>';
                 html += '<td>' + escHtml(item.batch_no || '-') + '</td>';
                 html += '<td>' + escHtml(item.exp_date || '-') + '</td>';
