@@ -106,6 +106,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .tag-rack { background: #fef3c7; color: #92400e; }
 .tag-rack.unset { background: var(--bg); color: var(--text-muted); }
 .tag-rack-remark { background: #e0f2fe; color: #0369a1; }
+.tag-rack-date { background: #f3e8ff; color: #7c3aed; font-size: 9px; }
 .tag-btn { cursor: pointer; transition: all var(--transition); }
 .tag-btn:hover { opacity: 0.8; transform: translateY(-1px); }
 
@@ -193,6 +194,18 @@ function escHtml(s) {
 }
 function escAttr(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatRackDate(dt) {
+  if (!dt) return '';
+  var d = new Date(dt.replace(' ', 'T'));
+  if (isNaN(d.getTime())) return dt;
+  var day = ('0' + d.getDate()).slice(-2);
+  var mon = ('0' + (d.getMonth() + 1)).slice(-2);
+  var yr = d.getFullYear();
+  var hr = ('0' + d.getHours()).slice(-2);
+  var min = ('0' + d.getMinutes()).slice(-2);
+  return day + '/' + mon + '/' + yr + ' ' + hr + ':' + min;
 }
 
 var allCategories = [];
@@ -368,6 +381,9 @@ function renderProductCard(p, index) {
   tags += '<span class="' + rackClass + '" onclick="openRackModal(' + p.id + ', \'' + escAttr((p.rack_location || '').replace(/'/g, "\\'")) + '\')">&#9881; ' + rackLabel + '</span>';
   if (!p.rack_location) {
     tags += '<span class="tag tag-rack-remark tag-btn" onclick="openRackRemarkModal(' + p.id + ', \'' + escAttr((p.rack_location || '').replace(/'/g, "\\'")) + '\')">&#9998; Rack Remark</span>';
+  }
+  if (p.rack_updated_at) {
+    tags += '<span class="tag tag-rack-date">Updated: ' + formatRackDate(p.rack_updated_at) + '</span>';
   }
 
   return '<div class="product-card" data-id="' + p.id + '" data-name="' + escAttr(p.name.toLowerCase()) + '" data-sku="' + escAttr((p.sku || '').toLowerCase()) + '" data-barcode="' + escAttr((p.barcode || '').toLowerCase()) + '" style="animation-delay:' + (index+1)*0.03 + 's">' +
@@ -635,7 +651,7 @@ function saveRack() {
       try {
         var resp = JSON.parse(xhr.responseText);
         if (resp.success) {
-          updateProductRackInData(rackEditProductId, resp.rack);
+          updateProductRackInData(rackEditProductId, resp.rack, resp.rack_updated_at);
           closeRackModal();
         } else {
           alert('Failed: ' + (resp.error || 'Unknown error'));
@@ -669,7 +685,7 @@ function saveRackRemark() {
       try {
         var resp = JSON.parse(xhr.responseText);
         if (resp.success) {
-          updateProductRackInData(rackEditProductId, resp.rack);
+          updateProductRackInData(rackEditProductId, resp.rack, resp.rack_updated_at);
           closeRackRemarkModal();
         } else {
           alert('Failed: ' + (resp.error || 'Unknown error'));
@@ -680,13 +696,15 @@ function saveRackRemark() {
   xhr.send('action=update_rack&id=' + rackEditProductId + '&rack=' + encodeURIComponent(val));
 }
 
-function updateProductRackInData(productId, newRack) {
+function updateProductRackInData(productId, newRack, rackUpdatedAt) {
+  var nowStr = rackUpdatedAt || new Date().toISOString().slice(0,19).replace('T',' ');
   // Update the data model
   allCategories.forEach(function(cat) {
     cat.subcategories.forEach(function(sc) {
       sc.products.forEach(function(p) {
         if (p.id === productId) {
           p.rack_location = newRack || null;
+          p.rack_updated_at = nowStr;
         }
       });
     });
@@ -702,6 +720,7 @@ function updateProductRackInData(productId, newRack) {
       if (!newRack) {
         tagsInner += '<span class="tag tag-rack-remark tag-btn" onclick="openRackRemarkModal(' + productId + ', \'' + (newRack || '').replace(/'/g, "\\'") + '\')">&#9998; Rack Remark</span>';
       }
+      tagsInner += '<span class="tag tag-rack-date">Updated: ' + formatRackDate(nowStr) + '</span>';
       tagsEl.innerHTML = tagsInner;
     }
   }

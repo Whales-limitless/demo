@@ -41,7 +41,7 @@ while ($cat = mysqli_fetch_assoc($cat_result)) {
     $sub_result = mysqli_query($connect, "SELECT DISTINCT sub_code, sub_cat, MIN(sort_no) AS sort_order FROM category WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat['cat_code']) . "' GROUP BY sub_code, sub_cat ORDER BY sort_order ASC, sub_cat ASC");
     $subcategories = [];
     while ($sub = mysqli_fetch_assoc($sub_result)) {
-        $prod_result = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, IFNULL(qoh, 0) AS quantity FROM PRODUCTS WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat['cat_code']) . "' AND sub_code = '" . mysqli_real_escape_string($connect, $sub['sub_code']) . "' ORDER BY name ASC");
+        $prod_result = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, IFNULL(qoh, 0) AS quantity FROM PRODUCTS WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat['cat_code']) . "' AND sub_code = '" . mysqli_real_escape_string($connect, $sub['sub_code']) . "' ORDER BY name ASC");
         $products = [];
         while ($prod = mysqli_fetch_assoc($prod_result)) {
             $prod['id'] = intval($prod['id']);

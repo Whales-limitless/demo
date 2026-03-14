@@ -98,11 +98,25 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .line-items-table input:focus { border-color: var(--primary); outline: none; }
 .btn-remove-line { background: #fee2e2; color: #dc2626; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 12px; }
 .btn-remove-line:hover { background: #fca5a5; }
+.li-uom-wrap { display: flex; gap: 4px; align-items: center; }
+.li-uom-select { padding: 5px 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; font-family: 'DM Sans', sans-serif; outline: none; min-width: 80px; }
+.li-uom-select:focus { border-color: var(--primary); }
+.li-conv-indicator { font-size: 11px; line-height: 1.3; margin-top: 3px; padding: 2px 6px; border-radius: 4px; }
+.li-conv-indicator.converted { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.li-conv-indicator.no-conv { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+.li-conv-indicator.same-uom { background: #f3f4f6; color: #6b7280; }
 
 /* Detail view */
 .detail-section { background: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
 .detail-row { display: flex; gap: 16px; margin-bottom: 6px; font-size: 13px; }
 .detail-label { font-weight: 600; min-width: 130px; color: var(--text-muted); }
+
+/* New product image upload */
+.np-img-upload-area { border: 2px dashed #d1d5db; border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all var(--transition); background: #fafbfc; position: relative; }
+.np-img-upload-area:hover { border-color: var(--primary); background: #fff5f5; }
+.np-img-upload-area.has-image { border-style: solid; border-color: #d1d5db; padding: 8px; }
+.np-upload-placeholder { color: var(--text-muted); font-size: 13px; }
+.np-btn-remove-img { position: absolute; top: 4px; right: 4px; background: #ef4444; color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
 
 @media (max-width: 768px) {
     .page-content { padding: 16px; }
@@ -207,8 +221,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                                 <th style="width:40px">#</th>
                                 <th>Product</th>
                                 <th>Barcode</th>
-                                <th style="width:80px">UOM</th>
+                                <th style="width:120px">UOM</th>
                                 <th style="width:100px">Qty</th>
+                                <th style="width:140px">QOH Impact</th>
                                 <th style="width:40px"></th>
                             </tr>
                         </thead>
@@ -253,6 +268,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 <div class="psm-search-bar mb-3">
                     <input type="text" class="form-control" id="psmSearchInput" placeholder="Enter product name or barcode..." autocomplete="off">
                     <button type="button" class="psm-search-btn" onclick="doProductSearch();"><i class="fas fa-search"></i> Search</button>
+                    <button type="button" class="btn-add" onclick="openNewProductModal();" style="white-space:nowrap;"><i class="fas fa-plus"></i> New Product</button>
                 </div>
                 <div id="psmResultsContainer">
                     <div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Enter a search term and click Search</div>
@@ -262,11 +278,87 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
+<!-- Add New Product Modal -->
+<div class="modal fade" id="newProductModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-box"></i> Add New Product</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Barcode <span class="text-danger">*</span></label>
+                        <input type="text" id="npBarcode" class="form-control" placeholder="Product barcode">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Product Code</label>
+                        <input type="text" id="npCode" class="form-control" placeholder="Product code">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Product Name <span class="text-danger">*</span></label>
+                    <input type="text" id="npName" class="form-control" placeholder="Product name">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Description</label>
+                    <textarea id="npDescription" class="form-control" rows="2" placeholder="Product description"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Product Image</label>
+                    <input type="file" id="npImage" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none;" onchange="npPreviewImage(this);">
+                    <div class="np-img-upload-area" id="npImgUploadArea" onclick="document.getElementById('npImage').click();">
+                        <div class="np-upload-placeholder" id="npImgPlaceholder">
+                            <i class="fas fa-cloud-upload-alt" style="font-size:28px;display:block;margin-bottom:8px;color:#9ca3af;"></i>
+                            Click to upload image<br><small>JPG, PNG, GIF, WebP (max 10MB)</small>
+                        </div>
+                        <img id="npImgPreview" src="" alt="" style="display:none;max-width:100%;max-height:200px;border-radius:6px;object-fit:contain;">
+                        <button type="button" class="np-btn-remove-img" id="npBtnRemoveImg" style="display:none;" onclick="npRemoveImage(event);"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Category</label>
+                        <select id="npCat" class="form-select" onchange="npLoadSubCatOptions();"></select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Sub Category</label>
+                        <select id="npSubCat" class="form-select"><option value="">-- Select --</option></select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">UOM</label>
+                        <select id="npUom" class="form-select"><option value="">-- Select --</option></select>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">QOH</label>
+                        <input type="number" id="npQoh" class="form-control" min="0" placeholder="0" value="0">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Rack</label>
+                        <select id="npRackSelect" class="form-select"><option value="">-- Select --</option></select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Rack Remark</label>
+                        <input type="text" id="npRackRemark" class="form-control" placeholder="Rack remark (optional)">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success w-50" onclick="saveNewProduct();"><i class="fas fa-check"></i> Save & Add to PO</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-var poModal = null, viewModal = null, productSearchModal = null;
+var poModal = null, viewModal = null, productSearchModal = null, newProductModal = null;
 var currentStatus = '';
 var lineItemIndex = 0;
 
@@ -274,6 +366,7 @@ document.addEventListener('DOMContentLoaded', function() {
     poModal = new bootstrap.Modal(document.getElementById('poModal'));
     viewModal = new bootstrap.Modal(document.getElementById('viewModal'));
     productSearchModal = new bootstrap.Modal(document.getElementById('productSearchModal'));
+    newProductModal = new bootstrap.Modal(document.getElementById('newProductModal'));
     // Auto-focus search input when product search modal opens
     document.getElementById('productSearchModal').addEventListener('shown.bs.modal', function() {
         document.getElementById('psmSearchInput').focus();
@@ -390,6 +483,7 @@ function clearForm() {
 function openCreateModal() {
     clearForm();
     document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-invoice"></i> New Purchase Order';
+    loadPoUomCache();
     loadSuppliers(function() {
         poModal.show();
     });
@@ -400,6 +494,7 @@ function editPO(id) {
     document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-invoice"></i> Edit Purchase Order';
     document.getElementById('editId').value = id;
 
+    loadPoUomCache();
     loadSuppliers(function() {
         $.ajax({
             type: 'POST', url: 'po_ajax.php', data: { action: 'get', id: id }, dataType: 'json',
@@ -421,18 +516,57 @@ function editPO(id) {
 }
 
 // ==================== LINE ITEMS ====================
+var poUomCache = [];
+var poUomLoaded = false;
+
+function loadPoUomCache(callback) {
+    if (poUomLoaded) { if (callback) callback(); return; }
+    $.post('product_ajax.php', { action: 'uom_list' }, function(uoms) {
+        poUomCache = (uoms || []).filter(function(u) { return u.status === 'ACTIVE'; });
+        poUomLoaded = true;
+        if (callback) callback();
+    }, 'json');
+}
+
+function buildUomSelect(idx, selectedUom) {
+    var html = '<select class="li-uom-select li-uom" onchange="onLineUomChange(' + idx + ');">';
+    var found = false;
+    poUomCache.forEach(function(u) {
+        var sel = (u.name === selectedUom) ? ' selected' : '';
+        if (u.name === selectedUom) found = true;
+        html += '<option value="' + escHtml(u.name) + '"' + sel + '>' + escHtml(u.name) + '</option>';
+    });
+    // If the current UOM isn't in cache (e.g. from old data), add it
+    if (selectedUom && !found) {
+        html += '<option value="' + escHtml(selectedUom) + '" selected>' + escHtml(selectedUom) + '</option>';
+    }
+    html += '<option value="__add_new__">+ Add New UOM</option>';
+    html += '</select>';
+    return html;
+}
+
 function addLineItem(barcode, desc, uom, qty) {
     lineItemIndex++;
     var idx = lineItemIndex;
-    var html = '<tr id="line_' + idx + '">';
-    html += '<td>' + idx + '</td>';
-    html += '<td>' + escHtml(desc) + '<input type="hidden" class="li-barcode" value="' + escHtml(barcode) + '"><input type="hidden" class="li-desc" value="' + escHtml(desc) + '"></td>';
-    html += '<td><small class="text-muted">' + escHtml(barcode) + '</small></td>';
-    html += '<td><input type="text" class="li-uom" value="' + escHtml(uom || '') + '"></td>';
-    html += '<td><input type="number" class="li-qty" value="' + (parseFloat(qty) || 1) + '" min="0" step="any"></td>';
-    html += '<td><button class="btn-remove-line" onclick="removeLine(' + idx + ');"><i class="fas fa-times"></i></button></td>';
-    html += '</tr>';
-    document.getElementById('lineItems').insertAdjacentHTML('beforeend', html);
+
+    function render() {
+        var html = '<tr id="line_' + idx + '" data-base-uom="' + escHtml(uom || '') + '">';
+        html += '<td>' + idx + '</td>';
+        html += '<td>' + escHtml(desc) + '<input type="hidden" class="li-barcode" value="' + escHtml(barcode) + '"><input type="hidden" class="li-desc" value="' + escHtml(desc) + '"></td>';
+        html += '<td><small class="text-muted">' + escHtml(barcode) + '</small></td>';
+        html += '<td>' + buildUomSelect(idx, uom || '') + '</td>';
+        html += '<td><input type="number" class="li-qty" value="' + (parseFloat(qty) || 1) + '" min="0" step="any" onchange="onLineQtyChange(' + idx + ');" oninput="onLineQtyChange(' + idx + ');"></td>';
+        html += '<td class="li-impact-cell" id="impact_' + idx + '"><span class="li-conv-indicator same-uom">+' + (parseFloat(qty) || 1) + ' ' + escHtml(uom || '') + ' QOH</span></td>';
+        html += '<td><button class="btn-remove-line" onclick="removeLine(' + idx + ');"><i class="fas fa-times"></i></button></td>';
+        html += '</tr>';
+        document.getElementById('lineItems').insertAdjacentHTML('beforeend', html);
+    }
+
+    if (!poUomLoaded) {
+        loadPoUomCache(render);
+    } else {
+        render();
+    }
 }
 
 function removeLine(idx) {
@@ -444,6 +578,93 @@ function removeLine(idx) {
 function renumberLines() {
     var rows = document.querySelectorAll('#lineItems tr');
     rows.forEach(function(r, i) { r.cells[0].textContent = i + 1; });
+}
+
+function onLineUomChange(idx) {
+    var row = document.getElementById('line_' + idx);
+    if (!row) return;
+    var sel = row.querySelector('.li-uom');
+    if (sel.value === '__add_new__') {
+        // Prompt for new UOM name
+        Swal.fire({
+            title: 'Add New UOM',
+            input: 'text',
+            inputPlaceholder: 'e.g. CTN, BOX, PACK',
+            showCancelButton: true,
+            confirmButtonText: 'Add',
+            inputValidator: function(v) { if (!v || !v.trim()) return 'UOM name is required.'; }
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                var newName = result.value.trim().toUpperCase();
+                $.post('product_ajax.php', { action: 'uom_create', name: newName }, function(r) {
+                    if (r.success) {
+                        poUomCache.push({ id: r.id, name: newName, status: 'ACTIVE' });
+                        // Rebuild this select with new UOM selected
+                        var td = sel.parentElement;
+                        td.innerHTML = buildUomSelect(idx, newName);
+                        updateConversionIndicator(idx);
+                    } else if (r.error && r.error.indexOf('already exists') > -1) {
+                        // UOM exists, just select it
+                        var exists = poUomCache.find(function(u) { return u.name === newName; });
+                        if (!exists) poUomCache.push({ id: 0, name: newName, status: 'ACTIVE' });
+                        var td = sel.parentElement;
+                        td.innerHTML = buildUomSelect(idx, newName);
+                        updateConversionIndicator(idx);
+                    } else {
+                        Swal.fire({ icon: 'error', text: r.error || 'Failed to create UOM.' });
+                        sel.value = row.getAttribute('data-base-uom') || '';
+                    }
+                }, 'json');
+            } else {
+                // Cancelled - revert to base UOM
+                sel.value = row.getAttribute('data-base-uom') || '';
+            }
+        });
+        return;
+    }
+    updateConversionIndicator(idx);
+}
+
+function onLineQtyChange(idx) {
+    updateConversionIndicator(idx);
+}
+
+function updateConversionIndicator(idx) {
+    var row = document.getElementById('line_' + idx);
+    if (!row) return;
+    var barcode = row.querySelector('.li-barcode').value;
+    var selectedUom = row.querySelector('.li-uom').value;
+    var baseUom = row.getAttribute('data-base-uom') || '';
+    var qty = parseFloat(row.querySelector('.li-qty').value) || 0;
+    var cell = document.getElementById('impact_' + idx);
+
+    if (qty <= 0) {
+        cell.innerHTML = '<span class="li-conv-indicator same-uom">No qty</span>';
+        return;
+    }
+
+    // Same UOM or no base UOM — direct 1:1
+    if (!baseUom || selectedUom === baseUom) {
+        cell.innerHTML = '<span class="li-conv-indicator same-uom">+' + qty + ' ' + escHtml(baseUom || selectedUom) + ' QOH</span>';
+        return;
+    }
+
+    // Different UOM — look up conversion
+    cell.innerHTML = '<span class="li-conv-indicator no-conv"><i class="fas fa-spinner fa-spin"></i></span>';
+    $.post('product_ajax.php', { action: 'uom_conversion_lookup', barcode: barcode, from_uom: selectedUom }, function(data) {
+        if (data.found) {
+            var converted = qty * data.conversion_factor;
+            cell.innerHTML = '<span class="li-conv-indicator converted">' +
+                '<strong>+' + converted + ' ' + escHtml(data.to_uom) + '</strong> QOH' +
+                '<br><small>' + qty + ' ' + escHtml(selectedUom) + ' x ' + data.conversion_factor + '</small>' +
+                '</span>';
+        } else {
+            cell.innerHTML = '<span class="li-conv-indicator no-conv">' +
+                '+' + qty + ' ' + escHtml(selectedUom) + ' QOH' +
+                '<br><small>No conversion set (1:1)</small>' +
+                '</span>';
+        }
+    }, 'json');
 }
 
 // ==================== PRODUCT SEARCH MODAL ====================
@@ -679,6 +900,195 @@ function cancelPO(id, poNumber) {
                     }
                 }
             });
+        }
+    });
+}
+
+// ==================== NEW PRODUCT FROM PO ====================
+var npCategoriesCache = [];
+var npUomCache = [];
+var npRacksCache = [];
+var npDropdownsLoaded = false;
+
+function openNewProductModal() {
+    // Clear form
+    document.getElementById('npBarcode').value = '';
+    document.getElementById('npCode').value = '';
+    document.getElementById('npName').value = '';
+    document.getElementById('npDescription').value = '';
+    document.getElementById('npQoh').value = '0';
+    document.getElementById('npRackRemark').value = '';
+    document.getElementById('npImage').value = '';
+    document.getElementById('npImgPreview').style.display = 'none';
+    document.getElementById('npImgPreview').src = '';
+    document.getElementById('npImgPlaceholder').style.display = '';
+    document.getElementById('npBtnRemoveImg').style.display = 'none';
+    document.getElementById('npImgUploadArea').classList.remove('has-image');
+    document.getElementById('npSubCat').innerHTML = '<option value="">-- Select --</option>';
+
+    if (!npDropdownsLoaded) {
+        npLoadDropdowns(function() {
+            newProductModal.show();
+        });
+    } else {
+        npRefreshDropdowns();
+        newProductModal.show();
+    }
+}
+
+function npLoadDropdowns(callback) {
+    var pending = 3;
+    function done() { pending--; if (pending === 0) { npDropdownsLoaded = true; if (callback) callback(); } }
+
+    $.post('product_ajax.php', { action: 'cat_list' }, function(cats) {
+        npCategoriesCache = (cats || []).filter(function(c) { return c.status === 'ACTIVE'; });
+        npRefreshCatSelect();
+        done();
+    }, 'json');
+
+    $.post('product_ajax.php', { action: 'uom_list' }, function(uoms) {
+        npUomCache = (uoms || []).filter(function(u) { return u.status === 'ACTIVE'; });
+        npRefreshUomSelect();
+        done();
+    }, 'json');
+
+    $.post('product_ajax.php', { action: 'rack_list' }, function(racks) {
+        npRacksCache = racks || [];
+        npRefreshRackSelect();
+        done();
+    }, 'json');
+}
+
+function npRefreshDropdowns() {
+    npRefreshCatSelect();
+    npRefreshUomSelect();
+    npRefreshRackSelect();
+}
+
+function npRefreshCatSelect() {
+    var sel = document.getElementById('npCat');
+    sel.innerHTML = '<option value="">-- Select --</option>';
+    npCategoriesCache.forEach(function(c) {
+        sel.innerHTML += '<option value="' + escHtml(c.ccode) + '" data-name="' + escHtml(c.name) + '" data-id="' + c.id + '">' + escHtml(c.name) + '</option>';
+    });
+}
+
+function npRefreshUomSelect() {
+    var sel = document.getElementById('npUom');
+    sel.innerHTML = '<option value="">-- Select --</option>';
+    npUomCache.forEach(function(u) {
+        sel.innerHTML += '<option value="' + escHtml(u.name) + '">' + escHtml(u.name) + '</option>';
+    });
+}
+
+function npRefreshRackSelect() {
+    var sel = document.getElementById('npRackSelect');
+    sel.innerHTML = '<option value="">-- Select --</option>';
+    npRacksCache.forEach(function(r) {
+        sel.innerHTML += '<option value="' + escHtml(r.code) + '">' + escHtml(r.code) + (r.description ? ' - ' + escHtml(r.description) : '') + '</option>';
+    });
+}
+
+function npLoadSubCatOptions() {
+    var catCode = document.getElementById('npCat').value;
+    var sel = document.getElementById('npSubCat');
+    sel.innerHTML = '<option value="">-- Select --</option>';
+    if (!catCode) return;
+
+    var catObj = npCategoriesCache.find(function(c) { return c.ccode === catCode; });
+    if (!catObj) return;
+
+    $.post('product_ajax.php', { action: 'subcat_list', category_id: catObj.id }, function(subs) {
+        (subs || []).forEach(function(s) {
+            sel.innerHTML += '<option value="' + escHtml(s.sub_code) + '" data-name="' + escHtml(s.name) + '">' + escHtml(s.name) + '</option>';
+        });
+    }, 'json');
+}
+
+function npPreviewImage(input) {
+    if (input.files && input.files[0]) {
+        var file = input.files[0];
+        if (file.size > 10 * 1024 * 1024) {
+            Swal.fire({ icon: 'warning', text: 'Image must be smaller than 10MB.' });
+            input.value = '';
+            return;
+        }
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('npImgPreview').src = e.target.result;
+            document.getElementById('npImgPreview').style.display = '';
+            document.getElementById('npImgPlaceholder').style.display = 'none';
+            document.getElementById('npBtnRemoveImg').style.display = 'flex';
+            document.getElementById('npImgUploadArea').classList.add('has-image');
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function npRemoveImage(e) {
+    e.stopPropagation();
+    document.getElementById('npImage').value = '';
+    document.getElementById('npImgPreview').style.display = 'none';
+    document.getElementById('npImgPreview').src = '';
+    document.getElementById('npImgPlaceholder').style.display = '';
+    document.getElementById('npBtnRemoveImg').style.display = 'none';
+    document.getElementById('npImgUploadArea').classList.remove('has-image');
+}
+
+function saveNewProduct() {
+    var barcode = document.getElementById('npBarcode').value.trim();
+    var name = document.getElementById('npName').value.trim();
+
+    if (barcode === '' || name === '') {
+        Swal.fire({ icon: 'warning', text: 'Barcode and product name are required.' });
+        return;
+    }
+
+    var catSel = document.getElementById('npCat');
+    var subSel = document.getElementById('npSubCat');
+    var catCode = catSel.value.trim();
+    var subCode = subSel.value.trim();
+    var catName = catSel.selectedOptions[0] ? (catSel.selectedOptions[0].getAttribute('data-name') || catSel.selectedOptions[0].textContent) : '';
+    var subName = subSel.selectedOptions[0] ? (subSel.selectedOptions[0].getAttribute('data-name') || subSel.selectedOptions[0].textContent) : '';
+    if (catSel.value === '') { catName = ''; catCode = ''; }
+    if (subSel.value === '') { subName = ''; subCode = ''; }
+
+    var formData = new FormData();
+    formData.append('action', 'create');
+    formData.append('barcode', barcode);
+    formData.append('code', document.getElementById('npCode').value.trim());
+    formData.append('name', name);
+    formData.append('description', document.getElementById('npDescription').value.trim());
+    formData.append('cat', catName);
+    formData.append('sub_cat', subName);
+    formData.append('cat_code', catCode);
+    formData.append('sub_code', subCode);
+    formData.append('uom', document.getElementById('npUom').value.trim());
+    formData.append('qoh', document.getElementById('npQoh').value);
+    formData.append('rack', document.getElementById('npRackSelect').value.trim());
+    formData.append('rack_remark', document.getElementById('npRackRemark').value.trim());
+    formData.append('checked', 'Y');
+    formData.append('existing_image', '');
+    formData.append('remove_image', '0');
+
+    var imageFile = document.getElementById('npImage').files[0];
+    if (imageFile) {
+        formData.append('product_image', imageFile);
+    }
+
+    $.ajax({
+        type: 'POST', url: 'product_ajax.php', data: formData, dataType: 'json',
+        processData: false, contentType: false,
+        success: function(data) {
+            if (data.success) {
+                var uom = document.getElementById('npUom').value.trim();
+                newProductModal.hide();
+                // Auto-add the new product as a line item
+                addLineItem(barcode, name, uom, 1);
+                Swal.fire({ icon: 'success', text: 'Product created and added to PO.', timer: 1500, showConfirmButton: false });
+            } else {
+                Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
+            }
         }
     });
 }

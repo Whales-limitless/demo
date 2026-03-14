@@ -293,6 +293,19 @@ if ($action === 'list') {
     $stmt = $connect->prepare("INSERT INTO `rack_product` (`rack_id`, `barcode`) VALUES (?, ?)");
     $stmt->bind_param("is", $rackId, $barcode);
     if ($stmt->execute()) {
+        // Update rack_updated_at and rack field on PRODUCTS
+        $rackCodeStmt = $connect->prepare("SELECT `code` FROM `rack` WHERE `id` = ? LIMIT 1");
+        $rackCodeStmt->bind_param("i", $rackId);
+        $rackCodeStmt->execute();
+        $rackCodeRow = $rackCodeStmt->get_result()->fetch_assoc();
+        $rackCodeStmt->close();
+        $rackCode = $rackCodeRow ? $rackCodeRow['code'] : '';
+
+        $updStmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = NOW() WHERE `barcode` = ?");
+        $updStmt->bind_param("ss", $rackCode, $barcode);
+        $updStmt->execute();
+        $updStmt->close();
+
         echo json_encode(['success' => 'Product added to rack.']);
     } else {
         if (strpos($connect->error, 'Duplicate') !== false) {
@@ -312,20 +325,32 @@ if ($action === 'list') {
         exit;
     }
 
+    // Get rack code for updating PRODUCTS table
+    $rackCodeStmt = $connect->prepare("SELECT `code` FROM `rack` WHERE `id` = ? LIMIT 1");
+    $rackCodeStmt->bind_param("i", $rackId);
+    $rackCodeStmt->execute();
+    $rackCodeRow = $rackCodeStmt->get_result()->fetch_assoc();
+    $rackCodeStmt->close();
+    $rackCode = $rackCodeRow ? $rackCodeRow['code'] : '';
+
     $added = 0;
     $skipped = 0;
     $stmt = $connect->prepare("INSERT INTO `rack_product` (`rack_id`, `barcode`) VALUES (?, ?)");
+    $updStmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = NOW() WHERE `barcode` = ?");
     foreach ($barcodes as $bc) {
         $bc = trim($bc);
         if ($bc === '') continue;
         $stmt->bind_param("is", $rackId, $bc);
         if ($stmt->execute()) {
             $added++;
+            $updStmt->bind_param("ss", $rackCode, $bc);
+            $updStmt->execute();
         } else {
             $skipped++;
         }
     }
     $stmt->close();
+    $updStmt->close();
 
     echo json_encode(['success' => $added . ' product(s) added, ' . $skipped . ' skipped (already assigned).']);
 
@@ -336,9 +361,24 @@ if ($action === 'list') {
         exit;
     }
 
+    // Get the barcode before deleting
+    $bcStmt = $connect->prepare("SELECT `barcode` FROM `rack_product` WHERE `id` = ? LIMIT 1");
+    $bcStmt->bind_param("i", $mappingId);
+    $bcStmt->execute();
+    $bcRow = $bcStmt->get_result()->fetch_assoc();
+    $bcStmt->close();
+    $removedBarcode = $bcRow ? $bcRow['barcode'] : '';
+
     $stmt = $connect->prepare("DELETE FROM `rack_product` WHERE `id` = ?");
     $stmt->bind_param("i", $mappingId);
     if ($stmt->execute()) {
+        // Update rack_updated_at and clear rack on PRODUCTS
+        if ($removedBarcode !== '') {
+            $updStmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = '', `rack_updated_at` = NOW() WHERE `barcode` = ?");
+            $updStmt->bind_param("s", $removedBarcode);
+            $updStmt->execute();
+            $updStmt->close();
+        }
         echo json_encode(['success' => 'Product removed from rack.']);
     } else {
         echo json_encode(['error' => 'Failed: ' . $connect->error]);
