@@ -10,10 +10,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 include('../staff/dbconnection.php');
 $connect->set_charset("utf8mb4");
 
-$customers = [];
-$result = $connect->query("SELECT * FROM `del_customer` ORDER BY `NAME` ASC");
-if ($result) { while ($r = $result->fetch_assoc()) { $customers[] = $r; } }
-
 $locations = [];
 $locResult = $connect->query("SELECT * FROM `del_location` ORDER BY `NAME` ASC");
 if ($locResult) { while ($r = $locResult->fetch_assoc()) { $locations[] = $r; } }
@@ -76,32 +72,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
     <div class="table-card">
         <div class="table-toolbar">
-            <div class="search-box"><i class="fas fa-search"></i><input type="text" id="searchInput" placeholder="Search customers..."></div>
-            <div class="item-count" id="itemCount"><?php echo count($customers); ?> customer(s)</div>
+            <div style="display:flex;gap:8px;flex:1;max-width:420px;">
+                <div class="search-box" style="max-width:none;flex:1;"><i class="fas fa-search"></i><input type="text" id="searchInput" placeholder="Search customers..." onkeydown="if(event.key==='Enter')searchCustomers();"></div>
+                <button class="btn-add" style="padding:9px 16px;" onclick="searchCustomers();"><i class="fas fa-search"></i> Search</button>
+            </div>
+            <div class="item-count" id="itemCount">0 customer(s)</div>
         </div>
-        <div style="overflow-x:auto;">
+        <div style="overflow-x:auto;max-height:70vh;overflow-y:auto;" id="tableScroll">
             <table class="data-table">
-                <thead><tr><th style="width:40px">No</th><th>Code</th><th>Name</th><th>Location</th><th>Address</th><th>Phone</th><th>Email</th><th style="width:1%">Action</th></tr></thead>
+                <thead style="position:sticky;top:0;z-index:1;"><tr><th style="width:40px">No</th><th>Code</th><th>Name</th><th>Location</th><th>Address</th><th>Phone</th><th>Email</th><th style="width:1%">Action</th></tr></thead>
                 <tbody id="dataBody">
-                    <?php if (count($customers) === 0): ?>
-                    <tr class="no-results"><td colspan="8"><i class="fas fa-address-book" style="font-size:24px;margin-bottom:8px;display:block;"></i>No customers found</td></tr>
-                    <?php else: ?>
-                    <?php foreach ($customers as $i => $c): ?>
-                    <tr data-search="<?php echo htmlspecialchars(strtolower(($c['CODE'] ?? '') . ' ' . ($c['NAME'] ?? '') . ' ' . ($c['LOCATION'] ?? '') . ' ' . ($c['HP'] ?? '') . ' ' . ($c['EMAIL'] ?? ''))); ?>">
-                        <td><?php echo $i + 1; ?></td>
-                        <td><strong><?php echo htmlspecialchars($c['CODE'] ?? ''); ?></strong></td>
-                        <td><?php echo htmlspecialchars($c['NAME'] ?? ''); ?></td>
-                        <td><?php echo htmlspecialchars($c['LOCATION'] ?? ''); ?></td>
-                        <td><?php echo htmlspecialchars($c['ADDRESS'] ?? ''); ?></td>
-                        <td><?php echo htmlspecialchars($c['HP'] ?? ''); ?></td>
-                        <td><?php echo htmlspecialchars($c['EMAIL'] ?? ''); ?></td>
-                        <td style="white-space:nowrap">
-                            <button class="btn-action btn-edit" onclick="openEditModal(<?php echo (int)$c['ID']; ?>);"><i class="fas fa-pen"></i> Edit</button>
-                            <button class="btn-action btn-delete" onclick="deleteItem(<?php echo (int)$c['ID']; ?>, '<?php echo htmlspecialchars($c['NAME'] ?? '', ENT_QUOTES); ?>');"><i class="fas fa-trash"></i></button>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                    <?php endif; ?>
+                    <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -160,16 +141,86 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 var modal = null;
-document.addEventListener('DOMContentLoaded', function() { modal = new bootstrap.Modal(document.getElementById('formModal')); });
+var currentOffset = 0;
+var totalCustomers = 0;
+var pageSize = 50;
+var isLoading = false;
+var currentSearch = '';
 
-document.getElementById('searchInput').addEventListener('input', function() {
-    var q = this.value.toLowerCase();
-    var rows = document.querySelectorAll('#dataBody tr:not(.no-results)');
-    var count = 0;
-    rows.forEach(function(row) { var d = row.getAttribute('data-search') || ''; if (d.indexOf(q) > -1) { row.style.display = ''; count++; } else { row.style.display = 'none'; } });
-    document.getElementById('itemCount').textContent = count + ' customer(s)';
-    var num = 1; rows.forEach(function(row) { if (row.style.display !== 'none') row.cells[0].textContent = num++; });
+document.addEventListener('DOMContentLoaded', function() {
+    modal = new bootstrap.Modal(document.getElementById('formModal'));
+    loadCustomers(true);
+
+    // Scroll to load more
+    document.getElementById('tableScroll').addEventListener('scroll', function() {
+        var el = this;
+        if (isLoading) return;
+        if (currentOffset >= totalCustomers) return;
+        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 100) {
+            loadCustomers(false);
+        }
+    });
 });
+
+function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function searchCustomers() {
+    currentSearch = document.getElementById('searchInput').value.trim();
+    currentOffset = 0;
+    loadCustomers(true);
+}
+
+function loadCustomers(reset) {
+    if (isLoading) return;
+    isLoading = true;
+
+    if (reset) {
+        currentOffset = 0;
+        document.getElementById('dataBody').innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+    }
+
+    $.ajax({
+        type: 'POST', url: 'del_customer_ajax.php', dataType: 'json',
+        data: { action: 'list', search: currentSearch, offset: currentOffset, limit: pageSize },
+        success: function(data) {
+            if (data.error) { isLoading = false; return; }
+            totalCustomers = data.total || 0;
+            document.getElementById('itemCount').textContent = totalCustomers + ' customer(s)';
+
+            var customers = data.customers || [];
+            var tbody = document.getElementById('dataBody');
+
+            if (reset) tbody.innerHTML = '';
+
+            if (customers.length === 0 && currentOffset === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-address-book" style="font-size:24px;margin-bottom:8px;display:block;"></i>No customers found</td></tr>';
+                isLoading = false;
+                return;
+            }
+
+            var html = customers.map(function(c, i) {
+                var num = currentOffset + i + 1;
+                return '<tr>' +
+                    '<td>' + num + '</td>' +
+                    '<td><strong>' + escHtml(c.CODE||'') + '</strong></td>' +
+                    '<td>' + escHtml(c.NAME||'') + '</td>' +
+                    '<td>' + escHtml(c.LOCATION||'') + '</td>' +
+                    '<td>' + escHtml(c.ADDRESS||'') + '</td>' +
+                    '<td>' + escHtml(c.HP||'') + '</td>' +
+                    '<td>' + escHtml(c.EMAIL||'') + '</td>' +
+                    '<td style="white-space:nowrap">' +
+                        '<button class="btn-action btn-edit" onclick="openEditModal(' + c.ID + ');"><i class="fas fa-pen"></i> Edit</button> ' +
+                        '<button class="btn-action btn-delete" onclick="deleteItem(' + c.ID + ',\'' + escHtml(c.NAME||'').replace(/'/g, "\\'") + '\');"><i class="fas fa-trash"></i></button>' +
+                    '</td></tr>';
+            }).join('');
+
+            tbody.insertAdjacentHTML('beforeend', html);
+            currentOffset += customers.length;
+            isLoading = false;
+        },
+        error: function() { isLoading = false; }
+    });
+}
 
 function clearForm() {
     document.getElementById('editId').value = '';
@@ -211,7 +262,7 @@ function saveItem() {
     $.ajax({
         type: 'POST', url: 'del_customer_ajax.php', data: postData, dataType: 'json',
         success: function(data) {
-            if (data.success) { modal.hide(); Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { location.reload(); }); }
+            if (data.success) { modal.hide(); Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadCustomers(true); }); }
             else { Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' }); }
         }
     });
@@ -221,7 +272,10 @@ function deleteItem(id, name) {
     Swal.fire({ title: 'Delete customer?', text: 'Remove "' + name + '"?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Yes, Delete' }).then(function(result) {
         if (result.isConfirmed) {
             $.ajax({ type: 'POST', url: 'del_customer_ajax.php', data: { action: 'delete', id: id }, dataType: 'json',
-                success: function(data) { if (data.success) { Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { location.reload(); }); } else { Swal.fire({ icon: 'error', text: data.error || 'Failed.' }); } }
+                success: function(data) {
+                    if (data.success) { Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadCustomers(true); }); }
+                    else { Swal.fire({ icon: 'error', text: data.error || 'Failed.' }); }
+                }
             });
         }
     });
