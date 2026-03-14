@@ -18,14 +18,14 @@ $driver = trim($_POST['driver'] ?? '');
 $location = trim($_POST['location'] ?? '');
 
 if ($action === 'summary') {
-    $where = "WHERE (STATUS = 'D' OR STATUS = 'C') AND DELDATE >= ? AND DELDATE <= ?";
+    $where = "WHERE (o.STATUS = 'D' OR o.STATUS = 'C') AND o.DELDATE >= ? AND o.DELDATE <= ?";
     $params = [$startDate, $endDate];
     $types = "ss";
 
-    if ($driver !== '') { $where .= " AND DRIVERCODE = ?"; $params[] = $driver; $types .= "s"; }
-    if ($location !== '') { $where .= " AND LOCATION = ?"; $params[] = $location; $types .= "s"; }
+    if ($driver !== '') { $where .= " AND o.DRIVERCODE = ?"; $params[] = $driver; $types .= "s"; }
+    if ($location !== '') { $where .= " AND o.LOCATION = ?"; $params[] = $location; $types .= "s"; }
 
-    $sql = "SELECT DRIVER, COUNT(*) AS total_orders, SUM(CAST(DISTANT AS DECIMAL(10,2))) AS total_distance, SUM(CAST(RETAIL AS DECIMAL(10,2))) AS total_commission FROM `del_orderlist` $where GROUP BY DRIVER, DRIVERCODE ORDER BY DRIVER ASC";
+    $sql = "SELECT o.DRIVER, COUNT(*) AS total_orders, SUM(CAST(CASE WHEN o.DISTANT IS NULL OR o.DISTANT = '' OR o.DISTANT = '0' OR o.DISTANT = '0.00' THEN IFNULL(l.DISTANT, 0) ELSE o.DISTANT END AS DECIMAL(10,2))) AS total_distance, SUM(CAST(CASE WHEN o.RETAIL IS NULL OR o.RETAIL = '' OR o.RETAIL = '0' OR o.RETAIL = '0.00' THEN IFNULL(l.RETAIL, 0) ELSE o.RETAIL END AS DECIMAL(10,2))) AS total_commission FROM `del_orderlist` o LEFT JOIN `del_location` l ON o.LOCATION = l.NAME $where GROUP BY o.DRIVER, o.DRIVERCODE ORDER BY o.DRIVER ASC";
     $stmt = $connect->prepare($sql);
     $stmt->bind_param($types, ...$params);
     $stmt->execute();
@@ -36,14 +36,14 @@ if ($action === 'summary') {
     echo json_encode(['rows' => $rows]);
 
 } elseif ($action === 'detailed') {
-    $where = "WHERE (STATUS = 'D' OR STATUS = 'C') AND DELDATE >= ? AND DELDATE <= ?";
+    $where = "WHERE (o.STATUS = 'D' OR o.STATUS = 'C') AND o.DELDATE >= ? AND o.DELDATE <= ?";
     $params = [$startDate, $endDate];
     $types = "ss";
 
-    if ($driver !== '') { $where .= " AND DRIVERCODE = ?"; $params[] = $driver; $types .= "s"; }
-    if ($location !== '') { $where .= " AND LOCATION = ?"; $params[] = $location; $types .= "s"; }
+    if ($driver !== '') { $where .= " AND o.DRIVERCODE = ?"; $params[] = $driver; $types .= "s"; }
+    if ($location !== '') { $where .= " AND o.LOCATION = ?"; $params[] = $location; $types .= "s"; }
 
-    $sql = "SELECT ORDNO, DELDATE, DRIVER, CUSTOMER, LOCATION, DISTANT, RETAIL, CAST(DONEDATETIME AS TIME) AS DONETIME FROM `del_orderlist` $where ORDER BY DELDATE DESC, ORDNO ASC";
+    $sql = "SELECT o.ORDNO, o.DELDATE, o.DRIVER, o.CUSTOMER, o.LOCATION, CASE WHEN o.DISTANT IS NULL OR o.DISTANT = '' OR o.DISTANT = '0' OR o.DISTANT = '0.00' THEN IFNULL(l.DISTANT, '0.00') ELSE o.DISTANT END AS DISTANT, CASE WHEN o.RETAIL IS NULL OR o.RETAIL = '' OR o.RETAIL = '0' OR o.RETAIL = '0.00' THEN IFNULL(l.RETAIL, '0.00') ELSE o.RETAIL END AS RETAIL, CAST(o.DONEDATETIME AS TIME) AS DONETIME FROM `del_orderlist` o LEFT JOIN `del_location` l ON o.LOCATION = l.NAME $where ORDER BY o.DELDATE DESC, o.ORDNO ASC";
     $stmt = $connect->prepare($sql);
     $stmt->bind_param($types, ...$params);
     $stmt->execute();

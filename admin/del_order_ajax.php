@@ -62,6 +62,20 @@ if ($action === 'list') {
         exit;
     }
 
+    // Auto-populate distance and commission from location master if not provided
+    if ($location !== '' && ($distant === '' || $retail === '')) {
+        $locStmt = $connect->prepare("SELECT `DISTANT`, `RETAIL` FROM `del_location` WHERE `NAME` = ? LIMIT 1");
+        $locStmt->bind_param("s", $location);
+        $locStmt->execute();
+        $locResult = $locStmt->get_result();
+        if ($locResult->num_rows > 0) {
+            $locRow = $locResult->fetch_assoc();
+            if ($distant === '') { $distant = $locRow['DISTANT']; }
+            if ($retail === '') { $retail = $locRow['RETAIL']; }
+        }
+        $locStmt->close();
+    }
+
     // Check duplicate
     $chk = $connect->prepare("SELECT ID FROM `del_orderlist` WHERE `ORDNO` = ? LIMIT 1");
     $chk->bind_param("s", $ordno);
@@ -141,6 +155,20 @@ if ($action === 'list') {
     if ($id <= 0 || $ordno === '' || $deldate === '' || $customercode === '') {
         echo json_encode(['error' => 'Order No, Date and Customer are required.']);
         exit;
+    }
+
+    // Auto-populate distance and commission from location master if not provided
+    if ($location !== '' && ($distant === '' || $retail === '')) {
+        $locStmt = $connect->prepare("SELECT `DISTANT`, `RETAIL` FROM `del_location` WHERE `NAME` = ? LIMIT 1");
+        $locStmt->bind_param("s", $location);
+        $locStmt->execute();
+        $locResult = $locStmt->get_result();
+        if ($locResult->num_rows > 0) {
+            $locRow = $locResult->fetch_assoc();
+            if ($distant === '') { $distant = $locRow['DISTANT']; }
+            if ($retail === '') { $retail = $locRow['RETAIL']; }
+        }
+        $locStmt->close();
     }
 
     // Get current ordno for the record
