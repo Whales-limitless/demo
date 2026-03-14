@@ -177,12 +177,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>QOH</th>
                         <th>Rack</th>
                         <th>Rack Remark</th>
+                        <th>Rack Updated</th>
                         <th>Status</th>
                         <th style="width:1%">Action</th>
                     </tr>
                 </thead>
                 <tbody id="dataBody">
-                    <tr class="no-results"><td colspan="10" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
+                    <tr class="no-results"><td colspan="11" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -447,7 +448,7 @@ function fetchProducts(page, restoreScrollY) {
 
     // Skip loading indicator when restoring scroll position (e.g. after save)
     if (restoreScrollY === undefined) {
-        document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
+        document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="11" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
     }
 
     // Ensure racks are loaded before fetching products (needed for inline dropdowns)
@@ -470,7 +471,7 @@ function fetchProducts(page, restoreScrollY) {
             window.scrollTo(0, restoreScrollY);
         }
     }, function() {
-        document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
+        document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="11"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
     });
 }
 
@@ -480,7 +481,7 @@ function renderTable(data) {
     var offset = (data.page - 1) * data.per_page;
 
     if (products.length === 0) {
-        tbody.innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-boxes-stacked" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products found</td></tr>';
+        tbody.innerHTML = '<tr class="no-results"><td colspan="11"><i class="fas fa-boxes-stacked" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products found</td></tr>';
         document.getElementById('itemCount').textContent = '0 product(s)';
         return;
     }
@@ -513,6 +514,7 @@ function renderTable(data) {
         html += '</select>';
         html += '</td>';
         html += '<td style="font-size:12px;color:var(--text-muted);">' + escHtml(p.rack_remark || '') + '</td>';
+        html += '<td style="font-size:11px;color:var(--text-muted);white-space:nowrap;">' + (p.rack_updated_at ? formatRackDate(p.rack_updated_at) : '') + '</td>';
         html += '<td><span class="badge-status ' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? 'Active' : 'Inactive') + '</span></td>';
         html += '<td style="white-space:nowrap">';
         html += '<button class="btn-action btn-edit" onclick="openEditModal(' + p.id + ');"><i class="fas fa-pen"></i> Edit</button>';
@@ -568,6 +570,18 @@ function escHtml(s) {
     var d = document.createElement('div');
     d.appendChild(document.createTextNode(s));
     return d.innerHTML;
+}
+
+function formatRackDate(dt) {
+    if (!dt) return '';
+    var d = new Date(dt.replace(' ', 'T'));
+    if (isNaN(d.getTime())) return dt;
+    var day = ('0' + d.getDate()).slice(-2);
+    var mon = ('0' + (d.getMonth() + 1)).slice(-2);
+    var yr = d.getFullYear();
+    var hr = ('0' + d.getHours()).slice(-2);
+    var min = ('0' + d.getMinutes()).slice(-2);
+    return day + '/' + mon + '/' + yr + ' ' + hr + ':' + min;
 }
 
 // ===================== DROPDOWNS =====================

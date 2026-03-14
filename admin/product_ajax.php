@@ -127,6 +127,12 @@ if ($chkCol && $chkCol->num_rows === 0) {
     $connect->query("ALTER TABLE `PRODUCTS` ADD COLUMN `rack_remark` VARCHAR(255) DEFAULT NULL AFTER `rack`");
 }
 
+// ===================== ENSURE rack_updated_at COLUMN =====================
+$chkCol2 = $connect->query("SHOW COLUMNS FROM `PRODUCTS` LIKE 'rack_updated_at'");
+if ($chkCol2 && $chkCol2->num_rows === 0) {
+    $connect->query("ALTER TABLE `PRODUCTS` ADD COLUMN `rack_updated_at` DATETIME DEFAULT NULL AFTER `rack_remark`");
+}
+
 // ===================== PRODUCT ACTIONS =====================
 
 if ($action === 'list') {
@@ -189,7 +195,7 @@ if ($action === 'list') {
     $offset = ($page - 1) * $perPage;
 
     // Fetch page
-    $sql = "SELECT `id`, `barcode`, `code`, `name`, `cat`, `sub_cat`, COALESCE(`qoh`, 0) AS `qoh`, `uom`, `rack`, `rack_remark`, `checked`, `img1` AS `image`
+    $sql = "SELECT `id`, `barcode`, `code`, `name`, `cat`, `sub_cat`, COALESCE(`qoh`, 0) AS `qoh`, `uom`, `rack`, `rack_remark`, `rack_updated_at`, `checked`, `img1` AS `image`
             FROM `PRODUCTS` WHERE $where ORDER BY `checked` DESC, `name` ASC LIMIT ?, ?";
     $stmt = $connect->prepare($sql);
     $fetchTypes = $types . "ii";
@@ -264,8 +270,9 @@ if ($action === 'list') {
     }
     $image = is_string($imageResult) ? $imageResult : '';
 
-    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`cat_code`,`sub_code`,`uom`,`rack`,`rack_remark`,`qoh`,`checked`,`img1`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-    $stmt->bind_param("sssssssssssdss", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $rack_remark, $qoh, $checked, $image);
+    $rackUpdatedAt = ($rack !== '') ? date('Y-m-d H:i:s') : null;
+    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`cat_code`,`sub_code`,`uom`,`rack`,`rack_remark`,`rack_updated_at`,`qoh`,`checked`,`img1`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $stmt->bind_param("ssssssssssssdss", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $rack_remark, $rackUpdatedAt, $qoh, $checked, $image);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Product created successfully.']);
@@ -305,8 +312,25 @@ if ($action === 'list') {
     }
     $image = is_string($imageResult) ? $imageResult : $existingImage;
 
-    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`cat_code`=?,`sub_code`=?,`uom`=?,`rack`=?,`rack_remark`=?,`qoh`=?,`checked`=?,`img1`=? WHERE `id`=?");
-    $stmt->bind_param("sssssssssssdssi", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $rack_remark, $qoh, $checked, $image, $id);
+    // Check if rack changed to update rack_updated_at
+    $oldRackStmt = $connect->prepare("SELECT `rack` FROM `PRODUCTS` WHERE `id` = ? LIMIT 1");
+    $oldRackStmt->bind_param("i", $id);
+    $oldRackStmt->execute();
+    $oldRackRow = $oldRackStmt->get_result()->fetch_assoc();
+    $oldRackStmt->close();
+    $oldRack = $oldRackRow ? trim($oldRackRow['rack'] ?? '') : '';
+
+    if ($rack !== $oldRack) {
+        $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`cat_code`=?,`sub_code`=?,`uom`=?,`rack`=?,`rack_remark`=?,`rack_updated_at`=NOW(),`qoh`=?,`checked`=?,`img1`=? WHERE `id`=?");
+    } else {
+        $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`cat_code`=?,`sub_code`=?,`uom`=?,`rack`=?,`rack_remark`=?,`qoh`=?,`checked`=?,`img1`=? WHERE `id`=?");
+    }
+
+    if ($rack !== $oldRack) {
+        $stmt->bind_param("sssssssssssdssi", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $rack_remark, $qoh, $checked, $image, $id);
+    } else {
+        $stmt->bind_param("sssssssssssdssi", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $rack_remark, $qoh, $checked, $image, $id);
+    }
 
     if ($stmt->execute()) {
         echo json_encode(['success' => 'Product updated successfully.']);
@@ -636,7 +660,7 @@ if ($action === 'list') {
         exit;
     }
     $updated = 0;
-    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ? WHERE `id` = ?");
+    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = NOW() WHERE `id` = ?");
     foreach ($items as $item) {
         $id = intval($item['id'] ?? 0);
         $rack = trim($item['rack'] ?? '');

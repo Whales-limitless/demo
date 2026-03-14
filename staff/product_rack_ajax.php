@@ -26,8 +26,14 @@ if ($action === 'update_rack') {
     $barcodeStmt->close();
     $barcode = $barcodeResult['barcode'] ?? '';
 
-    // Update the PRODUCTS.rack field
-    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ? WHERE `id` = ?");
+    // Ensure rack_updated_at column exists
+    $chkCol = $connect->query("SHOW COLUMNS FROM `PRODUCTS` LIKE 'rack_updated_at'");
+    if ($chkCol && $chkCol->num_rows === 0) {
+        $connect->query("ALTER TABLE `PRODUCTS` ADD COLUMN `rack_updated_at` DATETIME DEFAULT NULL AFTER `rack`");
+    }
+
+    // Update the PRODUCTS.rack field and rack_updated_at
+    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = NOW() WHERE `id` = ?");
     $stmt->bind_param("si", $rack, $id);
     $updated = $stmt->execute();
     $stmt->close();
@@ -57,7 +63,8 @@ if ($action === 'update_rack') {
     }
 
     if ($updated) {
-        echo json_encode(['success' => true, 'rack' => $rack]);
+        $now = date('Y-m-d H:i:s');
+        echo json_encode(['success' => true, 'rack' => $rack, 'rack_updated_at' => $now]);
     } else {
         echo json_encode(['success' => false, 'error' => 'Update failed']);
     }
