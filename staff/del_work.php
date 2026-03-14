@@ -132,7 +132,7 @@ if ($instQ) {
                 $imgField = 'IMG' . $i;
                 $hasImg = !empty($order[$imgField]);
             ?>
-            <div class="photo-card" onclick="document.getElementById('file<?php echo $i; ?>').click()">
+            <div class="photo-card" onclick="choosePhotoSource('file<?php echo $i; ?>')">
                 <div class="photo-label">Photo <?php echo $i; ?></div>
                 <?php if ($hasImg): ?>
                 <div class="photo-existing">Uploaded</div>
@@ -147,7 +147,9 @@ if ($instQ) {
                     </div>
                     <?php endif; ?>
                 </div>
-                <input type="file" accept="image/*" id="file<?php echo $i; ?>" onchange="previewImage(<?php echo $i; ?>)">
+                <input type="file" accept="image/*" capture="environment" id="file<?php echo $i; ?>_camera" style="display:none" onchange="onFileSelected(this, 'file<?php echo $i; ?>')">
+                <input type="file" accept="image/*" id="file<?php echo $i; ?>_gallery" style="display:none" onchange="onFileSelected(this, 'file<?php echo $i; ?>')">
+                <input type="file" accept="image/*" id="file<?php echo $i; ?>" style="display:none" onchange="previewImage(<?php echo $i; ?>)">
             </div>
             <?php endfor; ?>
         </div>
@@ -178,7 +180,7 @@ if ($instQ) {
                         <?php endif; ?>
                     </div>
                     <div class="install-item-qty">Qty: <?php echo htmlspecialchars(($instItem['QTY'] ?? '') . ' ' . ($instItem['UOM'] ?? '')); ?></div>
-                    <div class="install-photo-area" onclick="document.getElementById('installFile<?php echo $instItem['ID']; ?>').click()">
+                    <div class="install-photo-area" onclick="choosePhotoSource('installFile<?php echo $instItem['ID']; ?>')">
                         <div class="install-preview" id="installPreview<?php echo $instItem['ID']; ?>">
                             <?php if ($hasInstImg): ?>
                             <img src="uploads/<?php echo htmlspecialchars($instItem['INSTALL_IMG']); ?>" style="display:block;" alt="Install photo">
@@ -193,7 +195,9 @@ if ($instQ) {
                             Tap to take photo or upload
                         </div>
                     </div>
-                    <input type="file" accept="image/*" id="installFile<?php echo $instItem['ID']; ?>" onchange="previewInstallImage(<?php echo $instItem['ID']; ?>)">
+                    <input type="file" accept="image/*" capture="environment" id="installFile<?php echo $instItem['ID']; ?>_camera" style="display:none" onchange="onFileSelected(this, 'installFile<?php echo $instItem['ID']; ?>')">
+                    <input type="file" accept="image/*" id="installFile<?php echo $instItem['ID']; ?>_gallery" style="display:none" onchange="onFileSelected(this, 'installFile<?php echo $instItem['ID']; ?>')">
+                    <input type="file" accept="image/*" id="installFile<?php echo $instItem['ID']; ?>" style="display:none" onchange="previewInstallImage(<?php echo $instItem['ID']; ?>)">
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -221,6 +225,39 @@ if ($instQ) {
     <script>
     var orderId = <?php echo $orderId; ?>;
     var backPage = '<?php echo $fromPage; ?>';
+
+    function choosePhotoSource(inputId) {
+        Swal.fire({
+            title: 'Select Photo Source',
+            showCancelButton: true,
+            showDenyButton: true,
+            confirmButtonText: '<i class="fas fa-camera" style="margin-right:6px;"></i> Take Photo',
+            denyButtonText: '<i class="fas fa-images" style="margin-right:6px;"></i> Upload Picture',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#C8102E',
+            denyButtonColor: '#3b82f6',
+            customClass: { popup: 'photo-source-popup' }
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                document.getElementById(inputId + '_camera').click();
+            } else if (result.isDenied) {
+                document.getElementById(inputId + '_gallery').click();
+            }
+        });
+    }
+
+    function onFileSelected(sourceInput, targetId) {
+        // Copy the file from camera/gallery input to the main input via DataTransfer
+        if (sourceInput.files && sourceInput.files[0]) {
+            var dt = new DataTransfer();
+            dt.items.add(sourceInput.files[0]);
+            var target = document.getElementById(targetId);
+            target.files = dt.files;
+            // Trigger the onchange
+            var event = new Event('change', { bubbles: true });
+            target.dispatchEvent(event);
+        }
+    }
 
     function previewImage(num) {
         var input = document.getElementById('file' + num);
