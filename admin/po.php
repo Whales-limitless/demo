@@ -98,6 +98,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .line-items-table input:focus { border-color: var(--primary); outline: none; }
 .btn-remove-line { background: #fee2e2; color: #dc2626; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 12px; }
 .btn-remove-line:hover { background: #fca5a5; }
+.li-uom-wrap { display: flex; gap: 4px; align-items: center; }
+.li-uom-select { padding: 5px 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; font-family: 'DM Sans', sans-serif; outline: none; min-width: 80px; }
+.li-uom-select:focus { border-color: var(--primary); }
+.li-conv-indicator { font-size: 11px; line-height: 1.3; margin-top: 3px; padding: 2px 6px; border-radius: 4px; }
+.li-conv-indicator.converted { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.li-conv-indicator.no-conv { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+.li-conv-indicator.same-uom { background: #f3f4f6; color: #6b7280; }
 
 /* Detail view */
 .detail-section { background: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
@@ -214,8 +221,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                                 <th style="width:40px">#</th>
                                 <th>Product</th>
                                 <th>Barcode</th>
-                                <th style="width:80px">UOM</th>
+                                <th style="width:120px">UOM</th>
                                 <th style="width:100px">Qty</th>
+                                <th style="width:140px">QOH Impact</th>
                                 <th style="width:40px"></th>
                             </tr>
                         </thead>
@@ -475,6 +483,7 @@ function clearForm() {
 function openCreateModal() {
     clearForm();
     document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-invoice"></i> New Purchase Order';
+    loadPoUomCache();
     loadSuppliers(function() {
         poModal.show();
     });
@@ -485,6 +494,7 @@ function editPO(id) {
     document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-invoice"></i> Edit Purchase Order';
     document.getElementById('editId').value = id;
 
+    loadPoUomCache();
     loadSuppliers(function() {
         $.ajax({
             type: 'POST', url: 'po_ajax.php', data: { action: 'get', id: id }, dataType: 'json',
@@ -506,18 +516,57 @@ function editPO(id) {
 }
 
 // ==================== LINE ITEMS ====================
+var poUomCache = [];
+var poUomLoaded = false;
+
+function loadPoUomCache(callback) {
+    if (poUomLoaded) { if (callback) callback(); return; }
+    $.post('product_ajax.php', { action: 'uom_list' }, function(uoms) {
+        poUomCache = (uoms || []).filter(function(u) { return u.status === 'ACTIVE'; });
+        poUomLoaded = true;
+        if (callback) callback();
+    }, 'json');
+}
+
+function buildUomSelect(idx, selectedUom) {
+    var html = '<select class="li-uom-select li-uom" onchange="onLineUomChange(' + idx + ');">';
+    var found = false;
+    poUomCache.forEach(function(u) {
+        var sel = (u.name === selectedUom) ? ' selected' : '';
+        if (u.name === selectedUom) found = true;
+        html += '<option value="' + escHtml(u.name) + '"' + sel + '>' + escHtml(u.name) + '</option>';
+    });
+    // If the current UOM isn't in cache (e.g. from old data), add it
+    if (selectedUom && !found) {
+        html += '<option value="' + escHtml(selectedUom) + '" selected>' + escHtml(selectedUom) + '</option>';
+    }
+    html += '<option value="__add_new__">+ Add New UOM</option>';
+    html += '</select>';
+    return html;
+}
+
 function addLineItem(barcode, desc, uom, qty) {
     lineItemIndex++;
     var idx = lineItemIndex;
-    var html = '<tr id="line_' + idx + '">';
-    html += '<td>' + idx + '</td>';
-    html += '<td>' + escHtml(desc) + '<input type="hidden" class="li-barcode" value="' + escHtml(barcode) + '"><input type="hidden" class="li-desc" value="' + escHtml(desc) + '"></td>';
-    html += '<td><small class="text-muted">' + escHtml(barcode) + '</small></td>';
-    html += '<td><input type="text" class="li-uom" value="' + escHtml(uom || '') + '"></td>';
-    html += '<td><input type="number" class="li-qty" value="' + (parseFloat(qty) || 1) + '" min="0" step="any"></td>';
-    html += '<td><button class="btn-remove-line" onclick="removeLine(' + idx + ');"><i class="fas fa-times"></i></button></td>';
-    html += '</tr>';
-    document.getElementById('lineItems').insertAdjacentHTML('beforeend', html);
+
+    function render() {
+        var html = '<tr id="line_' + idx + '" data-base-uom="' + escHtml(uom || '') + '">';
+        html += '<td>' + idx + '</td>';
+        html += '<td>' + escHtml(desc) + '<input type="hidden" class="li-barcode" value="' + escHtml(barcode) + '"><input type="hidden" class="li-desc" value="' + escHtml(desc) + '"></td>';
+        html += '<td><small class="text-muted">' + escHtml(barcode) + '</small></td>';
+        html += '<td>' + buildUomSelect(idx, uom || '') + '</td>';
+        html += '<td><input type="number" class="li-qty" value="' + (parseFloat(qty) || 1) + '" min="0" step="any" onchange="onLineQtyChange(' + idx + ');" oninput="onLineQtyChange(' + idx + ');"></td>';
+        html += '<td class="li-impact-cell" id="impact_' + idx + '"><span class="li-conv-indicator same-uom">+' + (parseFloat(qty) || 1) + ' ' + escHtml(uom || '') + ' QOH</span></td>';
+        html += '<td><button class="btn-remove-line" onclick="removeLine(' + idx + ');"><i class="fas fa-times"></i></button></td>';
+        html += '</tr>';
+        document.getElementById('lineItems').insertAdjacentHTML('beforeend', html);
+    }
+
+    if (!poUomLoaded) {
+        loadPoUomCache(render);
+    } else {
+        render();
+    }
 }
 
 function removeLine(idx) {
@@ -529,6 +578,93 @@ function removeLine(idx) {
 function renumberLines() {
     var rows = document.querySelectorAll('#lineItems tr');
     rows.forEach(function(r, i) { r.cells[0].textContent = i + 1; });
+}
+
+function onLineUomChange(idx) {
+    var row = document.getElementById('line_' + idx);
+    if (!row) return;
+    var sel = row.querySelector('.li-uom');
+    if (sel.value === '__add_new__') {
+        // Prompt for new UOM name
+        Swal.fire({
+            title: 'Add New UOM',
+            input: 'text',
+            inputPlaceholder: 'e.g. CTN, BOX, PACK',
+            showCancelButton: true,
+            confirmButtonText: 'Add',
+            inputValidator: function(v) { if (!v || !v.trim()) return 'UOM name is required.'; }
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                var newName = result.value.trim().toUpperCase();
+                $.post('product_ajax.php', { action: 'uom_create', name: newName }, function(r) {
+                    if (r.success) {
+                        poUomCache.push({ id: r.id, name: newName, status: 'ACTIVE' });
+                        // Rebuild this select with new UOM selected
+                        var td = sel.parentElement;
+                        td.innerHTML = buildUomSelect(idx, newName);
+                        updateConversionIndicator(idx);
+                    } else if (r.error && r.error.indexOf('already exists') > -1) {
+                        // UOM exists, just select it
+                        var exists = poUomCache.find(function(u) { return u.name === newName; });
+                        if (!exists) poUomCache.push({ id: 0, name: newName, status: 'ACTIVE' });
+                        var td = sel.parentElement;
+                        td.innerHTML = buildUomSelect(idx, newName);
+                        updateConversionIndicator(idx);
+                    } else {
+                        Swal.fire({ icon: 'error', text: r.error || 'Failed to create UOM.' });
+                        sel.value = row.getAttribute('data-base-uom') || '';
+                    }
+                }, 'json');
+            } else {
+                // Cancelled - revert to base UOM
+                sel.value = row.getAttribute('data-base-uom') || '';
+            }
+        });
+        return;
+    }
+    updateConversionIndicator(idx);
+}
+
+function onLineQtyChange(idx) {
+    updateConversionIndicator(idx);
+}
+
+function updateConversionIndicator(idx) {
+    var row = document.getElementById('line_' + idx);
+    if (!row) return;
+    var barcode = row.querySelector('.li-barcode').value;
+    var selectedUom = row.querySelector('.li-uom').value;
+    var baseUom = row.getAttribute('data-base-uom') || '';
+    var qty = parseFloat(row.querySelector('.li-qty').value) || 0;
+    var cell = document.getElementById('impact_' + idx);
+
+    if (qty <= 0) {
+        cell.innerHTML = '<span class="li-conv-indicator same-uom">No qty</span>';
+        return;
+    }
+
+    // Same UOM or no base UOM — direct 1:1
+    if (!baseUom || selectedUom === baseUom) {
+        cell.innerHTML = '<span class="li-conv-indicator same-uom">+' + qty + ' ' + escHtml(baseUom || selectedUom) + ' QOH</span>';
+        return;
+    }
+
+    // Different UOM — look up conversion
+    cell.innerHTML = '<span class="li-conv-indicator no-conv"><i class="fas fa-spinner fa-spin"></i></span>';
+    $.post('product_ajax.php', { action: 'uom_conversion_lookup', barcode: barcode, from_uom: selectedUom }, function(data) {
+        if (data.found) {
+            var converted = qty * data.conversion_factor;
+            cell.innerHTML = '<span class="li-conv-indicator converted">' +
+                '<strong>+' + converted + ' ' + escHtml(data.to_uom) + '</strong> QOH' +
+                '<br><small>' + qty + ' ' + escHtml(selectedUom) + ' x ' + data.conversion_factor + '</small>' +
+                '</span>';
+        } else {
+            cell.innerHTML = '<span class="li-conv-indicator no-conv">' +
+                '+' + qty + ' ' + escHtml(selectedUom) + ' QOH' +
+                '<br><small>No conversion set (1:1)</small>' +
+                '</span>';
+        }
+    }, 'json');
 }
 
 // ==================== PRODUCT SEARCH MODAL ====================
