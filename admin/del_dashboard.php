@@ -92,9 +92,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <button class="status-tab" data-status="C" onclick="switchTab(this, 'C')">Completed <span class="tab-count" id="countCompleted">0</span></button>
     </div>
 
-    <div class="date-filter" id="dateFilter">
+    <div class="date-filter show" id="dateFilter">
         <label style="font-size:13px;font-weight:600;">From:</label>
-        <input type="date" id="startDate" value="<?php echo date('Y-m-d', strtotime('-7 days')); ?>">
+        <input type="date" id="startDate" value="<?php echo date('Y-m-d', strtotime('-30 days')); ?>">
         <label style="font-size:13px;font-weight:600;">To:</label>
         <input type="date" id="endDate" value="<?php echo date('Y-m-d'); ?>">
         <button onclick="loadData()"><i class="fas fa-filter"></i> Filter</button>
@@ -156,16 +156,16 @@ function switchTab(el, status) {
     document.querySelectorAll('.status-tab').forEach(function(t) { t.classList.remove('active'); });
     el.classList.add('active');
     currentStatus = status;
-    document.getElementById('dateFilter').classList.toggle('show', status === 'C');
     loadData();
 }
 
 function loadData() {
-    var postData = { action: 'list', status: currentStatus };
-    if (currentStatus === 'C') {
-        postData.start_date = document.getElementById('startDate').value;
-        postData.end_date = document.getElementById('endDate').value;
-    }
+    var postData = {
+        action: 'list',
+        status: currentStatus,
+        start_date: document.getElementById('startDate').value,
+        end_date: document.getElementById('endDate').value
+    };
 
     $.ajax({
         type: 'POST', url: 'del_dashboard_ajax.php', data: postData, dataType: 'json',
