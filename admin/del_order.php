@@ -221,7 +221,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="table-card">
     <div style="overflow-x:auto;">
         <table class="data-table">
-            <thead><tr><th style="width:40px">No</th><th>Del. Date</th><th>Order No</th><th>Driver</th><th>Customer</th><th>Location</th><th>Status</th><th style="width:1%">Action</th></tr></thead>
+            <thead><tr><th style="width:40px">No</th><th>Del. Date</th><th>Order No</th><th>Driver</th><th>Customer</th><th>Address</th><th>Status</th><th style="width:1%">Action</th></tr></thead>
             <tbody id="dataBody">
                 <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
             </tbody>
@@ -407,7 +407,7 @@ function loadOrders() {
             var statusMap = { '': 'Order', 'A': 'Assigned', 'D': 'Done', 'C': 'Completed' };
             var badgeMap = { '': 'badge-order', 'A': 'badge-assigned', 'D': 'badge-done', 'C': 'badge-completed' };
             tbody.innerHTML = orders.map(function(o, i) {
-                return '<tr><td>' + (i+1) + '</td><td>' + escHtml(o.DELDATE||'') + '</td><td><strong>' + escHtml(o.ORDNO||'') + '</strong></td><td>' + escHtml(o.DRIVER||'-') + '</td><td>' + escHtml(o.CUSTOMER||'') + '</td><td>' + escHtml(o.LOCATION||'') + '</td><td><span class="badge-status ' + (badgeMap[o.STATUS]||'') + '">' + (statusMap[o.STATUS]||o.STATUS) + '</span></td><td style="white-space:nowrap"><button class="btn-action btn-edit" onclick="openEditModal(' + o.ID + ')"><i class="fas fa-pen"></i></button> <button class="btn-action btn-view" onclick="window.open(\'del_order.php?view=' + o.ID + '\')"><i class="fas fa-eye"></i></button> <button class="btn-action btn-delete" onclick="deleteOrder(' + o.ID + ',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+                return '<tr><td>' + (i+1) + '</td><td>' + escHtml(o.DELDATE||'') + '</td><td><strong>' + escHtml(o.ORDNO||'') + '</strong></td><td>' + escHtml(o.DRIVER||'-') + '</td><td>' + escHtml(o.CUSTOMER||'') + '</td><td>' + escHtml(o.CUST_ADDRESS||'') + '</td><td><span class="badge-status ' + (badgeMap[o.STATUS]||'') + '">' + (statusMap[o.STATUS]||o.STATUS) + '</span></td><td style="white-space:nowrap"><button class="btn-action btn-edit" onclick="openEditModal(' + o.ID + ')"><i class="fas fa-pen"></i></button> <button class="btn-action btn-view" onclick="window.open(\'del_order.php?view=' + o.ID + '\')"><i class="fas fa-eye"></i></button> <button class="btn-action btn-delete" onclick="deleteOrder(' + o.ID + ',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas fa-trash"></i></button></td></tr>';
             }).join('');
         }
     });

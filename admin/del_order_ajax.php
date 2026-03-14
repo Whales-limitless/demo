@@ -36,7 +36,7 @@ if ($action === 'list') {
         $types .= "s";
     }
 
-    $sql = "SELECT o.* FROM `del_orderlist` o $where ORDER BY o.DELDATE DESC, o.ID DESC";
+    $sql = "SELECT o.*, c.ADDRESS AS CUST_ADDRESS FROM `del_orderlist` o LEFT JOIN `del_customer` c ON o.CUSTOMERCODE = c.CODE $where ORDER BY o.DELDATE DESC, o.ID DESC";
     $stmt = $connect->prepare($sql);
     $stmt->bind_param($types, ...$params);
     $stmt->execute();
