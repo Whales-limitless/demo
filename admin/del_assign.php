@@ -156,8 +156,9 @@ function renderPanel(containerId, orders, actionType, driverCode) {
         var btnClass = actionType === 'assign' ? 'btn-assign' : 'btn-unassign';
         var btnIcon = actionType === 'assign' ? 'fa-arrow-right' : 'fa-arrow-left';
         var btnText = actionType === 'assign' ? 'Assign' : 'Remove';
+        var addressLine = o.CUST_ADDRESS ? '<br><small style="color:#6b7280;"><i class="fas fa-map-marker-alt" style="margin-right:4px;"></i>' + escHtml(o.CUST_ADDRESS) + '</small>' : '';
         return '<div class="order-row">' +
-            '<div class="order-info"><strong>' + escHtml(o.ORDNO||'') + '</strong><small>' + escHtml(o.DELDATE||'') + ' | ' + escHtml(o.CUSTOMER||'') + ' | ' + escHtml(o.LOCATION||'') + '</small></div>' +
+            '<div class="order-info"><strong>' + escHtml(o.ORDNO||'') + '</strong><small>' + escHtml(o.DELDATE||'') + ' | ' + escHtml(o.CUSTOMER||'') + '</small>' + addressLine + '</div>' +
             '<button class="btn-action ' + btnClass + '" onclick="transferOrder(' + o.ID + ',\'' + actionType + '\',\'' + escHtml(driverCode) + '\',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas ' + btnIcon + '"></i> ' + btnText + '</button>' +
         '</div>';
     }).join('');

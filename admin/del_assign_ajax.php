@@ -25,7 +25,7 @@ if ($action === 'load') {
 
     // Available orders (unassigned)
     $available = [];
-    $stmt = $connect->prepare("SELECT o.* FROM `del_orderlist` o WHERE o.DRIVERCODE = '' AND o.STATUS = '' ORDER BY o.DELDATE DESC, o.ID DESC");
+    $stmt = $connect->prepare("SELECT o.*, c.ADDRESS AS CUST_ADDRESS FROM `del_orderlist` o LEFT JOIN `del_customer` c ON o.CUSTOMERCODE = c.CODE WHERE o.DRIVERCODE = '' AND o.STATUS = '' ORDER BY o.DELDATE DESC, o.ID DESC");
     $stmt->execute();
     $r = $stmt->get_result();
     while ($row = $r->fetch_assoc()) { $available[] = $row; }
@@ -33,7 +33,7 @@ if ($action === 'load') {
 
     // Assigned to this driver
     $assigned = [];
-    $stmt2 = $connect->prepare("SELECT o.* FROM `del_orderlist` o WHERE o.DRIVERCODE = ? AND o.STATUS = 'A' ORDER BY o.DELDATE DESC, o.ID DESC");
+    $stmt2 = $connect->prepare("SELECT o.*, c.ADDRESS AS CUST_ADDRESS FROM `del_orderlist` o LEFT JOIN `del_customer` c ON o.CUSTOMERCODE = c.CODE WHERE o.DRIVERCODE = ? AND o.STATUS = 'A' ORDER BY o.DELDATE DESC, o.ID DESC");
     $stmt2->bind_param("s", $driverCode);
     $stmt2->execute();
     $r2 = $stmt2->get_result();
