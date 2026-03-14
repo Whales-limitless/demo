@@ -333,6 +333,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:13px;line-height:1.6;color:#1a1a1a;">
+                    <div style="font-weight:700;margin-bottom:6px;"><i class="fas fa-info-circle" style="color:#0284c7;margin-right:4px;"></i> How UOM & Conversion Works</div>
+                    <p style="margin:0 0 8px;">Each product has a <strong>Base UOM</strong> (e.g. PCS, KG) — this is the unit used for inventory tracking (QOH).</p>
+                    <p style="margin:0 0 8px;">When receiving goods (GRN), if you receive in the <strong>same UOM</strong> as the product's base UOM, the quantity goes straight to QOH. For example: receive 20 PCS = QOH increases by 20.</p>
+                    <p style="margin:0 0 8px;">If a supplier sells in a <strong>different UOM</strong> (e.g. CTN, BOX), you can set up a <strong>UOM Conversion</strong> per product from the product table's <i class="fas fa-exchange-alt" style="font-size:11px;"></i> button. This tells the system how to convert, e.g.:</p>
+                    <div style="background:#fff;border:1px solid #e0e7ff;border-radius:6px;padding:8px 12px;margin:4px 0 8px;font-size:12px;">
+                        <strong>Example:</strong> 1 CTN = 50 PCS<br>
+                        Receive 2 CTN &rarr; QOH increases by 100 PCS
+                    </div>
+                    <p style="margin:0;color:var(--text-muted);font-size:12px;"><i class="fas fa-check-circle" style="color:#16a34a;margin-right:3px;"></i> <strong>No conversion set?</strong> No problem — quantities are used as-is (1:1). Everything works normally.</p>
+                </div>
                 <div class="manage-add-row">
                     <input type="text" id="newUomName" placeholder="New UOM name (e.g. PCS, KG, BOX)">
                     <button class="btn btn-sm btn-success" onclick="createUom();"><i class="fas fa-plus"></i> Add</button>
