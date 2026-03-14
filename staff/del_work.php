@@ -143,11 +143,11 @@ if ($instQ) {
                     <?php else: ?>
                     <div class="placeholder">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                        <p>Tap to select</p>
+                        <p>Tap to take photo or upload</p>
                     </div>
                     <?php endif; ?>
                 </div>
-                <input type="file" accept="image/*" capture="environment" id="file<?php echo $i; ?>" onchange="previewImage(<?php echo $i; ?>)">
+                <input type="file" accept="image/*" id="file<?php echo $i; ?>" onchange="previewImage(<?php echo $i; ?>)">
             </div>
             <?php endfor; ?>
         </div>
@@ -190,10 +190,10 @@ if ($instQ) {
                         </div>
                         <div class="install-photo-label">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                            Tap to take photo
+                            Tap to take photo or upload
                         </div>
                     </div>
-                    <input type="file" accept="image/*" capture="environment" id="installFile<?php echo $instItem['ID']; ?>" onchange="previewInstallImage(<?php echo $instItem['ID']; ?>)">
+                    <input type="file" accept="image/*" id="installFile<?php echo $instItem['ID']; ?>" onchange="previewInstallImage(<?php echo $instItem['ID']; ?>)">
                 </div>
                 <?php endforeach; ?>
             </div>

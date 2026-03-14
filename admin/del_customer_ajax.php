@@ -13,7 +13,48 @@ $connect->set_charset("utf8mb4");
 
 $action = $_POST['action'] ?? '';
 
-if ($action === 'get') {
+if ($action === 'list') {
+    $search = trim($_POST['search'] ?? '');
+    $offset = intval($_POST['offset'] ?? 0);
+    $limit = intval($_POST['limit'] ?? 50);
+    if ($limit <= 0 || $limit > 200) $limit = 50;
+    if ($offset < 0) $offset = 0;
+
+    $where = "";
+    $params = [];
+    $types = "";
+
+    if ($search !== '') {
+        $like = '%' . $search . '%';
+        $where = "WHERE (`CODE` LIKE ? OR `NAME` LIKE ? OR `LOCATION` LIKE ? OR `ADDRESS` LIKE ? OR `HP` LIKE ? OR `EMAIL` LIKE ?)";
+        $params = [$like, $like, $like, $like, $like, $like];
+        $types = "ssssss";
+    }
+
+    // Get total count
+    $cntSql = "SELECT COUNT(*) AS total FROM `del_customer` $where";
+    $cntStmt = $connect->prepare($cntSql);
+    if ($types !== '') $cntStmt->bind_param($types, ...$params);
+    $cntStmt->execute();
+    $total = $cntStmt->get_result()->fetch_assoc()['total'];
+    $cntStmt->close();
+
+    // Get page
+    $sql = "SELECT * FROM `del_customer` $where ORDER BY `NAME` ASC LIMIT ? OFFSET ?";
+    $params[] = $limit;
+    $params[] = $offset;
+    $types .= "ii";
+    $stmt = $connect->prepare($sql);
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $customers = [];
+    while ($r = $result->fetch_assoc()) { $customers[] = $r; }
+    $stmt->close();
+
+    echo json_encode(['customers' => $customers, 'total' => (int)$total, 'offset' => $offset, 'limit' => $limit]);
+
+} elseif ($action === 'get') {
     $id = intval($_POST['id'] ?? 0);
     $stmt = $connect->prepare("SELECT * FROM `del_customer` WHERE `ID` = ? LIMIT 1");
     $stmt->bind_param("i", $id);
