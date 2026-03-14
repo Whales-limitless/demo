@@ -301,8 +301,9 @@ if ($action === 'list') {
         $rackCodeStmt->close();
         $rackCode = $rackCodeRow ? $rackCodeRow['code'] : '';
 
-        $updStmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = NOW() WHERE `barcode` = ?");
-        $updStmt->bind_param("ss", $rackCode, $barcode);
+        $nowMY = date('Y-m-d H:i:s');
+        $updStmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = ? WHERE `barcode` = ?");
+        $updStmt->bind_param("sss", $rackCode, $nowMY, $barcode);
         $updStmt->execute();
         $updStmt->close();
 
@@ -335,15 +336,16 @@ if ($action === 'list') {
 
     $added = 0;
     $skipped = 0;
+    $nowMY = date('Y-m-d H:i:s');
     $stmt = $connect->prepare("INSERT INTO `rack_product` (`rack_id`, `barcode`) VALUES (?, ?)");
-    $updStmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = NOW() WHERE `barcode` = ?");
+    $updStmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = ? WHERE `barcode` = ?");
     foreach ($barcodes as $bc) {
         $bc = trim($bc);
         if ($bc === '') continue;
         $stmt->bind_param("is", $rackId, $bc);
         if ($stmt->execute()) {
             $added++;
-            $updStmt->bind_param("ss", $rackCode, $bc);
+            $updStmt->bind_param("sss", $rackCode, $nowMY, $bc);
             $updStmt->execute();
         } else {
             $skipped++;
@@ -374,8 +376,10 @@ if ($action === 'list') {
     if ($stmt->execute()) {
         // Update rack_updated_at and clear rack on PRODUCTS
         if ($removedBarcode !== '') {
-            $updStmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = '', `rack_updated_at` = NOW() WHERE `barcode` = ?");
-            $updStmt->bind_param("s", $removedBarcode);
+            $nowMY = date('Y-m-d H:i:s');
+            $emptyRack = '';
+            $updStmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = ? WHERE `barcode` = ?");
+            $updStmt->bind_param("sss", $emptyRack, $nowMY, $removedBarcode);
             $updStmt->execute();
             $updStmt->close();
         }

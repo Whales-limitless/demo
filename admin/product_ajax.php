@@ -321,14 +321,11 @@ if ($action === 'list') {
     $oldRack = $oldRackRow ? trim($oldRackRow['rack'] ?? '') : '';
 
     if ($rack !== $oldRack) {
-        $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`cat_code`=?,`sub_code`=?,`uom`=?,`rack`=?,`rack_remark`=?,`rack_updated_at`=NOW(),`qoh`=?,`checked`=?,`img1`=? WHERE `id`=?");
+        $nowMY = date('Y-m-d H:i:s');
+        $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`cat_code`=?,`sub_code`=?,`uom`=?,`rack`=?,`rack_remark`=?,`rack_updated_at`=?,`qoh`=?,`checked`=?,`img1`=? WHERE `id`=?");
+        $stmt->bind_param("ssssssssssssdssi", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $rack_remark, $nowMY, $qoh, $checked, $image, $id);
     } else {
         $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `barcode`=?,`code`=?,`name`=?,`description`=?,`cat`=?,`sub_cat`=?,`cat_code`=?,`sub_code`=?,`uom`=?,`rack`=?,`rack_remark`=?,`qoh`=?,`checked`=?,`img1`=? WHERE `id`=?");
-    }
-
-    if ($rack !== $oldRack) {
-        $stmt->bind_param("sssssssssssdssi", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $rack_remark, $qoh, $checked, $image, $id);
-    } else {
         $stmt->bind_param("sssssssssssdssi", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $rack_remark, $qoh, $checked, $image, $id);
     }
 
@@ -660,12 +657,13 @@ if ($action === 'list') {
         exit;
     }
     $updated = 0;
-    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = NOW() WHERE `id` = ?");
+    $nowMY = date('Y-m-d H:i:s');
+    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = ? WHERE `id` = ?");
     foreach ($items as $item) {
         $id = intval($item['id'] ?? 0);
         $rack = trim($item['rack'] ?? '');
         if ($id <= 0) continue;
-        $stmt->bind_param("si", $rack, $id);
+        $stmt->bind_param("ssi", $rack, $nowMY, $id);
         if ($stmt->execute()) $updated++;
     }
     $stmt->close();
