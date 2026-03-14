@@ -353,6 +353,218 @@ if ($action === 'search_products') {
     }
     echo json_encode(['suppliers' => $list]);
 
+// ==================== UOM LIST ====================
+} elseif ($action === 'uom_list') {
+    $rows = [];
+    $result = $connect->query("SELECT `id`, `name`, `status` FROM `product_uom` ORDER BY `name` ASC");
+    if ($result) {
+        while ($r = $result->fetch_assoc()) {
+            $rows[] = $r;
+        }
+    }
+    echo json_encode($rows);
+
+// ==================== UOM CREATE ====================
+} elseif ($action === 'uom_create') {
+    $name = trim($_POST['name'] ?? '');
+    if ($name === '') { echo json_encode(['error' => 'Name is required.']); exit; }
+    $stmt = $connect->prepare("INSERT INTO `product_uom` (`name`) VALUES (?)");
+    $stmt->bind_param("s", $name);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => 'UOM created.', 'id' => $stmt->insert_id]);
+    } else {
+        if (strpos($connect->error, 'Duplicate') !== false) {
+            echo json_encode(['error' => 'UOM already exists.']);
+        } else {
+            echo json_encode(['error' => 'Failed: ' . $connect->error]);
+        }
+    }
+    $stmt->close();
+
+// ==================== UOM CONVERSION LOOKUP ====================
+} elseif ($action === 'uom_conversion_lookup') {
+    // Ensure uom_conversion table exists
+    $connect->query("CREATE TABLE IF NOT EXISTS `uom_conversion` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `barcode` VARCHAR(50) NOT NULL,
+        `from_uom` VARCHAR(20) NOT NULL,
+        `to_uom` VARCHAR(20) NOT NULL,
+        `conversion_factor` DOUBLE(10,4) NOT NULL DEFAULT 1.0000,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY `uq_barcode_from_to` (`barcode`, `from_uom`, `to_uom`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $barcode = trim($_POST['barcode'] ?? '');
+    $fromUom = trim($_POST['from_uom'] ?? '');
+    if ($barcode === '' || $fromUom === '') {
+        echo json_encode(['found' => false]);
+        exit;
+    }
+
+    $pStmt = $connect->prepare("SELECT `uom` FROM `PRODUCTS` WHERE `barcode` = ? LIMIT 1");
+    $pStmt->bind_param("s", $barcode);
+    $pStmt->execute();
+    $pRow = $pStmt->get_result()->fetch_assoc();
+    $pStmt->close();
+    $baseUom = $pRow ? trim($pRow['uom'] ?? '') : '';
+
+    if ($fromUom === $baseUom || $baseUom === '') {
+        echo json_encode(['found' => false, 'base_uom' => $baseUom]);
+        exit;
+    }
+
+    $cStmt = $connect->prepare("SELECT `conversion_factor`, `to_uom` FROM `uom_conversion` WHERE `barcode` = ? AND `from_uom` = ? AND `to_uom` = ? LIMIT 1");
+    $cStmt->bind_param("sss", $barcode, $fromUom, $baseUom);
+    $cStmt->execute();
+    $cRow = $cStmt->get_result()->fetch_assoc();
+    $cStmt->close();
+
+    if ($cRow) {
+        echo json_encode([
+            'found' => true,
+            'from_uom' => $fromUom,
+            'to_uom' => $cRow['to_uom'],
+            'conversion_factor' => floatval($cRow['conversion_factor']),
+            'base_uom' => $baseUom
+        ]);
+    } else {
+        echo json_encode(['found' => false, 'base_uom' => $baseUom]);
+    }
+
+// ==================== CATEGORY LIST ====================
+} elseif ($action === 'cat_list') {
+    $rows = [];
+    $result = $connect->query("SELECT `id`, `ccode`, `cat_name` AS `name`, COALESCE(`status`, 'ACTIVE') AS `status` FROM `cat_group` ORDER BY `sort_no` ASC, `cat_name` ASC");
+    if ($result) {
+        while ($r = $result->fetch_assoc()) {
+            $rows[] = $r;
+        }
+    }
+    echo json_encode($rows);
+
+// ==================== SUBCATEGORY LIST ====================
+} elseif ($action === 'subcat_list') {
+    $catGroupId = intval($_POST['category_id'] ?? 0);
+    $rows = [];
+    if ($catGroupId > 0) {
+        $cg = $connect->prepare("SELECT `ccode` FROM `cat_group` WHERE `id`=?");
+        $cg->bind_param("i", $catGroupId);
+        $cg->execute();
+        $cgRow = $cg->get_result()->fetch_assoc();
+        $cg->close();
+        if ($cgRow) {
+            $stmt = $connect->prepare("SELECT `id`, `cat_code` AS `category_id`, `sub_cat` AS `name`, `sub_code`, 'ACTIVE' AS `status` FROM `category` WHERE `cat_code`=? ORDER BY `sort_no` ASC, `sub_cat` ASC");
+            $stmt->bind_param("s", $cgRow['ccode']);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($r = $result->fetch_assoc()) {
+                $rows[] = $r;
+            }
+            $stmt->close();
+        }
+    }
+    echo json_encode($rows);
+
+// ==================== RACK LIST ====================
+} elseif ($action === 'rack_list') {
+    $rows = [];
+    $result = $connect->query("SELECT `id`, `code`, `description`, `status` FROM `rack` WHERE `status`='ACTIVE' ORDER BY `code` ASC");
+    if ($result) {
+        while ($r = $result->fetch_assoc()) {
+            $rows[] = $r;
+        }
+    }
+    echo json_encode($rows);
+
+// ==================== CREATE PRODUCT (full) ====================
+} elseif ($action === 'create_product') {
+    $barcode = trim($_POST['barcode'] ?? '');
+    $code = trim($_POST['code'] ?? '');
+    $name = trim($_POST['name'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+    $cat = trim($_POST['cat'] ?? '');
+    $sub_cat = trim($_POST['sub_cat'] ?? '');
+    $cat_code = trim($_POST['cat_code'] ?? '');
+    $sub_code = trim($_POST['sub_code'] ?? '');
+    $uom = trim($_POST['uom'] ?? '');
+    $rack = trim($_POST['rack'] ?? '');
+    $rack_remark = trim($_POST['rack_remark'] ?? '');
+    $qoh = floatval($_POST['qoh'] ?? 0);
+    $checked = trim($_POST['checked'] ?? 'Y');
+
+    if ($barcode === '' || $name === '') {
+        echo json_encode(['error' => 'Barcode and name are required.']);
+        exit;
+    }
+
+    $chk = $connect->prepare("SELECT `id` FROM `PRODUCTS` WHERE `barcode` = ? LIMIT 1");
+    $chk->bind_param("s", $barcode);
+    $chk->execute();
+    if ($chk->get_result()->num_rows > 0) {
+        echo json_encode(['error' => 'Barcode already exists.']);
+        $chk->close();
+        exit;
+    }
+    $chk->close();
+
+    // Handle image upload
+    $image = '';
+    if (isset($_FILES['product_image']) && $_FILES['product_image']['error'] === UPLOAD_ERR_OK) {
+        $file = $_FILES['product_image'];
+        $uploadDir = __DIR__ . '/../img/';
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+
+        if (in_array($mimeType, $allowedTypes) && $file['size'] <= 10 * 1024 * 1024) {
+            $fileName = 'prod_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.jpg';
+            $destPath = $uploadDir . $fileName;
+            switch ($mimeType) {
+                case 'image/jpeg': $img = @imagecreatefromjpeg($file['tmp_name']); break;
+                case 'image/png':  $img = @imagecreatefrompng($file['tmp_name']); break;
+                case 'image/gif':  $img = @imagecreatefromgif($file['tmp_name']); break;
+                case 'image/webp': $img = @imagecreatefromwebp($file['tmp_name']); break;
+                default: $img = false;
+            }
+            if ($img) {
+                $maxDim = 800;
+                $origW = imagesx($img);
+                $origH = imagesy($img);
+                if ($origW > $maxDim || $origH > $maxDim) {
+                    if ($origW >= $origH) { $newW = $maxDim; $newH = intval($origH * $maxDim / $origW); }
+                    else { $newH = $maxDim; $newW = intval($origW * $maxDim / $origH); }
+                    $resized = imagecreatetruecolor($newW, $newH);
+                    imagealphablending($resized, false);
+                    imagesavealpha($resized, true);
+                    imagecopyresampled($resized, $img, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+                    imagedestroy($img);
+                    $img = $resized;
+                }
+                imagejpeg($img, $destPath, 75);
+                imagedestroy($img);
+                $image = $fileName;
+            }
+        }
+    }
+
+    // Ensure rack_updated_at column exists
+    $chkCol = $connect->query("SHOW COLUMNS FROM `PRODUCTS` LIKE 'rack_updated_at'");
+    if ($chkCol && $chkCol->num_rows === 0) {
+        $connect->query("ALTER TABLE `PRODUCTS` ADD COLUMN `rack_updated_at` DATETIME DEFAULT NULL AFTER `rack_remark`");
+    }
+
+    $rackUpdatedAt = ($rack !== '') ? date('Y-m-d H:i:s') : null;
+    $stmt = $connect->prepare("INSERT INTO `PRODUCTS` (`barcode`,`code`,`name`,`description`,`cat`,`sub_cat`,`cat_code`,`sub_code`,`uom`,`rack`,`rack_remark`,`rack_updated_at`,`qoh`,`checked`,`img1`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $stmt->bind_param("ssssssssssssdss", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $rack_remark, $rackUpdatedAt, $qoh, $checked, $image);
+
+    if ($stmt->execute()) {
+        echo json_encode(['success' => 'Product created successfully.', 'product' => ['barcode' => $barcode, 'name' => $name, 'uom' => $uom]]);
+    } else {
+        echo json_encode(['error' => 'Failed to create product: ' . $connect->error]);
+    }
+    $stmt->close();
+
 } else {
     echo json_encode(['error' => 'Invalid action.']);
 }
