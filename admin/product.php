@@ -345,11 +345,72 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
+<!-- UOM Conversion Modal -->
+<div class="modal fade" id="uomConversionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-exchange-alt" style="color:var(--primary);margin-right:6px;"></i> UOM Conversion - <span id="ucProductName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="ucBarcode" value="">
+                <div class="detail-section mb-3" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px 16px;">
+                    <div style="font-size:13px;"><i class="fas fa-info-circle" style="color:#0284c7;margin-right:4px;"></i>
+                    Define how this product's purchase UOM converts to its inventory (base) UOM.
+                    <br>Base UOM: <strong id="ucBaseUom">-</strong></div>
+                </div>
+                <!-- Add conversion row -->
+                <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:16px;">
+                    <div>
+                        <label class="form-label fw-semibold" style="font-size:12px;">1 x</label>
+                        <select id="ucFromUom" class="form-select form-select-sm" style="min-width:120px;">
+                            <option value="">From UOM</option>
+                        </select>
+                    </div>
+                    <div style="padding-bottom:6px;font-weight:600;">=</div>
+                    <div>
+                        <label class="form-label fw-semibold" style="font-size:12px;">Qty</label>
+                        <input type="number" id="ucFactor" class="form-control form-control-sm" min="0.0001" step="any" placeholder="e.g. 50" style="width:100px;">
+                    </div>
+                    <div style="padding-bottom:6px;font-weight:600;">x</div>
+                    <div>
+                        <label class="form-label fw-semibold" style="font-size:12px;">To (Base UOM)</label>
+                        <span id="ucToUomLabel" class="form-control form-control-sm" style="min-width:80px;background:#f3f4f6;display:inline-block;"></span>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-success" onclick="addConversion();" style="margin-bottom:1px;"><i class="fas fa-plus"></i> Add</button>
+                    </div>
+                </div>
+                <!-- Existing conversions -->
+                <table class="data-table" style="font-size:13px;">
+                    <thead>
+                        <tr>
+                            <th style="width:30px">#</th>
+                            <th>From UOM</th>
+                            <th>Factor</th>
+                            <th>To UOM (Base)</th>
+                            <th>Meaning</th>
+                            <th style="width:100px">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ucConversionList">
+                        <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">No conversions defined</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-var productModal = null, manageCatModal = null, manageUomModal = null;
+var productModal = null, manageCatModal = null, manageUomModal = null, uomConversionModal = null;
 var currentPage = 1;
 var debounceTimer = null;
 
@@ -363,6 +424,7 @@ document.addEventListener('DOMContentLoaded', function() {
     productModal = new bootstrap.Modal(document.getElementById('productModal'));
     manageCatModal = new bootstrap.Modal(document.getElementById('manageCatModal'));
     manageUomModal = new bootstrap.Modal(document.getElementById('manageUomModal'));
+    uomConversionModal = new bootstrap.Modal(document.getElementById('uomConversionModal'));
 
     // Load initial data
     loadCategoryFilter();
@@ -454,6 +516,7 @@ function renderTable(data) {
         html += '<td><span class="badge-status ' + (isActive ? 'badge-active' : 'badge-inactive') + '">' + (isActive ? 'Active' : 'Inactive') + '</span></td>';
         html += '<td style="white-space:nowrap">';
         html += '<button class="btn-action btn-edit" onclick="openEditModal(' + p.id + ');"><i class="fas fa-pen"></i> Edit</button>';
+        html += ' <button class="btn-action" style="background:#0891b2;color:#fff;" onclick="openUomConversionModal(\'' + escHtml(p.barcode || '').replace(/'/g, "\\'") + '\',\'' + escHtml(p.name || '').replace(/'/g, "\\'") + '\',\'' + escHtml(p.uom || '').replace(/'/g, "\\'") + '\');" title="UOM Conversion"><i class="fas fa-exchange-alt"></i></button>';
         if (isActive) {
             html += ' <button class="btn-action btn-delete" onclick="deactivateProduct(' + p.id + ',\'' + escHtml(p.name || '').replace(/'/g, "\\'") + '\');"><i class="fas fa-ban"></i></button>';
         }
@@ -1032,6 +1095,117 @@ function saveBulkRacks() {
         },
         error: function() {
             Swal.fire({ icon: 'error', text: 'Network error. Please try again.' });
+        }
+    });
+}
+
+// ===================== UOM CONVERSION MANAGEMENT =====================
+
+function openUomConversionModal(barcode, productName, baseUom) {
+    document.getElementById('ucBarcode').value = barcode;
+    document.getElementById('ucProductName').textContent = productName;
+    document.getElementById('ucBaseUom').textContent = baseUom || '(not set)';
+    document.getElementById('ucToUomLabel').textContent = baseUom || '-';
+    document.getElementById('ucFactor').value = '';
+
+    // Populate From UOM dropdown (all active UOMs except the base UOM)
+    var sel = document.getElementById('ucFromUom');
+    sel.innerHTML = '<option value="">From UOM</option>';
+    uomCache.forEach(function(u) {
+        if (u.name !== baseUom) {
+            sel.innerHTML += '<option value="' + escHtml(u.name) + '">' + escHtml(u.name) + '</option>';
+        }
+    });
+
+    loadConversions(barcode, baseUom);
+    uomConversionModal.show();
+}
+
+function loadConversions(barcode, baseUom) {
+    if (!barcode) barcode = document.getElementById('ucBarcode').value;
+    if (!baseUom) baseUom = document.getElementById('ucBaseUom').textContent;
+
+    $.post('product_ajax.php', { action: 'uom_conversion_list', barcode: barcode }, function(data) {
+        var tbody = document.getElementById('ucConversionList');
+        var rows = data || [];
+        if (rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">No conversions defined</td></tr>';
+            return;
+        }
+        var html = '';
+        rows.forEach(function(c, i) {
+            html += '<tr>';
+            html += '<td>' + (i + 1) + '</td>';
+            html += '<td><strong>' + escHtml(c.from_uom) + '</strong></td>';
+            html += '<td>' + c.conversion_factor + '</td>';
+            html += '<td>' + escHtml(c.to_uom) + '</td>';
+            html += '<td style="color:var(--text-muted);font-size:12px;">1 ' + escHtml(c.from_uom) + ' = ' + c.conversion_factor + ' ' + escHtml(c.to_uom) + '</td>';
+            html += '<td style="white-space:nowrap">';
+            html += '<button class="btn-action" style="background:#3b82f6;color:#fff;" onclick="editConversion(' + c.id + ',' + c.conversion_factor + ');"><i class="fas fa-pen"></i></button> ';
+            html += '<button class="btn-action" style="background:#ef4444;color:#fff;" onclick="deleteConversion(' + c.id + ');"><i class="fas fa-trash"></i></button>';
+            html += '</td>';
+            html += '</tr>';
+        });
+        tbody.innerHTML = html;
+    }, 'json');
+}
+
+function addConversion() {
+    var barcode = document.getElementById('ucBarcode').value;
+    var fromUom = document.getElementById('ucFromUom').value;
+    var toUom = document.getElementById('ucBaseUom').textContent;
+    var factor = parseFloat(document.getElementById('ucFactor').value);
+
+    if (!fromUom) { Swal.fire({ icon: 'warning', text: 'Please select From UOM.' }); return; }
+    if (!factor || factor <= 0) { Swal.fire({ icon: 'warning', text: 'Please enter a valid conversion factor.' }); return; }
+    if (toUom === '(not set)' || toUom === '-') { Swal.fire({ icon: 'warning', text: 'Product has no base UOM set. Please edit the product and set its UOM first.' }); return; }
+
+    $.post('product_ajax.php', {
+        action: 'uom_conversion_create',
+        barcode: barcode,
+        from_uom: fromUom,
+        to_uom: toUom,
+        conversion_factor: factor
+    }, function(r) {
+        if (r.success) {
+            document.getElementById('ucFactor').value = '';
+            document.getElementById('ucFromUom').value = '';
+            loadConversions(barcode);
+        } else {
+            Swal.fire({ icon: 'error', text: r.error });
+        }
+    }, 'json');
+}
+
+function editConversion(id, oldFactor) {
+    Swal.fire({
+        title: 'Edit Conversion Factor',
+        input: 'number',
+        inputValue: oldFactor,
+        inputAttributes: { min: 0.0001, step: 'any' },
+        showCancelButton: true,
+        confirmButtonText: 'Save',
+        inputValidator: function(v) { if (!v || parseFloat(v) <= 0) return 'Factor must be greater than 0.'; }
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.post('product_ajax.php', { action: 'uom_conversion_update', id: id, conversion_factor: result.value }, function(r) {
+                if (r.success) loadConversions();
+                else Swal.fire({ icon: 'error', text: r.error });
+            }, 'json');
+        }
+    });
+}
+
+function deleteConversion(id) {
+    Swal.fire({
+        text: 'Delete this conversion?', icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#ef4444', confirmButtonText: 'Delete'
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.post('product_ajax.php', { action: 'uom_conversion_delete', id: id }, function(r) {
+                if (r.success) loadConversions();
+                else Swal.fire({ icon: 'error', text: r.error });
+            }, 'json');
         }
     });
 }

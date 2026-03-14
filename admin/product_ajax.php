@@ -683,6 +683,201 @@ if ($action === 'list') {
     }
     echo json_encode($racks);
 
+// ===================== UOM CONVERSION ACTIONS =====================
+
+} elseif ($action === 'uom_conversion_ensure_table') {
+    // Auto-create table if not exists
+    $connect->query("CREATE TABLE IF NOT EXISTS `uom_conversion` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `barcode` VARCHAR(50) NOT NULL,
+        `from_uom` VARCHAR(20) NOT NULL,
+        `to_uom` VARCHAR(20) NOT NULL,
+        `conversion_factor` DOUBLE(10,4) NOT NULL DEFAULT 1.0000,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY `uq_barcode_from_to` (`barcode`, `from_uom`, `to_uom`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    echo json_encode(['success' => true]);
+
+} elseif ($action === 'uom_conversion_list') {
+    $barcode = trim($_POST['barcode'] ?? '');
+    if ($barcode === '') { echo json_encode([]); exit; }
+
+    // Ensure table exists
+    $connect->query("CREATE TABLE IF NOT EXISTS `uom_conversion` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `barcode` VARCHAR(50) NOT NULL,
+        `from_uom` VARCHAR(20) NOT NULL,
+        `to_uom` VARCHAR(20) NOT NULL,
+        `conversion_factor` DOUBLE(10,4) NOT NULL DEFAULT 1.0000,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY `uq_barcode_from_to` (`barcode`, `from_uom`, `to_uom`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $stmt = $connect->prepare("SELECT `id`, `barcode`, `from_uom`, `to_uom`, `conversion_factor` FROM `uom_conversion` WHERE `barcode` = ? ORDER BY `from_uom` ASC");
+    $stmt->bind_param("s", $barcode);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $rows = [];
+    while ($r = $result->fetch_assoc()) {
+        $r['conversion_factor'] = floatval($r['conversion_factor']);
+        $rows[] = $r;
+    }
+    $stmt->close();
+    echo json_encode($rows);
+
+} elseif ($action === 'uom_conversion_create') {
+    $barcode = trim($_POST['barcode'] ?? '');
+    $fromUom = trim($_POST['from_uom'] ?? '');
+    $toUom = trim($_POST['to_uom'] ?? '');
+    $factor = floatval($_POST['conversion_factor'] ?? 0);
+
+    if ($barcode === '' || $fromUom === '' || $toUom === '') {
+        echo json_encode(['error' => 'Barcode, From UOM, and To UOM are required.']);
+        exit;
+    }
+    if ($fromUom === $toUom) {
+        echo json_encode(['error' => 'From UOM and To UOM must be different.']);
+        exit;
+    }
+    if ($factor <= 0) {
+        echo json_encode(['error' => 'Conversion factor must be greater than 0.']);
+        exit;
+    }
+
+    $stmt = $connect->prepare("INSERT INTO `uom_conversion` (`barcode`, `from_uom`, `to_uom`, `conversion_factor`) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param("sssd", $barcode, $fromUom, $toUom, $factor);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => 'Conversion added.', 'id' => $stmt->insert_id]);
+    } else {
+        if (strpos($connect->error, 'Duplicate') !== false) {
+            echo json_encode(['error' => 'This conversion already exists for this product.']);
+        } else {
+            echo json_encode(['error' => 'Failed: ' . $connect->error]);
+        }
+    }
+    $stmt->close();
+
+} elseif ($action === 'uom_conversion_update') {
+    $id = intval($_POST['id'] ?? 0);
+    $factor = floatval($_POST['conversion_factor'] ?? 0);
+    if ($id <= 0 || $factor <= 0) {
+        echo json_encode(['error' => 'Invalid data.']);
+        exit;
+    }
+    $stmt = $connect->prepare("UPDATE `uom_conversion` SET `conversion_factor` = ? WHERE `id` = ?");
+    $stmt->bind_param("di", $factor, $id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => 'Conversion updated.']);
+    } else {
+        echo json_encode(['error' => 'Failed: ' . $connect->error]);
+    }
+    $stmt->close();
+
+} elseif ($action === 'uom_conversion_delete') {
+    $id = intval($_POST['id'] ?? 0);
+    if ($id <= 0) { echo json_encode(['error' => 'Invalid ID.']); exit; }
+    $stmt = $connect->prepare("DELETE FROM `uom_conversion` WHERE `id` = ?");
+    $stmt->bind_param("i", $id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => 'Conversion deleted.']);
+    } else {
+        echo json_encode(['error' => 'Failed: ' . $connect->error]);
+    }
+    $stmt->close();
+
+} elseif ($action === 'uom_conversion_lookup') {
+    // Lookup conversion for a specific barcode + from_uom → product base UOM
+    $barcode = trim($_POST['barcode'] ?? '');
+    $fromUom = trim($_POST['from_uom'] ?? '');
+    if ($barcode === '' || $fromUom === '') {
+        echo json_encode(['found' => false]);
+        exit;
+    }
+
+    // Ensure table exists
+    $connect->query("CREATE TABLE IF NOT EXISTS `uom_conversion` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `barcode` VARCHAR(50) NOT NULL,
+        `from_uom` VARCHAR(20) NOT NULL,
+        `to_uom` VARCHAR(20) NOT NULL,
+        `conversion_factor` DOUBLE(10,4) NOT NULL DEFAULT 1.0000,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY `uq_barcode_from_to` (`barcode`, `from_uom`, `to_uom`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Get product base UOM
+    $pStmt = $connect->prepare("SELECT `uom` FROM `PRODUCTS` WHERE `barcode` = ? LIMIT 1");
+    $pStmt->bind_param("s", $barcode);
+    $pStmt->execute();
+    $pRow = $pStmt->get_result()->fetch_assoc();
+    $pStmt->close();
+    $baseUom = $pRow ? trim($pRow['uom'] ?? '') : '';
+
+    // If from_uom matches base UOM, no conversion needed
+    if ($fromUom === $baseUom || $baseUom === '') {
+        echo json_encode(['found' => false, 'base_uom' => $baseUom]);
+        exit;
+    }
+
+    // Look for conversion from_uom → base_uom
+    $cStmt = $connect->prepare("SELECT `conversion_factor`, `to_uom` FROM `uom_conversion` WHERE `barcode` = ? AND `from_uom` = ? AND `to_uom` = ? LIMIT 1");
+    $cStmt->bind_param("sss", $barcode, $fromUom, $baseUom);
+    $cStmt->execute();
+    $cRow = $cStmt->get_result()->fetch_assoc();
+    $cStmt->close();
+
+    if ($cRow) {
+        echo json_encode([
+            'found' => true,
+            'from_uom' => $fromUom,
+            'to_uom' => $cRow['to_uom'],
+            'conversion_factor' => floatval($cRow['conversion_factor']),
+            'base_uom' => $baseUom
+        ]);
+    } else {
+        echo json_encode(['found' => false, 'base_uom' => $baseUom]);
+    }
+
+} elseif ($action === 'uom_conversion_bulk_lookup') {
+    // Bulk lookup conversions for multiple barcodes at once (used by GRN form)
+    $barcodesJson = $_POST['barcodes'] ?? '[]';
+    $barcodes = json_decode($barcodesJson, true);
+    if (!is_array($barcodes) || empty($barcodes)) {
+        echo json_encode(['conversions' => []]);
+        exit;
+    }
+
+    // Ensure table exists
+    $connect->query("CREATE TABLE IF NOT EXISTS `uom_conversion` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `barcode` VARCHAR(50) NOT NULL,
+        `from_uom` VARCHAR(20) NOT NULL,
+        `to_uom` VARCHAR(20) NOT NULL,
+        `conversion_factor` DOUBLE(10,4) NOT NULL DEFAULT 1.0000,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY `uq_barcode_from_to` (`barcode`, `from_uom`, `to_uom`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $placeholders = implode(',', array_fill(0, count($barcodes), '?'));
+    $types = str_repeat('s', count($barcodes));
+
+    // Get all conversions for these barcodes
+    $stmt = $connect->prepare("SELECT uc.`barcode`, uc.`from_uom`, uc.`to_uom`, uc.`conversion_factor`, p.`uom` AS `base_uom`
+        FROM `uom_conversion` uc
+        LEFT JOIN `PRODUCTS` p ON uc.`barcode` = p.`barcode`
+        WHERE uc.`barcode` IN ($placeholders)");
+    $stmt->bind_param($types, ...$barcodes);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $conversions = [];
+    while ($r = $result->fetch_assoc()) {
+        $r['conversion_factor'] = floatval($r['conversion_factor']);
+        $conversions[] = $r;
+    }
+    $stmt->close();
+
+    echo json_encode(['conversions' => $conversions]);
+
 } else {
     echo json_encode(['error' => 'Invalid action.']);
 }
