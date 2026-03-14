@@ -104,6 +104,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .detail-row { display: flex; gap: 16px; margin-bottom: 6px; font-size: 13px; }
 .detail-label { font-weight: 600; min-width: 130px; color: var(--text-muted); }
 
+/* New product image upload */
+.np-img-upload-area { border: 2px dashed #d1d5db; border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all var(--transition); background: #fafbfc; position: relative; }
+.np-img-upload-area:hover { border-color: var(--primary); background: #fff5f5; }
+.np-img-upload-area.has-image { border-style: solid; border-color: #d1d5db; padding: 8px; }
+.np-upload-placeholder { color: var(--text-muted); font-size: 13px; }
+.np-btn-remove-img { position: absolute; top: 4px; right: 4px; background: #ef4444; color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+
 @media (max-width: 768px) {
     .page-content { padding: 16px; }
     .table-card { padding: 12px; }
@@ -253,6 +260,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 <div class="psm-search-bar mb-3">
                     <input type="text" class="form-control" id="psmSearchInput" placeholder="Enter product name or barcode..." autocomplete="off">
                     <button type="button" class="psm-search-btn" onclick="doProductSearch();"><i class="fas fa-search"></i> Search</button>
+                    <button type="button" class="btn-add" onclick="openNewProductModal();" style="white-space:nowrap;"><i class="fas fa-plus"></i> New Product</button>
                 </div>
                 <div id="psmResultsContainer">
                     <div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Enter a search term and click Search</div>
@@ -262,11 +270,87 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
+<!-- Add New Product Modal -->
+<div class="modal fade" id="newProductModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-box"></i> Add New Product</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Barcode <span class="text-danger">*</span></label>
+                        <input type="text" id="npBarcode" class="form-control" placeholder="Product barcode">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Product Code</label>
+                        <input type="text" id="npCode" class="form-control" placeholder="Product code">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Product Name <span class="text-danger">*</span></label>
+                    <input type="text" id="npName" class="form-control" placeholder="Product name">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Description</label>
+                    <textarea id="npDescription" class="form-control" rows="2" placeholder="Product description"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Product Image</label>
+                    <input type="file" id="npImage" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none;" onchange="npPreviewImage(this);">
+                    <div class="np-img-upload-area" id="npImgUploadArea" onclick="document.getElementById('npImage').click();">
+                        <div class="np-upload-placeholder" id="npImgPlaceholder">
+                            <i class="fas fa-cloud-upload-alt" style="font-size:28px;display:block;margin-bottom:8px;color:#9ca3af;"></i>
+                            Click to upload image<br><small>JPG, PNG, GIF, WebP (max 10MB)</small>
+                        </div>
+                        <img id="npImgPreview" src="" alt="" style="display:none;max-width:100%;max-height:200px;border-radius:6px;object-fit:contain;">
+                        <button type="button" class="np-btn-remove-img" id="npBtnRemoveImg" style="display:none;" onclick="npRemoveImage(event);"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Category</label>
+                        <select id="npCat" class="form-select" onchange="npLoadSubCatOptions();"></select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Sub Category</label>
+                        <select id="npSubCat" class="form-select"><option value="">-- Select --</option></select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">UOM</label>
+                        <select id="npUom" class="form-select"><option value="">-- Select --</option></select>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">QOH</label>
+                        <input type="number" id="npQoh" class="form-control" min="0" placeholder="0" value="0">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Rack</label>
+                        <select id="npRackSelect" class="form-select"><option value="">-- Select --</option></select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">Rack Remark</label>
+                        <input type="text" id="npRackRemark" class="form-control" placeholder="Rack remark (optional)">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success w-50" onclick="saveNewProduct();"><i class="fas fa-check"></i> Save & Add to PO</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-var poModal = null, viewModal = null, productSearchModal = null;
+var poModal = null, viewModal = null, productSearchModal = null, newProductModal = null;
 var currentStatus = '';
 var lineItemIndex = 0;
 
@@ -274,6 +358,7 @@ document.addEventListener('DOMContentLoaded', function() {
     poModal = new bootstrap.Modal(document.getElementById('poModal'));
     viewModal = new bootstrap.Modal(document.getElementById('viewModal'));
     productSearchModal = new bootstrap.Modal(document.getElementById('productSearchModal'));
+    newProductModal = new bootstrap.Modal(document.getElementById('newProductModal'));
     // Auto-focus search input when product search modal opens
     document.getElementById('productSearchModal').addEventListener('shown.bs.modal', function() {
         document.getElementById('psmSearchInput').focus();
@@ -679,6 +764,195 @@ function cancelPO(id, poNumber) {
                     }
                 }
             });
+        }
+    });
+}
+
+// ==================== NEW PRODUCT FROM PO ====================
+var npCategoriesCache = [];
+var npUomCache = [];
+var npRacksCache = [];
+var npDropdownsLoaded = false;
+
+function openNewProductModal() {
+    // Clear form
+    document.getElementById('npBarcode').value = '';
+    document.getElementById('npCode').value = '';
+    document.getElementById('npName').value = '';
+    document.getElementById('npDescription').value = '';
+    document.getElementById('npQoh').value = '0';
+    document.getElementById('npRackRemark').value = '';
+    document.getElementById('npImage').value = '';
+    document.getElementById('npImgPreview').style.display = 'none';
+    document.getElementById('npImgPreview').src = '';
+    document.getElementById('npImgPlaceholder').style.display = '';
+    document.getElementById('npBtnRemoveImg').style.display = 'none';
+    document.getElementById('npImgUploadArea').classList.remove('has-image');
+    document.getElementById('npSubCat').innerHTML = '<option value="">-- Select --</option>';
+
+    if (!npDropdownsLoaded) {
+        npLoadDropdowns(function() {
+            newProductModal.show();
+        });
+    } else {
+        npRefreshDropdowns();
+        newProductModal.show();
+    }
+}
+
+function npLoadDropdowns(callback) {
+    var pending = 3;
+    function done() { pending--; if (pending === 0) { npDropdownsLoaded = true; if (callback) callback(); } }
+
+    $.post('product_ajax.php', { action: 'cat_list' }, function(cats) {
+        npCategoriesCache = (cats || []).filter(function(c) { return c.status === 'ACTIVE'; });
+        npRefreshCatSelect();
+        done();
+    }, 'json');
+
+    $.post('product_ajax.php', { action: 'uom_list' }, function(uoms) {
+        npUomCache = (uoms || []).filter(function(u) { return u.status === 'ACTIVE'; });
+        npRefreshUomSelect();
+        done();
+    }, 'json');
+
+    $.post('product_ajax.php', { action: 'rack_list' }, function(racks) {
+        npRacksCache = racks || [];
+        npRefreshRackSelect();
+        done();
+    }, 'json');
+}
+
+function npRefreshDropdowns() {
+    npRefreshCatSelect();
+    npRefreshUomSelect();
+    npRefreshRackSelect();
+}
+
+function npRefreshCatSelect() {
+    var sel = document.getElementById('npCat');
+    sel.innerHTML = '<option value="">-- Select --</option>';
+    npCategoriesCache.forEach(function(c) {
+        sel.innerHTML += '<option value="' + escHtml(c.ccode) + '" data-name="' + escHtml(c.name) + '" data-id="' + c.id + '">' + escHtml(c.name) + '</option>';
+    });
+}
+
+function npRefreshUomSelect() {
+    var sel = document.getElementById('npUom');
+    sel.innerHTML = '<option value="">-- Select --</option>';
+    npUomCache.forEach(function(u) {
+        sel.innerHTML += '<option value="' + escHtml(u.name) + '">' + escHtml(u.name) + '</option>';
+    });
+}
+
+function npRefreshRackSelect() {
+    var sel = document.getElementById('npRackSelect');
+    sel.innerHTML = '<option value="">-- Select --</option>';
+    npRacksCache.forEach(function(r) {
+        sel.innerHTML += '<option value="' + escHtml(r.code) + '">' + escHtml(r.code) + (r.description ? ' - ' + escHtml(r.description) : '') + '</option>';
+    });
+}
+
+function npLoadSubCatOptions() {
+    var catCode = document.getElementById('npCat').value;
+    var sel = document.getElementById('npSubCat');
+    sel.innerHTML = '<option value="">-- Select --</option>';
+    if (!catCode) return;
+
+    var catObj = npCategoriesCache.find(function(c) { return c.ccode === catCode; });
+    if (!catObj) return;
+
+    $.post('product_ajax.php', { action: 'subcat_list', category_id: catObj.id }, function(subs) {
+        (subs || []).forEach(function(s) {
+            sel.innerHTML += '<option value="' + escHtml(s.sub_code) + '" data-name="' + escHtml(s.name) + '">' + escHtml(s.name) + '</option>';
+        });
+    }, 'json');
+}
+
+function npPreviewImage(input) {
+    if (input.files && input.files[0]) {
+        var file = input.files[0];
+        if (file.size > 10 * 1024 * 1024) {
+            Swal.fire({ icon: 'warning', text: 'Image must be smaller than 10MB.' });
+            input.value = '';
+            return;
+        }
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('npImgPreview').src = e.target.result;
+            document.getElementById('npImgPreview').style.display = '';
+            document.getElementById('npImgPlaceholder').style.display = 'none';
+            document.getElementById('npBtnRemoveImg').style.display = 'flex';
+            document.getElementById('npImgUploadArea').classList.add('has-image');
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function npRemoveImage(e) {
+    e.stopPropagation();
+    document.getElementById('npImage').value = '';
+    document.getElementById('npImgPreview').style.display = 'none';
+    document.getElementById('npImgPreview').src = '';
+    document.getElementById('npImgPlaceholder').style.display = '';
+    document.getElementById('npBtnRemoveImg').style.display = 'none';
+    document.getElementById('npImgUploadArea').classList.remove('has-image');
+}
+
+function saveNewProduct() {
+    var barcode = document.getElementById('npBarcode').value.trim();
+    var name = document.getElementById('npName').value.trim();
+
+    if (barcode === '' || name === '') {
+        Swal.fire({ icon: 'warning', text: 'Barcode and product name are required.' });
+        return;
+    }
+
+    var catSel = document.getElementById('npCat');
+    var subSel = document.getElementById('npSubCat');
+    var catCode = catSel.value.trim();
+    var subCode = subSel.value.trim();
+    var catName = catSel.selectedOptions[0] ? (catSel.selectedOptions[0].getAttribute('data-name') || catSel.selectedOptions[0].textContent) : '';
+    var subName = subSel.selectedOptions[0] ? (subSel.selectedOptions[0].getAttribute('data-name') || subSel.selectedOptions[0].textContent) : '';
+    if (catSel.value === '') { catName = ''; catCode = ''; }
+    if (subSel.value === '') { subName = ''; subCode = ''; }
+
+    var formData = new FormData();
+    formData.append('action', 'create');
+    formData.append('barcode', barcode);
+    formData.append('code', document.getElementById('npCode').value.trim());
+    formData.append('name', name);
+    formData.append('description', document.getElementById('npDescription').value.trim());
+    formData.append('cat', catName);
+    formData.append('sub_cat', subName);
+    formData.append('cat_code', catCode);
+    formData.append('sub_code', subCode);
+    formData.append('uom', document.getElementById('npUom').value.trim());
+    formData.append('qoh', document.getElementById('npQoh').value);
+    formData.append('rack', document.getElementById('npRackSelect').value.trim());
+    formData.append('rack_remark', document.getElementById('npRackRemark').value.trim());
+    formData.append('checked', 'Y');
+    formData.append('existing_image', '');
+    formData.append('remove_image', '0');
+
+    var imageFile = document.getElementById('npImage').files[0];
+    if (imageFile) {
+        formData.append('product_image', imageFile);
+    }
+
+    $.ajax({
+        type: 'POST', url: 'product_ajax.php', data: formData, dataType: 'json',
+        processData: false, contentType: false,
+        success: function(data) {
+            if (data.success) {
+                var uom = document.getElementById('npUom').value.trim();
+                newProductModal.hide();
+                // Auto-add the new product as a line item
+                addLineItem(barcode, name, uom, 1);
+                Swal.fire({ icon: 'success', text: 'Product created and added to PO.', timer: 1500, showConfirmButton: false });
+            } else {
+                Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
+            }
         }
     });
 }
