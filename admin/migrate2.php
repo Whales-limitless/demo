@@ -287,6 +287,24 @@ if ($action === 'import_sql') {
         $connect->query("SET FOREIGN_KEY_CHECKS = 1");
     }
 
+    // Ensure required columns exist before import
+    $columnFixes = [
+        ['category', 'sort_no', "ALTER TABLE `category` ADD COLUMN `sort_no` int(11) DEFAULT NULL"],
+        ['cat_group', 'status', "ALTER TABLE `cat_group` ADD COLUMN `status` enum('ACTIVE','INACTIVE') NOT NULL DEFAULT 'ACTIVE'"],
+        ['PRODUCTS', 'rack_remark', "ALTER TABLE `PRODUCTS` ADD COLUMN `rack_remark` varchar(255) DEFAULT NULL"],
+        ['PRODUCTS', 'rack_updated_at', "ALTER TABLE `PRODUCTS` ADD COLUMN `rack_updated_at` datetime DEFAULT NULL"],
+    ];
+    foreach ($columnFixes as $fix) {
+        $chk = $connect->query("SHOW COLUMNS FROM `{$fix[0]}` LIKE '{$fix[1]}'");
+        if ($chk && $chk->num_rows === 0) {
+            if ($connect->query($fix[2])) {
+                $results[] = ['ok', "Added missing column `{$fix[1]}` to `{$fix[0]}`"];
+            } else {
+                $results[] = ['fail', "Failed to add `{$fix[1]}` to `{$fix[0]}`: " . $connect->error];
+            }
+        }
+    }
+
     // Import the SQL file
     $results[] = ['info', 'Importing: ' . basename($selectedFile) . ' (' . number_format(filesize($filePath) / 1048576, 1) . ' MB)'];
 
