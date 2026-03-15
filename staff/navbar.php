@@ -33,6 +33,24 @@ a[onclick*="delete"], a[onclick*="remove"],
 #lineItems .btn-remove-line,
 .cart-btn,
 form button[type="submit"].btn-success,
+/* Purchase / Add to Cart / Checkout / Confirm */
+.btn-add-cart,
+button[onclick*="addToCart"],
+.btn-confirm, .btn-next,
+button[onclick*="goToConfirm"],
+button[onclick*="handleConfirmClick"],
+button[onclick*="confirmOrder"], button[onclick*="submitOrder"], button[onclick*="placeOrder"],
+/* Stock take save/submit */
+.save-btn, .btn-save,
+button[onclick*="saveDraft"], button[onclick*="submitCount"],
+button[onclick*="saveRackSelection"], button[onclick*="saveRackRemark"],
+/* Stock loss record */
+.btn-record,
+button[onclick*="recordLoss"],
+/* GRN receive */
+button[onclick*="receive"], button[onclick*="Receive"],
+button[onclick*="submitReceive"], button[onclick*="selectMode"],
+.receive-mode-btn, #btnReceive,
 /* Subcategory/UOM add forms inside modals */
 body.permission-view .modal-body .d-flex button.btn-success,
 body.permission-view .modal-body button.btn-success { display: none !important; }
@@ -47,6 +65,8 @@ body.permission-view .rack-tag[onclick],
 body.permission-view .rack-remark-tag[onclick],
 body.permission-view [onclick*="openRackModal"],
 body.permission-view [onclick*="openRackRemarkModal"] { pointer-events: none; opacity: 0.7; }
+/* Hide cart badge counter */
+body.permission-view .cart-badge { display: none !important; }
 </style>
 <script>document.addEventListener('DOMContentLoaded',function(){document.body.classList.add('permission-view');});</script>
 <?php endif; ?>
