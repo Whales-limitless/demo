@@ -22,6 +22,12 @@ if ($chkCol && $chkCol->num_rows === 0) {
     $connect->query("ALTER TABLE `grn_item` ADD COLUMN `inventory_uom` VARCHAR(20) DEFAULT NULL AFTER `qty_converted`");
 }
 
+// Ensure PRODUCTS has stock_in_at column
+$chkStockInAt = $connect->query("SHOW COLUMNS FROM `PRODUCTS` LIKE 'stock_in_at'");
+if ($chkStockInAt && $chkStockInAt->num_rows === 0) {
+    $connect->query("ALTER TABLE `PRODUCTS` ADD COLUMN `stock_in_at` DATETIME DEFAULT NULL AFTER `rack_updated_at`");
+}
+
 // Ensure uom_conversion table exists
 $connect->query("CREATE TABLE IF NOT EXISTS `uom_conversion` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -237,7 +243,8 @@ if ($action === 'list') {
         $stmt->close();
 
         $grnItemStmt = $connect->prepare("INSERT INTO `grn_item` (`grn_id`,`po_item_id`,`barcode`,`product_desc`,`qty_received`,`qty_rejected`,`receive_uom`,`qty_converted`,`inventory_uom`,`unit_cost`,`batch_no`,`exp_date`,`rack_location`) VALUES (?,?,?,?,?,?,?,?,?,0,?,?,?)");
-        $updateQohStmt = $connect->prepare("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) + ? WHERE `barcode` = ?");
+        $stockInAt = date('Y-m-d H:i:s');
+        $updateQohStmt = $connect->prepare("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) + ?, `stock_in_at` = ? WHERE `barcode` = ?");
         $updatePoItemStmt = $connect->prepare("UPDATE `purchase_order_item` SET `qty_received` = COALESCE(`qty_received`, 0) + ? WHERE `id` = ?");
 
         foreach ($items as $item) {
@@ -269,7 +276,7 @@ if ($action === 'list') {
             // Use converted qty for inventory update (base UOM)
             $stockQty = $qtyConverted > 0 ? $qtyConverted : $qtyReceived;
             if ($stockQty > 0 && $barcode !== '') {
-                $updateQohStmt->bind_param("ds", $stockQty, $barcode);
+                $updateQohStmt->bind_param("dss", $stockQty, $stockInAt, $barcode);
                 $updateQohStmt->execute();
             }
 
