@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['admin_level'] = $user['LEVEL'] ?? 0;
             $_SESSION['admin_type'] = $user['TYPE'] ?? '';
             $_SESSION['admin_outlet'] = $user['OUTLET'] ?? '';
+            $_SESSION['admin_permission'] = $user['PERMISSION'] ?? 'FULL';
             header("Location: dashboard.php");
             exit;
         } else {

@@ -48,7 +48,7 @@ function generateCode($connect) {
 
 if ($action === 'get') {
     $id = intval($_POST['id'] ?? 0);
-    $stmt = $connect->prepare("SELECT `ID`,`USER1`,`USER_NAME`,`USERNAME`,`TYPE`,`OUTLET` FROM `sysfile` WHERE `ID` = ? LIMIT 1");
+    $stmt = $connect->prepare("SELECT `ID`,`USER1`,`USER_NAME`,`USERNAME`,`TYPE`,`PERMISSION`,`OUTLET` FROM `sysfile` WHERE `ID` = ? LIMIT 1");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -61,11 +61,12 @@ if ($action === 'get') {
     $stmt->close();
 
 } elseif ($action === 'create') {
-    $username = trim($_POST['username'] ?? '');
-    $password = trim($_POST['password'] ?? '');
-    $name     = trim($_POST['name'] ?? '');
-    $type     = trim($_POST['type'] ?? 'S');
-    $branch   = trim($_POST['branch'] ?? '');
+    $username   = trim($_POST['username'] ?? '');
+    $password   = trim($_POST['password'] ?? '');
+    $name       = trim($_POST['name'] ?? '');
+    $type       = trim($_POST['type'] ?? 'S');
+    $permission = trim($_POST['permission'] ?? 'FULL');
+    $branch     = trim($_POST['branch'] ?? '');
 
     if ($username === '' || $password === '') {
         echo json_encode(['error' => 'Username and password are required.']);
@@ -82,6 +83,11 @@ if ($action === 'get') {
         $type = 'S';
     }
 
+    // Validate permission
+    if (!in_array($permission, ['FULL', 'VIEW'])) {
+        $permission = 'FULL';
+    }
+
     // Check duplicate username
     $chk = $connect->prepare("SELECT `ID` FROM `sysfile` WHERE `USER1` = ? LIMIT 1");
     $chk->bind_param("s", $username);
@@ -96,8 +102,8 @@ if ($action === 'get') {
     // Auto-generate code
     $code = generateCode($connect);
 
-    $stmt = $connect->prepare("INSERT INTO `sysfile` (`USER1`,`USER2`,`USER_NAME`,`USERNAME`,`TYPE`,`STATUS`,`OUTLET`) VALUES (?,?,?,?,?,'Y',?)");
-    $stmt->bind_param("ssssss", $username, $password, $name, $code, $type, $branch);
+    $stmt = $connect->prepare("INSERT INTO `sysfile` (`USER1`,`USER2`,`USER_NAME`,`USERNAME`,`TYPE`,`STATUS`,`PERMISSION`,`OUTLET`) VALUES (?,?,?,?,?,'Y',?,?)");
+    $stmt->bind_param("sssssss", $username, $password, $name, $code, $type, $permission, $branch);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => 'User created. Code: ' . $code]);
@@ -107,11 +113,12 @@ if ($action === 'get') {
     $stmt->close();
 
 } elseif ($action === 'update') {
-    $id       = intval($_POST['id'] ?? 0);
-    $password = trim($_POST['password'] ?? '');
-    $name     = trim($_POST['name'] ?? '');
-    $type     = trim($_POST['type'] ?? 'S');
-    $branch   = trim($_POST['branch'] ?? '');
+    $id         = intval($_POST['id'] ?? 0);
+    $password   = trim($_POST['password'] ?? '');
+    $name       = trim($_POST['name'] ?? '');
+    $type       = trim($_POST['type'] ?? 'S');
+    $permission = trim($_POST['permission'] ?? 'FULL');
+    $branch     = trim($_POST['branch'] ?? '');
 
     if ($id <= 0) {
         echo json_encode(['error' => 'Invalid user ID.']);
@@ -127,12 +134,16 @@ if ($action === 'get') {
         $type = 'S';
     }
 
+    if (!in_array($permission, ['FULL', 'VIEW'])) {
+        $permission = 'FULL';
+    }
+
     if ($password !== '') {
-        $stmt = $connect->prepare("UPDATE `sysfile` SET `USER2`=?, `USER_NAME`=?, `TYPE`=?, `OUTLET`=? WHERE `ID`=?");
-        $stmt->bind_param("ssssi", $password, $name, $type, $branch, $id);
+        $stmt = $connect->prepare("UPDATE `sysfile` SET `USER2`=?, `USER_NAME`=?, `TYPE`=?, `PERMISSION`=?, `OUTLET`=? WHERE `ID`=?");
+        $stmt->bind_param("sssssi", $password, $name, $type, $permission, $branch, $id);
     } else {
-        $stmt = $connect->prepare("UPDATE `sysfile` SET `USER_NAME`=?, `TYPE`=?, `OUTLET`=? WHERE `ID`=?");
-        $stmt->bind_param("sssi", $name, $type, $branch, $id);
+        $stmt = $connect->prepare("UPDATE `sysfile` SET `USER_NAME`=?, `TYPE`=?, `PERMISSION`=?, `OUTLET`=? WHERE `ID`=?");
+        $stmt->bind_param("ssssi", $name, $type, $permission, $branch, $id);
     }
 
     if ($stmt->execute()) {

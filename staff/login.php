@@ -35,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_outlet'] = $user['OUTLET'] ?? '';
             $_SESSION['user_dept'] = $user['DEPT'] ?? '';
             $_SESSION['user_type'] = $user['TYPE'] ?? 'S';
+            $_SESSION['user_permission'] = $user['PERMISSION'] ?? 'FULL';
 
             // Load branch name from branch table
             $_SESSION['user_branch_code'] = $user['OUTLET'] ?? '';
