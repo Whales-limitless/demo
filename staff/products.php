@@ -49,7 +49,7 @@ $sub_result = mysqli_query($connect, "SELECT DISTINCT sub_code, sub_cat, MIN(sor
 $subcategories = [];
 while ($sub = mysqli_fetch_assoc($sub_result)) {
     // Fetch products matching this category and subcategory
-    $prod_result = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity FROM PRODUCTS WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat_code) . "' AND sub_code = '" . mysqli_real_escape_string($connect, $sub['sub_code']) . "' ORDER BY name ASC");
+    $prod_result = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity FROM PRODUCTS WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat_code) . "' AND sub_code = '" . mysqli_real_escape_string($connect, $sub['sub_code']) . "' AND (checked != 'N' OR checked IS NULL) ORDER BY name ASC");
     $products = [];
     while ($prod = mysqli_fetch_assoc($prod_result)) {
         $prod['id'] = intval($prod['id']);
