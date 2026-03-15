@@ -18,32 +18,15 @@ $endDate = $_POST['end_date'] ?? date('Y-m-d');
 // ── Stock Movement Report ──
 if ($action === 'stock_movement') {
     $search = trim($_POST['search'] ?? '');
+    $selectedBranches = $_POST['branches'] ?? [];
+    if (!is_array($selectedBranches)) $selectedBranches = [];
+    // Filter out empty values
+    $selectedBranches = array_values(array_filter($selectedBranches, function($v) { return trim($v) !== ''; }));
+    $hasBranchFilter = !empty($selectedBranches);
 
-    $where = "WHERE o.SDATE >= ? AND o.SDATE <= ? AND o.BARCODE <> 'PT'";
-    $params = [$startDate, $endDate];
-    $types = "ss";
-
+    $searchParam = '';
     if ($search !== '') {
-        $where .= " AND (o.BARCODE LIKE ? OR o.PDESC LIKE ?)";
         $searchParam = '%' . $search . '%';
-        $params[] = $searchParam;
-        $params[] = $searchParam;
-        $types .= "ss";
-    }
-
-    // Get stock movements grouped by product
-    // Uses UNION of orderlist and stockadj to capture ALL products with movement
-    // Opening = current_qoh + out - adj_in + adj_out (reverse from current)
-    // Closing = opening - out + adj_in - adj_out
-
-    // Build search condition for stockadj subquery too
-    $adjSearchWhere = "";
-    $adjSearchParams = [];
-    $adjSearchTypes = "";
-    if ($search !== '') {
-        $adjSearchWhere = " AND (sa.BARCODE LIKE ? OR sa.BARCODE LIKE ?)";
-        $adjSearchParams = [$searchParam, $searchParam];
-        $adjSearchTypes = "ss";
     }
 
     $collate = "COLLATE utf8mb4_unicode_ci";
@@ -52,71 +35,60 @@ if ($action === 'stock_movement') {
     $hasGrn = $connect->query("SHOW TABLES LIKE 'grn'")->num_rows > 0
            && $connect->query("SHOW TABLES LIKE 'grn_item'")->num_rows > 0;
 
-    // Build GRN subqueries for the UNION and the qty_in sum
-    $grnUnion = "";
-    $grnJoin = "";
-    $grnSelect = "0 AS qty_grn_in";
-    $grnUnionParams = [];
-    $grnUnionTypes = "";
-    $grnJoinParams = [];
-    $grnJoinTypes = "";
+    // ── STEP 1: Get all products with movement (combined UNION) ──
+    $unionSql = "SELECT BARCODE $collate AS BARCODE, PDESC AS description FROM `orderlist`
+                WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'";
+    $unionParams = [$startDate, $endDate];
+    $unionTypes = "ss";
+    if ($search !== '') {
+        $unionSql .= " AND (BARCODE LIKE ? OR PDESC LIKE ?)";
+        $unionParams[] = $searchParam;
+        $unionParams[] = $searchParam;
+        $unionTypes .= "ss";
+    }
+    $unionSql .= " GROUP BY BARCODE, PDESC";
+
+    $unionSql .= " UNION SELECT sa.BARCODE $collate AS BARCODE, COALESCE(p2.name, sa.BARCODE) AS description FROM `stockadj` sa
+                LEFT JOIN `PRODUCTS` p2 ON sa.BARCODE $collate = p2.barcode $collate
+                WHERE sa.SDATE >= ? AND sa.SDATE <= ?";
+    $unionParams[] = $startDate;
+    $unionParams[] = $endDate;
+    $unionTypes .= "ss";
+    if ($search !== '') {
+        $unionSql .= " AND (sa.BARCODE LIKE ? OR sa.BARCODE LIKE ?)";
+        $unionParams[] = $searchParam;
+        $unionParams[] = $searchParam;
+        $unionTypes .= "ss";
+    }
+    $unionSql .= " GROUP BY sa.BARCODE";
 
     if ($hasGrn) {
-        $grnSearchWhere = "";
-        if ($search !== '') {
-            $grnSearchWhere = "AND (gi.barcode LIKE ? OR gi.product_desc LIKE ?)";
-        }
-        $grnUnion = "UNION
-                SELECT gi.barcode $collate AS BARCODE, COALESCE(p3.name, gi.product_desc, gi.barcode) AS description
+        $unionSql .= " UNION SELECT gi.barcode $collate AS BARCODE, COALESCE(p3.name, gi.product_desc, gi.barcode) AS description
                 FROM `grn_item` gi
                 LEFT JOIN `grn` g ON gi.grn_id = g.id
                 LEFT JOIN `PRODUCTS` p3 ON gi.barcode $collate = p3.barcode $collate
-                WHERE g.receive_date >= ? AND g.receive_date <= ?
-                $grnSearchWhere
-                GROUP BY gi.barcode";
-        $grnUnionParams = [$startDate, $endDate];
-        $grnUnionTypes = "ss";
+                WHERE g.receive_date >= ? AND g.receive_date <= ?";
+        $unionParams[] = $startDate;
+        $unionParams[] = $endDate;
+        $unionTypes .= "ss";
         if ($search !== '') {
-            $grnUnionParams[] = $searchParam;
-            $grnUnionParams[] = $searchParam;
-            $grnUnionTypes .= "ss";
+            $unionSql .= " AND (gi.barcode LIKE ? OR gi.product_desc LIKE ?)";
+            $unionParams[] = $searchParam;
+            $unionParams[] = $searchParam;
+            $unionTypes .= "ss";
         }
-
-        $grnSelect = "COALESCE(grn_in.qty_grn_in, 0) AS qty_grn_in";
-        $grnJoin = "LEFT JOIN (
-                SELECT gi.barcode AS BARCODE,
-                    SUM(gi.qty_received) AS qty_grn_in
-                FROM `grn_item` gi
-                LEFT JOIN `grn` g ON gi.grn_id = g.id
-                WHERE g.receive_date >= ? AND g.receive_date <= ?
-                GROUP BY gi.barcode
-            ) grn_in ON combined.BARCODE $collate = grn_in.BARCODE $collate";
-        $grnJoinParams = [$startDate, $endDate];
-        $grnJoinTypes = "ss";
+        $unionSql .= " GROUP BY gi.barcode";
     }
 
-    $sql = "SELECT
-                combined.BARCODE,
-                combined.description,
+    // ── STEP 2: Main query with total In/Out/Adj ──
+    $sql = "SELECT combined.BARCODE, combined.description,
                 COALESCE(p.qoh, 0) AS current_qoh,
                 COALESCE(orders.qty_out, 0) AS qty_out,
                 COALESCE(orders.qty_stockin, 0) AS qty_stockin,
                 COALESCE(adj.adj_in, 0) AS adj_in,
                 COALESCE(adj.adj_out, 0) AS adj_out,
-                $grnSelect
-            FROM (
-                SELECT BARCODE $collate AS BARCODE, PDESC AS description FROM `orderlist`
-                WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'
-                " . ($search !== '' ? "AND (BARCODE LIKE ? OR PDESC LIKE ?)" : "") . "
-                GROUP BY BARCODE, PDESC
-                UNION
-                SELECT sa.BARCODE $collate AS BARCODE, COALESCE(p2.name, sa.BARCODE) AS description FROM `stockadj` sa
-                LEFT JOIN `PRODUCTS` p2 ON sa.BARCODE $collate = p2.barcode $collate
-                WHERE sa.SDATE >= ? AND sa.SDATE <= ?
-                $adjSearchWhere
-                GROUP BY sa.BARCODE
-                $grnUnion
-            ) combined
+                " . ($hasGrn ? "COALESCE(grn_in.qty_grn_in, 0)" : "0") . " AS qty_grn_in
+            FROM ($unionSql) combined
             LEFT JOIN `PRODUCTS` p ON combined.BARCODE $collate = p.barcode $collate
             LEFT JOIN (
                 SELECT BARCODE,
@@ -133,41 +105,26 @@ if ($action === 'stock_movement') {
                 FROM `stockadj`
                 WHERE SDATE >= ? AND SDATE <= ?
                 GROUP BY BARCODE
-            ) adj ON combined.BARCODE $collate = adj.BARCODE $collate
-            $grnJoin
-            ORDER BY combined.description ASC";
+            ) adj ON combined.BARCODE $collate = adj.BARCODE $collate";
 
-    // Build params: combined(orderlist + stockadj + grn unions), then orders, adj, grn joins
-    $allParams = [$startDate, $endDate];
-    $allTypes = "ss";
-    if ($search !== '') {
-        $allParams[] = $searchParam;
-        $allParams[] = $searchParam;
-        $allTypes .= "ss";
+    $allParams = $unionParams;
+    $allTypes = $unionTypes;
+    // orders subquery
+    $allParams[] = $startDate; $allParams[] = $endDate; $allTypes .= "ss";
+    // adj subquery
+    $allParams[] = $startDate; $allParams[] = $endDate; $allTypes .= "ss";
+
+    if ($hasGrn) {
+        $sql .= " LEFT JOIN (
+                SELECT gi.barcode AS BARCODE, SUM(gi.qty_received) AS qty_grn_in
+                FROM `grn_item` gi LEFT JOIN `grn` g ON gi.grn_id = g.id
+                WHERE g.receive_date >= ? AND g.receive_date <= ?
+                GROUP BY gi.barcode
+            ) grn_in ON combined.BARCODE $collate = grn_in.BARCODE $collate";
+        $allParams[] = $startDate; $allParams[] = $endDate; $allTypes .= "ss";
     }
-    // stockadj union dates + search
-    $allParams[] = $startDate;
-    $allParams[] = $endDate;
-    $allTypes .= "ss";
-    if ($search !== '') {
-        $allParams[] = $searchParam;
-        $allParams[] = $searchParam;
-        $allTypes .= "ss";
-    }
-    // grn union params
-    foreach ($grnUnionParams as $p) { $allParams[] = $p; }
-    $allTypes .= $grnUnionTypes;
-    // orders subquery dates
-    $allParams[] = $startDate;
-    $allParams[] = $endDate;
-    $allTypes .= "ss";
-    // adj subquery dates
-    $allParams[] = $startDate;
-    $allParams[] = $endDate;
-    $allTypes .= "ss";
-    // grn join params
-    foreach ($grnJoinParams as $p) { $allParams[] = $p; }
-    $allTypes .= $grnJoinTypes;
+
+    $sql .= " ORDER BY combined.description ASC";
 
     $stmt = $connect->prepare($sql);
     if (!$stmt) {
@@ -177,7 +134,9 @@ if ($action === 'stock_movement') {
     $stmt->bind_param($allTypes, ...$allParams);
     $stmt->execute();
     $result = $stmt->get_result();
-    $rows = [];
+
+    // Build base rows keyed by barcode
+    $productRows = [];
     while ($r = $result->fetch_assoc()) {
         $out = floatval($r['qty_out']);
         $stockIn = floatval($r['qty_stockin']);
@@ -186,11 +145,10 @@ if ($action === 'stock_movement') {
         $adjOut = floatval($r['adj_out']);
         $currentQoh = floatval($r['current_qoh']);
         $totalIn = $stockIn + $grnIn + $adjIn;
-        // Opening = current_qoh + out - totalIn + adj_out
         $opening = $currentQoh + $out - $totalIn + $adjOut;
         $closing = $opening + $totalIn - $out - $adjOut;
 
-        $rows[] = [
+        $productRows[$r['BARCODE']] = [
             'description' => $r['description'] ?: $r['BARCODE'],
             'opening' => $opening,
             'in' => $totalIn,
@@ -200,7 +158,93 @@ if ($action === 'stock_movement') {
         ];
     }
     $stmt->close();
-    echo json_encode(['rows' => $rows]);
+
+    // ── STEP 3: If branch filter, get per-branch In/Out/Adj ──
+    $branchInfo = [];
+    if ($hasBranchFilter) {
+        // Fetch branch names
+        $branchPlaceholders = implode(',', array_fill(0, count($selectedBranches), '?'));
+        $brStmt = $connect->prepare("SELECT `code`, `name` FROM `branch` WHERE `code` IN ($branchPlaceholders) ORDER BY `name` ASC");
+        $brTypes = str_repeat('s', count($selectedBranches));
+        $brStmt->bind_param($brTypes, ...$selectedBranches);
+        $brStmt->execute();
+        $brResult = $brStmt->get_result();
+        while ($br = $brResult->fetch_assoc()) {
+            $branchInfo[] = ['code' => $br['code'], 'name' => $br['name']];
+        }
+        $brStmt->close();
+
+        // Per-branch orderlist data (In/Out)
+        $branchInPlaceholders = implode(',', array_fill(0, count($selectedBranches), '?'));
+        $brOrderSql = "SELECT BARCODE, COALESCE(branch_code, '') AS branch_code,
+                SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') THEN QTY ELSE 0 END) AS qty_out,
+                SUM(CASE WHEN PTYPE = 'STOCKIN' THEN QTY ELSE 0 END) AS qty_stockin
+            FROM `orderlist`
+            WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'
+                AND COALESCE(branch_code, '') IN ($branchInPlaceholders)
+            GROUP BY BARCODE, branch_code";
+        $brOrderParams = [$startDate, $endDate];
+        $brOrderTypes = "ss";
+        foreach ($selectedBranches as $bc) { $brOrderParams[] = $bc; $brOrderTypes .= "s"; }
+
+        $brOrderStmt = $connect->prepare($brOrderSql);
+        $brOrderStmt->bind_param($brOrderTypes, ...$brOrderParams);
+        $brOrderStmt->execute();
+        $brOrderResult = $brOrderStmt->get_result();
+
+        // Initialize branch data for all products
+        foreach ($productRows as $barcode => &$row) {
+            $row['branches'] = [];
+            foreach ($selectedBranches as $bc) {
+                $row['branches'][$bc] = ['in' => 0, 'out' => 0, 'adj' => 0];
+            }
+        }
+        unset($row);
+
+        while ($r = $brOrderResult->fetch_assoc()) {
+            $bc = $r['branch_code'];
+            $barcode = $r['BARCODE'];
+            if (isset($productRows[$barcode]) && isset($productRows[$barcode]['branches'][$bc])) {
+                $productRows[$barcode]['branches'][$bc]['in'] += floatval($r['qty_stockin']);
+                $productRows[$barcode]['branches'][$bc]['out'] += floatval($r['qty_out']);
+            }
+        }
+        $brOrderStmt->close();
+
+        // Per-branch stockadj data (Adj)
+        $brAdjSql = "SELECT BARCODE, COALESCE(branch_code, '') AS branch_code,
+                SUM(CASE WHEN QTYADJ > 0 THEN QTYADJ ELSE 0 END) AS adj_in,
+                SUM(CASE WHEN QTYADJ < 0 THEN ABS(QTYADJ) ELSE 0 END) AS adj_out
+            FROM `stockadj`
+            WHERE SDATE >= ? AND SDATE <= ?
+                AND COALESCE(branch_code, '') IN ($branchInPlaceholders)
+            GROUP BY BARCODE, branch_code";
+        $brAdjParams = [$startDate, $endDate];
+        $brAdjTypes = "ss";
+        foreach ($selectedBranches as $bc) { $brAdjParams[] = $bc; $brAdjTypes .= "s"; }
+
+        $brAdjStmt = $connect->prepare($brAdjSql);
+        $brAdjStmt->bind_param($brAdjTypes, ...$brAdjParams);
+        $brAdjStmt->execute();
+        $brAdjResult = $brAdjStmt->get_result();
+
+        while ($r = $brAdjResult->fetch_assoc()) {
+            $bc = $r['branch_code'];
+            $barcode = $r['BARCODE'];
+            if (isset($productRows[$barcode]) && isset($productRows[$barcode]['branches'][$bc])) {
+                $productRows[$barcode]['branches'][$bc]['adj'] += floatval($r['adj_in']) - floatval($r['adj_out']);
+                $productRows[$barcode]['branches'][$bc]['in'] += floatval($r['adj_in']);
+            }
+        }
+        $brAdjStmt->close();
+    }
+
+    $rows = array_values($productRows);
+    $response = ['rows' => $rows];
+    if ($hasBranchFilter) {
+        $response['branches'] = $branchInfo;
+    }
+    echo json_encode($response);
 
 // ── Sales by Date Report ──
 } elseif ($action === 'sales_by_date') {

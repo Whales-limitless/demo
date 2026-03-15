@@ -55,6 +55,19 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <label>Start Date:</label><input type="date" id="startDate" value="<?php echo date('Y-m-01'); ?>">
         <label>End Date:</label><input type="date" id="endDate" value="<?php echo date('Y-m-d'); ?>">
         <input type="text" id="searchInput" placeholder="Search product..." style="flex:1;max-width:250px;">
+        <div style="position:relative;" id="branchFilterWrap">
+            <button type="button" id="branchFilterBtn" onclick="toggleBranchDropdown();" style="padding:7px 14px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                <i class="fas fa-building"></i> <span id="branchFilterLabel">All Branches</span> <i class="fas fa-chevron-down" style="font-size:10px;"></i>
+            </button>
+            <div id="branchDropdown" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:100;min-width:220px;max-height:300px;overflow-y:auto;padding:8px 0;">
+                <div style="padding:6px 14px;border-bottom:1px solid #e5e7eb;">
+                    <label style="font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                        <input type="checkbox" id="branchSelectAll" checked onchange="toggleAllBranches(this.checked);"> All Branches
+                    </label>
+                </div>
+                <div id="branchCheckboxes" style="padding:4px 0;"></div>
+            </div>
+        </div>
         <button onclick="generateReport();"><i class="fas fa-search"></i> Apply Filter</button>
     </div>
 
@@ -94,11 +107,87 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
 <script>
 var dtTable = null;
+var allBranches = []; // [{code, name}, ...]
 
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 function fmtNum(n) { return parseFloat(n || 0).toFixed(2); }
 
+// ==================== BRANCH FILTER ====================
+function loadBranches() {
+    $.post('branch_ajax.php', { action: 'list' }, function(data) {
+        allBranches = data.branches || [];
+        var container = document.getElementById('branchCheckboxes');
+        if (allBranches.length === 0) {
+            container.innerHTML = '<div style="padding:8px 14px;color:#6b7280;font-size:12px;">No branches found</div>';
+            return;
+        }
+        var html = '';
+        allBranches.forEach(function(br) {
+            html += '<label style="display:flex;align-items:center;gap:8px;padding:5px 14px;font-size:13px;cursor:pointer;">' +
+                '<input type="checkbox" class="branch-cb" value="' + escHtml(br.code) + '" checked> ' +
+                escHtml(br.name) + '</label>';
+        });
+        container.innerHTML = html;
+        // Listen for individual checkbox changes
+        container.querySelectorAll('.branch-cb').forEach(function(cb) {
+            cb.addEventListener('change', updateBranchLabel);
+        });
+    }, 'json');
+}
+
+function toggleBranchDropdown() {
+    var dd = document.getElementById('branchDropdown');
+    dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', function(e) {
+    var wrap = document.getElementById('branchFilterWrap');
+    if (wrap && !wrap.contains(e.target)) {
+        document.getElementById('branchDropdown').style.display = 'none';
+    }
+});
+
+function toggleAllBranches(checked) {
+    document.querySelectorAll('.branch-cb').forEach(function(cb) { cb.checked = checked; });
+    updateBranchLabel();
+}
+
+function updateBranchLabel() {
+    var cbs = document.querySelectorAll('.branch-cb');
+    var checked = document.querySelectorAll('.branch-cb:checked');
+    var allCb = document.getElementById('branchSelectAll');
+
+    if (checked.length === 0 || checked.length === cbs.length) {
+        allCb.checked = true;
+        cbs.forEach(function(cb) { cb.checked = true; });
+        document.getElementById('branchFilterLabel').textContent = 'All Branches';
+    } else {
+        allCb.checked = false;
+        var names = [];
+        checked.forEach(function(cb) {
+            var br = allBranches.find(function(b) { return b.code === cb.value; });
+            if (br) names.push(br.name);
+        });
+        document.getElementById('branchFilterLabel').textContent = names.length <= 2 ? names.join(', ') : checked.length + ' branches';
+    }
+}
+
+function getSelectedBranches() {
+    var cbs = document.querySelectorAll('.branch-cb');
+    var checked = document.querySelectorAll('.branch-cb:checked');
+    // If all checked or none checked, return empty (= all branches combined)
+    if (checked.length === 0 || checked.length === cbs.length) return [];
+    var codes = [];
+    checked.forEach(function(cb) { codes.push(cb.value); });
+    return codes;
+}
+
+// Load branches on page ready
+document.addEventListener('DOMContentLoaded', function() { loadBranches(); });
+
+// ==================== REPORT ====================
 function generateReport() {
     var postData = {
         action: 'stock_movement',
@@ -107,46 +196,88 @@ function generateReport() {
         search: document.getElementById('searchInput').value.trim()
     };
 
+    var selBranches = getSelectedBranches();
+    for (var bi = 0; bi < selBranches.length; bi++) {
+        postData['branches[' + bi + ']'] = selBranches[bi];
+    }
+
     document.getElementById('reportContent').innerHTML = '<p style="text-align:center;padding:40px;"><i class="fas fa-spinner fa-spin"></i> Loading...</p>';
 
     $.ajax({
         type: 'POST', url: 'report_ajax.php', data: postData, dataType: 'json',
         success: function(data) {
             if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
-            renderTable(data.rows || []);
+            renderTable(data.rows || [], data.branches || []);
         },
         error: function() { Swal.fire({ icon: 'error', text: 'Failed to load report.' }); }
     });
 }
 
-function renderTable(rows) {
+function renderTable(rows, branches) {
     if (rows.length === 0) {
         document.getElementById('reportContent').innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px;">No data found for the selected period.</p>';
         document.getElementById('summaryCards').style.display = 'none';
         return;
     }
 
+    var hasBranches = branches && branches.length > 0;
     var totalIn = 0, totalOut = 0;
-    var html = '<table id="reportTable" class="table table-striped table-sm" style="width:100%;font-size:13px;">' +
-        '<thead><tr><th>No</th><th>Description</th><th class="text-end">Opening</th><th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Adj</th><th class="text-end">Closing</th></tr></thead><tbody>';
+
+    // Build header
+    var html = '<div style="overflow-x:auto;"><table id="reportTable" class="table table-striped table-sm" style="width:100%;font-size:13px;">';
+    html += '<thead>';
+
+    if (hasBranches) {
+        // Two-row header: top row for branch group names, bottom row for In/Out/Adj per branch + totals
+        html += '<tr><th rowspan="2" style="vertical-align:middle;">No</th><th rowspan="2" style="vertical-align:middle;">Description</th><th rowspan="2" class="text-end" style="vertical-align:middle;">Opening</th>';
+        branches.forEach(function(br) {
+            html += '<th colspan="3" class="text-center" style="background:#f0f4ff;border-bottom:2px solid #3b82f6;">' + escHtml(br.name) + '</th>';
+        });
+        html += '<th colspan="3" class="text-center" style="background:#f0fdf4;border-bottom:2px solid #16a34a;">Total</th>';
+        html += '<th rowspan="2" class="text-end" style="vertical-align:middle;">Closing</th></tr>';
+
+        html += '<tr>';
+        branches.forEach(function() {
+            html += '<th class="text-end" style="font-size:11px;background:#f0f4ff;">In</th><th class="text-end" style="font-size:11px;background:#f0f4ff;">Out</th><th class="text-end" style="font-size:11px;background:#f0f4ff;">Adj</th>';
+        });
+        html += '<th class="text-end" style="font-size:11px;background:#f0fdf4;">In</th><th class="text-end" style="font-size:11px;background:#f0fdf4;">Out</th><th class="text-end" style="font-size:11px;background:#f0fdf4;">Adj</th>';
+        html += '</tr>';
+    } else {
+        html += '<tr><th>No</th><th>Description</th><th class="text-end">Opening</th><th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Adj</th><th class="text-end">Closing</th></tr>';
+    }
+    html += '</thead><tbody>';
 
     rows.forEach(function(r, i) {
         var inQty = parseFloat(r.in) || 0;
         var outQty = parseFloat(r.out) || 0;
         totalIn += inQty;
         totalOut += outQty;
-        html += '<tr>' +
-            '<td>' + (i+1) + '</td>' +
-            '<td>' + escHtml(r.description) + '</td>' +
-            '<td class="text-end">' + fmtNum(r.opening) + '</td>' +
-            '<td class="text-end text-success fw-bold">' + (inQty > 0 ? fmtNum(inQty) : '') + '</td>' +
-            '<td class="text-end text-danger fw-bold">' + (outQty > 0 ? fmtNum(outQty) : '') + '</td>' +
-            '<td class="text-end">' + (parseFloat(r.adj) !== 0 ? fmtNum(r.adj) : '') + '</td>' +
-            '<td class="text-end fw-bold">' + fmtNum(r.closing) + '</td>' +
-            '</tr>';
+
+        html += '<tr>';
+        html += '<td>' + (i+1) + '</td>';
+        html += '<td>' + escHtml(r.description) + '</td>';
+        html += '<td class="text-end">' + fmtNum(r.opening) + '</td>';
+
+        if (hasBranches && r.branches) {
+            branches.forEach(function(br) {
+                var bd = r.branches[br.code] || { in: 0, out: 0, adj: 0 };
+                var brIn = parseFloat(bd.in) || 0;
+                var brOut = parseFloat(bd.out) || 0;
+                var brAdj = parseFloat(bd.adj) || 0;
+                html += '<td class="text-end text-success" style="background:#fafbff;">' + (brIn > 0 ? fmtNum(brIn) : '') + '</td>';
+                html += '<td class="text-end text-danger" style="background:#fafbff;">' + (brOut > 0 ? fmtNum(brOut) : '') + '</td>';
+                html += '<td class="text-end" style="background:#fafbff;">' + (brAdj !== 0 ? fmtNum(brAdj) : '') + '</td>';
+            });
+        }
+
+        html += '<td class="text-end text-success fw-bold">' + (inQty > 0 ? fmtNum(inQty) : '') + '</td>';
+        html += '<td class="text-end text-danger fw-bold">' + (outQty > 0 ? fmtNum(outQty) : '') + '</td>';
+        html += '<td class="text-end">' + (parseFloat(r.adj) !== 0 ? fmtNum(r.adj) : '') + '</td>';
+        html += '<td class="text-end fw-bold">' + fmtNum(r.closing) + '</td>';
+        html += '</tr>';
     });
 
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
     document.getElementById('reportContent').innerHTML = html;
 
     document.getElementById('summaryCards').style.display = 'flex';
