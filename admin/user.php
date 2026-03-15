@@ -10,6 +10,12 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 include('../staff/dbconnection.php');
 $connect->set_charset("utf8mb4");
 
+// Ensure PERMISSION column exists in sysfile
+$chkCol = $connect->query("SHOW COLUMNS FROM `sysfile` LIKE 'PERMISSION'");
+if ($chkCol && $chkCol->num_rows === 0) {
+    $connect->query("ALTER TABLE `sysfile` ADD COLUMN `PERMISSION` VARCHAR(10) NOT NULL DEFAULT 'FULL' AFTER `STATUS`");
+}
+
 // Ensure branch table exists
 $connect->query("CREATE TABLE IF NOT EXISTS `branch` (
     `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -290,6 +296,7 @@ body {
                         <th>Username</th>
                         <th>Name</th>
                         <th>Type</th>
+                        <th>Permission</th>
                         <th>Branch</th>
                         <th style="width:1%">Action</th>
                     </tr>
@@ -297,7 +304,7 @@ body {
                 <tbody id="usersBody">
                     <?php if (count($users) === 0): ?>
                     <tr class="no-results">
-                        <td colspan="7"><i class="fas fa-users-slash" style="font-size:24px;margin-bottom:8px;display:block;"></i>No users found</td>
+                        <td colspan="8"><i class="fas fa-users-slash" style="font-size:24px;margin-bottom:8px;display:block;"></i>No users found</td>
                     </tr>
                     <?php else: ?>
                     <?php foreach ($users as $i => $u): ?>
@@ -318,6 +325,14 @@ body {
                         <td><strong><?php echo htmlspecialchars($u['USER1'] ?? ''); ?></strong></td>
                         <td><?php echo htmlspecialchars($u['USER_NAME'] ?? ''); ?></td>
                         <td><span class="badge-type <?php echo $badgeClass; ?>"><?php echo $typeName; ?></span></td>
+                        <td><?php
+                            $perm = $u['PERMISSION'] ?? 'FULL';
+                            if ($perm === 'VIEW') {
+                                echo '<span class="badge-type" style="background:#fef3c7;color:#b45309;">View Only</span>';
+                            } else {
+                                echo '<span class="badge-type" style="background:#d1fae5;color:#047857;">Full Access</span>';
+                            }
+                        ?></td>
                         <td><?php
                             $userOutlet = $u['OUTLET'] ?? '';
                             echo !empty($userOutlet) && isset($branchMap[$userOutlet]) ? htmlspecialchars($branchMap[$userOutlet]) : '<span style="color:var(--text-muted);font-size:12px;">-</span>';
@@ -379,6 +394,14 @@ body {
                         <option value="A">Admin</option>
                         <option value="D">Delivery</option>
                     </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="fPermission">Permission <span class="text-danger">*</span></label>
+                    <select id="fPermission" class="form-select">
+                        <option value="FULL">Full Access</option>
+                        <option value="VIEW">View Only</option>
+                    </select>
+                    <div class="form-text">Full Access = create, edit, delete. View Only = browse and view only.</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold" for="fBranch">Branch <span class="text-danger">*</span></label>
@@ -477,6 +500,7 @@ function openCreateModal() {
     document.getElementById('passwordHint').style.display = 'none';
     document.getElementById('fName').value = '';
     document.getElementById('fType').value = 'S';
+    document.getElementById('fPermission').value = 'FULL';
     document.getElementById('fBranch').value = '';
     userModal.show();
 }
@@ -505,6 +529,7 @@ function openEditModal(id) {
             document.getElementById('fPassword').value = '';
             document.getElementById('fName').value = data.USER_NAME || '';
             document.getElementById('fType').value = data.TYPE || 'S';
+            document.getElementById('fPermission').value = data.PERMISSION || 'FULL';
             document.getElementById('fBranch').value = data.OUTLET || '';
             userModal.show();
         }
@@ -518,6 +543,7 @@ function saveUser() {
     var password = document.getElementById('fPassword').value.trim();
     var name = document.getElementById('fName').value.trim();
     var type = document.getElementById('fType').value;
+    var permission = document.getElementById('fPermission').value;
     var branch = document.getElementById('fBranch').value;
 
     if (username === '') {
@@ -541,6 +567,7 @@ function saveUser() {
         password: password,
         name: name,
         type: type,
+        permission: permission,
         branch: branch
     };
 

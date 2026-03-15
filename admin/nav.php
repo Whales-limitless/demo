@@ -166,6 +166,30 @@
 }
 </style>
 
+<?php
+$adminPermission = $_SESSION['admin_permission'] ?? 'FULL';
+if ($adminPermission === 'VIEW'): ?>
+<style>
+/* === VIEW-ONLY PERMISSION: hide all create/edit/delete actions === */
+.btn-add, .btn-edit, .btn-delete, .btn-remove-line,
+button[onclick*="openCreateModal"], button[onclick*="openCreate"],
+button[onclick*="savePO"], button[onclick*="saveUser"],
+button[onclick*="approvePO"], button[onclick*="cancelPO"],
+button[onclick*="deleteBranch"], button[onclick*="deleteUser"],
+button[onclick*="saveBranch"], button[onclick*="addLineItem"],
+button[onclick*="removeLine"],
+.modal-footer .btn-success,
+.modal-footer button[onclick*="save"],
+#lineItems .btn-remove-line,
+form button[type="submit"].btn-success { display: none !important; }
+/* Make form inputs read-only appearance */
+body.permission-view .modal-body input:not([type="hidden"]),
+body.permission-view .modal-body select,
+body.permission-view .modal-body textarea { pointer-events: none; opacity: 0.7; }
+</style>
+<script>document.addEventListener('DOMContentLoaded',function(){document.body.classList.add('permission-view');});</script>
+<?php endif; ?>
+
 <?php include('topbar.php'); ?>
 <?php include('sidebar.php'); ?>
 

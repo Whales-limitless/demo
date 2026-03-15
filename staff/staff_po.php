@@ -553,7 +553,7 @@ function addLineItem(barcode, desc, uom, qty) {
     function render() {
         var html = '<tr id="line_' + idx + '" data-base-uom="' + escHtml(uom || '') + '">';
         html += '<td>' + idx + '</td>';
-        html += '<td>' + escHtml(desc) + '<input type="hidden" class="li-barcode" value="' + escHtml(barcode) + '"><input type="hidden" class="li-desc" value="' + escHtml(desc) + '"></td>';
+        html += '<td><input type="text" class="li-desc" value="' + escHtml(desc) + '" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:4px 6px;font-size:0.95em;"><input type="hidden" class="li-barcode" value="' + escHtml(barcode) + '"></td>';
         html += '<td><small class="text-muted">' + escHtml(barcode) + '</small></td>';
         html += '<td>' + buildUomSelect(idx, uom || '') + '</td>';
         html += '<td><input type="number" class="li-qty" value="' + (parseFloat(qty) || 1) + '" min="0" step="any" onchange="onLineQtyChange(' + idx + ');" oninput="onLineQtyChange(' + idx + ');"></td>';
