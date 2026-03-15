@@ -107,6 +107,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .tag-rack.unset { background: var(--bg); color: var(--text-muted); }
 .tag-rack-remark { background: #e0f2fe; color: #0369a1; }
 .tag-rack-date { background: #f3e8ff; color: #7c3aed; font-size: 9px; }
+.tag-stock-in-date { background: #ecfdf5; color: #059669; font-size: 9px; }
 .tag-btn { cursor: pointer; transition: all var(--transition); }
 .tag-btn:hover { opacity: 0.8; transform: translateY(-1px); }
 
@@ -384,6 +385,9 @@ function renderProductCard(p, index) {
   }
   if (p.rack_updated_at) {
     tags += '<span class="tag tag-rack-date">Updated: ' + formatRackDate(p.rack_updated_at) + '</span>';
+  }
+  if (p.stock_in_at) {
+    tags += '<span class="tag tag-stock-in-date">Stock In: ' + formatRackDate(p.stock_in_at) + '</span>';
   }
 
   return '<div class="product-card" data-id="' + p.id + '" data-name="' + escAttr(p.name.toLowerCase()) + '" data-sku="' + escAttr((p.sku || '').toLowerCase()) + '" data-barcode="' + escAttr((p.barcode || '').toLowerCase()) + '" style="animation-delay:' + (index+1)*0.03 + 's">' +
