@@ -182,6 +182,7 @@ if ($action === 'list') {
     $stmt->close();
 
     $itemStmt = $connect->prepare("INSERT INTO `purchase_order_item` (`po_id`,`barcode`,`product_desc`,`qty_ordered`,`unit_cost`,`uom`) VALUES (?,?,?,?,?,?)");
+    $prodNameStmt = $connect->prepare("UPDATE `PRODUCTS` SET `name` = ? WHERE `barcode` = ?");
     $totalAmount = 0;
     foreach ($items as $item) {
         $barcode = trim($item['barcode'] ?? '');
@@ -192,8 +193,14 @@ if ($action === 'list') {
         $totalAmount += $qtyOrdered * $unitCost;
         $itemStmt->bind_param("issdds", $newPoId, $barcode, $desc, $qtyOrdered, $unitCost, $uom);
         $itemStmt->execute();
+        // Update product name in PRODUCTS table
+        if ($barcode !== '' && $desc !== '') {
+            $prodNameStmt->bind_param("ss", $desc, $barcode);
+            $prodNameStmt->execute();
+        }
     }
     $itemStmt->close();
+    $prodNameStmt->close();
 
     $connect->query("UPDATE `purchase_order` SET `total_amount` = $totalAmount WHERE `id` = $newPoId");
 
@@ -242,6 +249,7 @@ if ($action === 'list') {
     $delStmt->close();
 
     $itemStmt = $connect->prepare("INSERT INTO `purchase_order_item` (`po_id`,`barcode`,`product_desc`,`qty_ordered`,`unit_cost`,`uom`) VALUES (?,?,?,?,?,?)");
+    $prodNameStmt = $connect->prepare("UPDATE `PRODUCTS` SET `name` = ? WHERE `barcode` = ?");
     $totalAmount = 0;
     foreach ($items as $item) {
         $barcode = trim($item['barcode'] ?? '');
@@ -252,8 +260,14 @@ if ($action === 'list') {
         $totalAmount += $qtyOrdered * $unitCost;
         $itemStmt->bind_param("issdds", $id, $barcode, $desc, $qtyOrdered, $unitCost, $uom);
         $itemStmt->execute();
+        // Update product name in PRODUCTS table
+        if ($barcode !== '' && $desc !== '') {
+            $prodNameStmt->bind_param("ss", $desc, $barcode);
+            $prodNameStmt->execute();
+        }
     }
     $itemStmt->close();
+    $prodNameStmt->close();
 
     $connect->query("UPDATE `purchase_order` SET `total_amount` = $totalAmount WHERE `id` = " . intval($id));
 

@@ -229,6 +229,7 @@ if ($action === 'search_products') {
     $stmt->close();
 
     $itemStmt = $connect->prepare("INSERT INTO `purchase_order_item` (`po_id`,`barcode`,`product_desc`,`qty_ordered`,`unit_cost`,`uom`) VALUES (?,?,?,?,0,?)");
+    $prodNameStmt = $connect->prepare("UPDATE `PRODUCTS` SET `name` = ? WHERE `barcode` = ?");
     foreach ($items as $item) {
         $barcode = trim($item['barcode'] ?? '');
         $desc = trim($item['product_desc'] ?? '');
@@ -236,8 +237,14 @@ if ($action === 'search_products') {
         $uom = trim($item['uom'] ?? '');
         $itemStmt->bind_param("issds", $newPoId, $barcode, $desc, $qtyOrdered, $uom);
         $itemStmt->execute();
+        // Update product name in PRODUCTS table
+        if ($barcode !== '' && $desc !== '') {
+            $prodNameStmt->bind_param("ss", $desc, $barcode);
+            $prodNameStmt->execute();
+        }
     }
     $itemStmt->close();
+    $prodNameStmt->close();
 
     echo json_encode(['success' => 'PO ' . $poNumber . ' created.', 'po_id' => $newPoId]);
 
@@ -276,6 +283,7 @@ if ($action === 'search_products') {
     $connect->query("DELETE FROM `purchase_order_item` WHERE `po_id` = $id");
 
     $itemStmt = $connect->prepare("INSERT INTO `purchase_order_item` (`po_id`,`barcode`,`product_desc`,`qty_ordered`,`unit_cost`,`uom`) VALUES (?,?,?,?,0,?)");
+    $prodNameStmt = $connect->prepare("UPDATE `PRODUCTS` SET `name` = ? WHERE `barcode` = ?");
     foreach ($items as $item) {
         $barcode = trim($item['barcode'] ?? '');
         $desc = trim($item['product_desc'] ?? '');
@@ -283,8 +291,14 @@ if ($action === 'search_products') {
         $uom = trim($item['uom'] ?? '');
         $itemStmt->bind_param("issds", $id, $barcode, $desc, $qtyOrdered, $uom);
         $itemStmt->execute();
+        // Update product name in PRODUCTS table
+        if ($barcode !== '' && $desc !== '') {
+            $prodNameStmt->bind_param("ss", $desc, $barcode);
+            $prodNameStmt->execute();
+        }
     }
     $itemStmt->close();
+    $prodNameStmt->close();
 
     echo json_encode(['success' => 'PO updated.', 'po_id' => $id]);
 
