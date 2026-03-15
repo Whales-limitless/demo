@@ -78,6 +78,13 @@ $branchCode = $_SESSION['user_branch_code'] ?? ($_SESSION['user_outlet'] ?? '');
 $insertedCount = 0;
 $errors = [];
 
+// Check if branch_code column exists in orderlist table
+$branchColExists = false;
+$colCheck = mysqli_query($connect, "SHOW COLUMNS FROM `orderlist` LIKE 'branch_code'");
+if ($colCheck && mysqli_num_rows($colCheck) > 0) {
+    $branchColExists = true;
+}
+
 foreach ($items as $item) {
     $barcode = clean($connect, $item['barcode'] ?? '');
     $name = clean($connect, $item['name'] ?? '');
@@ -91,9 +98,8 @@ foreach ($items as $item) {
 
     $escapedBranch = mysqli_real_escape_string($connect, $branchCode);
 
-    $sql = "INSERT INTO `orderlist` (OUTLET, SDATE, ACCODE, NAME, SALNUM, BARCODE, PDESC, QTY, PTYPE, TRANSNO, TDATE, TTIME, STATUS, PRINT, view_status, ADMINRMK, SOUND, TXTTO, branch_code)
-            VALUES (
-                '$outlet',
+    $columns = "OUTLET, SDATE, ACCODE, NAME, SALNUM, BARCODE, PDESC, QTY, PTYPE, TRANSNO, TDATE, TTIME, STATUS, PRINT, view_status, ADMINRMK, SOUND, TXTTO";
+    $values = "'$outlet',
                 '$curDate',
                 '$escapedAccode',
                 '$escapedUserName',
@@ -110,9 +116,14 @@ foreach ($items as $item) {
                 '0',
                 '',
                 '0',
-                '" . mysqli_real_escape_string($connect, $txtTo) . "',
-                '$escapedBranch'
-            )";
+                '" . mysqli_real_escape_string($connect, $txtTo) . "'";
+
+    if ($branchColExists) {
+        $columns .= ", branch_code";
+        $values .= ", '$escapedBranch'";
+    }
+
+    $sql = "INSERT INTO `orderlist` ($columns) VALUES ($values)";
 
     if (mysqli_query($connect, $sql)) {
         $insertedCount++;

@@ -300,7 +300,11 @@ function finishOrder() {
             // Redirect to preview/print page
             window.location.href = 'stockin_preview.php?salnum=' + encodeURIComponent(resp.salnum);
           } else {
-            alert('Order failed: ' + (resp.error || 'Unknown error'));
+            var errMsg = resp.error || 'Unknown error';
+            if (resp.details && resp.details.length > 0) {
+              errMsg += '\n' + resp.details.join('\n');
+            }
+            alert('Order failed: ' + errMsg);
             updateType();
           }
         } catch(e) {
