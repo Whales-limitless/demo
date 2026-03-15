@@ -2,23 +2,51 @@
 $staffPermission = $_SESSION['user_permission'] ?? 'FULL';
 if ($staffPermission === 'VIEW'): ?>
 <style>
-/* === VIEW-ONLY PERMISSION: hide all create/edit/delete actions === */
-.btn-add, .btn-edit, .btn-delete, .btn-remove-line,
+/* === VIEW-ONLY PERMISSION: hide all create/edit/delete/save actions === */
+/* Generic action buttons */
+.btn-add, .btn-edit, .btn-delete, .btn-remove-line, .btn-activate, .btn-assign-item,
+/* Buttons by onclick handler — covers all modules */
 button[onclick*="openCreateModal"], button[onclick*="openCreate"],
-button[onclick*="savePO"], button[onclick*="saveUser"],
-button[onclick*="approvePO"], button[onclick*="cancelPO"],
+button[onclick*="openEditModal"], button[onclick*="openEdit"],
+button[onclick*="openAssignModal"], button[onclick*="assignProduct"],
+button[onclick*="openManageSubCatModal"], button[onclick*="openManageCatModal"],
+button[onclick*="openManageUomModal"], button[onclick*="openUomConversionModal"],
+button[onclick*="openRackModal"], button[onclick*="openRackRemarkModal"],
+button[onclick*="save"], button[onclick*="Save"],
+button[onclick*="create"], button[onclick*="Create"],
+button[onclick*="delete"], button[onclick*="Delete"],
+button[onclick*="remove"], button[onclick*="Remove"],
+button[onclick*="deactivate"], button[onclick*="activate"],
+button[onclick*="approve"], button[onclick*="Approve"],
+button[onclick*="cancel"], button[onclick*="Cancel"],
+button[onclick*="toggle"], button[onclick*="Toggle"],
 button[onclick*="addLineItem"], button[onclick*="removeLine"],
-button[onclick*="save"], button[onclick*="delete"],
-button[onclick*="approve"], button[onclick*="cancel"],
-.modal-footer .btn-success,
+button[onclick*="addConversion"],
+/* Links used as action buttons */
+a[onclick*="openEditModal"], a[onclick*="openEdit"],
+a[onclick*="deactivate"], a[onclick*="activate"],
+a[onclick*="delete"], a[onclick*="remove"],
+/* Modal footers — save/submit buttons */
+.modal-footer .btn-success, .modal-footer .btn-primary,
 .modal-footer button[onclick*="save"],
+/* Specific elements */
 #lineItems .btn-remove-line,
 .cart-btn,
-form button[type="submit"].btn-success { display: none !important; }
+form button[type="submit"].btn-success,
+/* Subcategory/UOM add forms inside modals */
+body.permission-view .modal-body .d-flex button.btn-success,
+body.permission-view .modal-body button.btn-success { display: none !important; }
 /* Make form inputs read-only appearance */
 body.permission-view .modal-body input:not([type="hidden"]),
 body.permission-view .modal-body select,
 body.permission-view .modal-body textarea { pointer-events: none; opacity: 0.7; }
+/* Rack selects and editable fields in product tables/cards */
+body.permission-view select.rack-select,
+body.permission-view input.rack-input,
+body.permission-view .rack-tag[onclick],
+body.permission-view .rack-remark-tag[onclick],
+body.permission-view [onclick*="openRackModal"],
+body.permission-view [onclick*="openRackRemarkModal"] { pointer-events: none; opacity: 0.7; }
 </style>
 <script>document.addEventListener('DOMContentLoaded',function(){document.body.classList.add('permission-view');});</script>
 <?php endif; ?>
