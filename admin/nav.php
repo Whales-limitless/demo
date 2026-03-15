@@ -193,6 +193,8 @@ button[onclick*="addLineItem"], button[onclick*="removeLine"],
 button[onclick*="addConversion"],
 button[onclick*="editSubCategory"], button[onclick*="deleteSubCategory"],
 button[onclick*="editBranch"], button[onclick*="deleteBranch"],
+/* Dashboard live view — mark as done */
+.btn-done, button[onclick*="donebtn"],
 /* Links used as action buttons */
 a[onclick*="openEditModal"], a[onclick*="openEdit"],
 a[onclick*="deactivate"], a[onclick*="activate"],
