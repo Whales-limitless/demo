@@ -168,7 +168,8 @@
 
 <?php
 $adminPermission = $_SESSION['admin_permission'] ?? 'FULL';
-if ($adminPermission === 'VIEW'): ?>
+$isDeliveryPage = isset($currentPage) && strpos($currentPage, 'del_') === 0;
+if ($adminPermission === 'VIEW' && !$isDeliveryPage): ?>
 <style>
 /* === VIEW-ONLY PERMISSION: hide all create/edit/delete/save actions === */
 /* Generic action buttons */

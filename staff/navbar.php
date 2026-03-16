@@ -1,6 +1,8 @@
 <?php
 $staffPermission = $_SESSION['user_permission'] ?? 'FULL';
-if ($staffPermission === 'VIEW'): ?>
+$_staffCurrentFile = basename($_SERVER['SCRIPT_FILENAME'] ?? '');
+$_isDeliveryPage = strpos($_staffCurrentFile, 'del_') === 0;
+if ($staffPermission === 'VIEW' && !$_isDeliveryPage): ?>
 <style>
 /* === VIEW-ONLY PERMISSION: hide all create/edit/delete/save actions === */
 /* Generic action buttons */
