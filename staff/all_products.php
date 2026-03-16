@@ -110,13 +110,20 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .tag-stock-in-date { background: #ecfdf5; color: #059669; font-size: 9px; }
 .tag-btn { cursor: pointer; transition: all var(--transition); }
 .tag-btn:hover { opacity: 0.8; transform: translateY(-1px); }
-.tag-uom { background: #dbeafe; color: #1d4ed8; position: relative; }
+.tag-uom { background: #dbeafe; color: #1d4ed8; }
 .uom-icon { font-size: 12px; }
-.uom-tooltip { display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #1e293b; color: #f8fafc; border-radius: 10px; padding: 10px 14px; min-width: 170px; z-index: 50; box-shadow: 0 4px 16px rgba(0,0,0,0.2); white-space: nowrap; }
-.uom-tooltip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #1e293b; }
-.uom-tooltip.active { display: flex; flex-direction: column; gap: 4px; }
-.uom-tooltip-title { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
-.uom-tooltip-row { font-size: 12px; font-weight: 600; padding: 2px 0; }
+.uom-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500; align-items: flex-end; justify-content: center; }
+.uom-modal-overlay.active { display: flex; }
+.uom-modal { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; padding: 0 0 24px; animation: slideUp 0.3s ease; }
+.uom-modal-handle { width: 40px; height: 4px; background: #d1d5db; border-radius: 4px; margin: 12px auto 16px; }
+.uom-modal-title { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; text-align: center; color: var(--text); padding: 0 20px; }
+.uom-modal-product { font-size: 13px; color: var(--text-muted); text-align: center; margin: 4px 20px 16px; line-height: 1.4; }
+.uom-modal-table { width: calc(100% - 40px); margin: 0 20px; border-collapse: collapse; }
+.uom-modal-table th { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px; text-align: left; border-bottom: 2px solid #e5e7eb; }
+.uom-modal-table td { font-size: 14px; font-weight: 600; color: var(--text); padding: 10px 12px; border-bottom: 1px solid #f3f4f6; }
+.uom-modal-table tr:last-child td { border-bottom: none; }
+.uom-modal-close { display: block; margin: 16px 20px 0; width: calc(100% - 40px); padding: 14px; border: none; border-radius: 12px; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+.uom-modal-close:hover { background: #e5e7eb; }
 
 .rack-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; justify-content: center; align-items: center; padding: 16px; }
 .rack-modal-overlay.active { display: flex; }
@@ -205,18 +212,18 @@ function escAttr(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function showUomInfo(el, e) {
-  e.stopPropagation();
-  var tip = el.querySelector('.uom-tooltip');
-  if (!tip) return;
-  var isOpen = tip.classList.contains('active');
-  // Close all other tooltips first
-  document.querySelectorAll('.uom-tooltip.active').forEach(function(t) { t.classList.remove('active'); });
-  if (!isOpen) tip.classList.add('active');
+function openUomModal(productName, conversions) {
+  document.getElementById('uomModalProduct').textContent = productName;
+  var tbody = document.getElementById('uomModalBody');
+  tbody.innerHTML = conversions.map(function(u) {
+    var factor = u.conversion_factor % 1 === 0 ? u.conversion_factor.toFixed(0) : u.conversion_factor;
+    return '<tr><td>' + escHtml(u.from_uom) + '</td><td>' + escHtml(u.to_uom) + '</td><td>1 ' + escHtml(u.from_uom) + ' = ' + factor + ' ' + escHtml(u.to_uom) + '</td></tr>';
+  }).join('');
+  document.getElementById('uomModalOverlay').classList.add('active');
 }
-document.addEventListener('click', function() {
-  document.querySelectorAll('.uom-tooltip.active').forEach(function(t) { t.classList.remove('active'); });
-});
+function closeUomModal() {
+  document.getElementById('uomModalOverlay').classList.remove('active');
+}
 
 function formatRackDate(dt) {
   if (!dt) return '';
@@ -412,13 +419,7 @@ function renderProductCard(p, index) {
     tags += '<span class="tag tag-stock-in-date">Stock In: ' + formatRackDate(p.stock_in_at) + '</span>';
   }
   if (p.uom_conversions && p.uom_conversions.length > 0) {
-    tags += '<span class="tag tag-uom tag-btn" onclick="showUomInfo(this, event)"><span class="uom-icon">&#9878;</span> UOM' +
-      '<span class="uom-tooltip"><span class="uom-tooltip-title">UOM Conversion</span>' +
-      p.uom_conversions.map(function(u) {
-        var factor = u.conversion_factor % 1 === 0 ? u.conversion_factor.toFixed(0) : u.conversion_factor;
-        return '<span class="uom-tooltip-row">1 ' + escHtml(u.from_uom) + ' = ' + factor + ' ' + escHtml(u.to_uom) + '</span>';
-      }).join('') +
-      '</span></span>';
+    tags += '<span class="tag tag-uom tag-btn" onclick="openUomModal(\'' + escAttr(p.name.replace(/'/g, "\\'")) + '\', ' + escAttr(JSON.stringify(p.uom_conversions)) + ')"><span class="uom-icon">&#9878;</span> UOM</span>';
   }
 
   return '<div class="product-card" data-id="' + p.id + '" data-name="' + escAttr(p.name.toLowerCase()) + '" data-sku="' + escAttr((p.sku || '').toLowerCase()) + '" data-barcode="' + escAttr((p.barcode || '').toLowerCase()) + '" style="animation-delay:' + (index+1)*0.03 + 's">' +
@@ -797,6 +798,20 @@ document.getElementById('rackRemarkModalOverlay').addEventListener('click', func
       <button class="btn-cancel" onclick="closeRackRemarkModal()">Cancel</button>
       <button class="btn-save" onclick="saveRackRemark()">Save</button>
     </div>
+  </div>
+</div>
+
+<!-- UOM Conversion Modal -->
+<div class="uom-modal-overlay" id="uomModalOverlay" onclick="if(event.target===this)closeUomModal()">
+  <div class="uom-modal">
+    <div class="uom-modal-handle"></div>
+    <div class="uom-modal-title">UOM Conversion</div>
+    <div class="uom-modal-product" id="uomModalProduct"></div>
+    <table class="uom-modal-table">
+      <thead><tr><th>From</th><th>To</th><th>Conversion</th></tr></thead>
+      <tbody id="uomModalBody"></tbody>
+    </table>
+    <button class="uom-modal-close" onclick="closeUomModal()">Close</button>
   </div>
 </div>
 
