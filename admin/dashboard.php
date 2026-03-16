@@ -225,8 +225,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="table-card">
         <div class="table-toolbar">
             <div class="type-filters">
-                <button class="type-filter-btn active" data-type="ALL" onclick="setTypeFilter('ALL')">All</button>
-                <button class="type-filter-btn" data-type="PURCHASE" onclick="setTypeFilter('PURCHASE')">Purchase</button>
+                <button class="type-filter-btn active" data-type="PURCHASE" onclick="setTypeFilter('PURCHASE')">Purchase</button>
                 <button class="type-filter-btn" data-type="STOCKIN" onclick="setTypeFilter('STOCKIN')">Stock In</button>
             </div>
             <div class="search-box">
@@ -435,7 +434,7 @@ function doPoll() {
 
 // ── Render Table ───────────────────────────────────────
 
-var currentTypeFilter = 'ALL';
+var currentTypeFilter = 'PURCHASE';
 
 function setTypeFilter(type) {
     currentTypeFilter = type;
@@ -658,6 +657,7 @@ function manualRefresh() {
 }
 
 // ── Init ───────────────────────────────────────────────
+applyClientFilters();
 startPolling();
 </script>
 </body>
