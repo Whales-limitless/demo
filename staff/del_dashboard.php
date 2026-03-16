@@ -131,6 +131,46 @@ if ($driverCode !== '') {
         .item-qty { font-weight: 700; white-space: nowrap; }
         .item-install-badge { display: inline-block; background: #fef3c7; color: #92400e; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 6px; white-space: nowrap; }
 
+        /* DO modal */
+        .do-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: flex-start; justify-content: center; padding: 16px; overflow-y: auto; }
+        .do-overlay.active { display: flex; }
+        .do-modal { background: var(--surface); border-radius: 16px; max-width: 700px; width: 100%; margin: 24px auto; padding: 0; overflow: hidden; }
+        .do-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--primary); color: #fff; }
+        .do-modal-header h3 { font-family: 'Outfit', sans-serif; font-size: 17px; font-weight: 600; margin: 0; }
+        .do-modal-header .do-close-btn { background: rgba(255,255,255,0.2); border: none; cursor: pointer; padding: 6px; border-radius: 8px; color: #fff; display: flex; align-items: center; }
+        .do-modal-header .do-close-btn:hover { background: rgba(255,255,255,0.3); }
+        .do-modal-header .do-close-btn svg { width: 20px; height: 20px; }
+        .do-modal-header .do-print-btn { background: rgba(255,255,255,0.2); border: none; color: #fff; padding: 6px 12px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .do-modal-header .do-print-btn:hover { background: rgba(255,255,255,0.3); }
+        .do-modal-header .do-print-btn svg { width: 14px; height: 14px; }
+        .do-modal-body { padding: 20px; max-height: 75vh; overflow-y: auto; }
+        .do-m-company { text-align: center; margin-bottom: 16px; border-bottom: 2px solid var(--text); padding-bottom: 10px; }
+        .do-m-company h4 { font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; margin: 0; }
+        .do-m-company small { font-size: 11px; color: var(--text-muted); }
+        .do-m-company .do-m-title { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin-top: 6px; }
+        .do-m-info { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px; font-size: 13px; }
+        .do-m-info-item { display: flex; gap: 6px; }
+        .do-m-info-item.full { grid-column: 1 / -1; }
+        .do-m-info-label { font-weight: 700; white-space: nowrap; }
+        .do-m-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 13px; }
+        .do-m-table th { background: var(--text); color: #fff; padding: 7px 10px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+        .do-m-table td { padding: 7px 10px; border-bottom: 1px solid #e5e7eb; }
+        .do-m-table th:first-child, .do-m-table td:first-child { width: 40px; text-align: center; }
+        .do-m-table th:last-child, .do-m-table td:last-child { width: 80px; text-align: center; }
+        .do-m-sig { margin-top: 16px; border: 2px dashed #d1d5db; border-radius: 8px; padding: 14px; text-align: center; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .do-m-sig img { max-width: 280px; max-height: 90px; }
+        .do-m-sig p { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+        .do-m-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; font-size: 12px; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+        .do-m-footer-label { font-weight: 700; text-transform: uppercase; font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+        .do-m-footer-value { font-size: 13px; }
+        @media print {
+            .do-overlay.active { position: static; background: none; padding: 0; display: block; }
+            .do-modal { box-shadow: none; border-radius: 0; margin: 0; }
+            .do-modal-header .do-close-btn, .do-modal-header .do-print-btn { display: none !important; }
+            .do-modal-body { max-height: none; overflow: visible; }
+            body > *:not(.do-overlay) { display: none !important; }
+        }
+
         /* Sync history */
         .sync-section { margin-top: 20px; margin-bottom: 16px; }
         .sync-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -240,10 +280,10 @@ if ($driverCode !== '') {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
                     Items
                 </button>
-                <a href="del_vieworder.php?ordno=<?php echo urlencode($o['ORDNO'] ?? ''); ?>" class="action-btn">
+                <button class="action-btn" onclick="showDO('<?php echo htmlspecialchars($o['ORDNO'] ?? '', ENT_QUOTES); ?>')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                     DO
-                </a>
+                </button>
             </div>
         </div>
         <?php endforeach; ?>
@@ -280,6 +320,27 @@ if ($driverCode !== '') {
                 </button>
             </h3>
             <div id="itemsBody"><p style="color:var(--text-muted);text-align:center;padding:20px;">Loading...</p></div>
+        </div>
+    </div>
+
+    <!-- DO Modal -->
+    <div class="do-overlay" id="doOverlay" onclick="if(event.target===this)closeDO()">
+        <div class="do-modal">
+            <div class="do-modal-header">
+                <h3 id="doModalTitle">Delivery Order</h3>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <button class="do-print-btn" onclick="window.print()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                        Print
+                    </button>
+                    <button class="do-close-btn" onclick="closeDO()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="do-modal-body" id="doModalBody">
+                <p style="color:var(--text-muted);text-align:center;padding:40px;">Loading...</p>
+            </div>
         </div>
     </div>
 
@@ -343,6 +404,88 @@ if ($driverCode !== '') {
 
     function closeItems() {
         document.getElementById('itemsOverlay').classList.remove('active');
+    }
+
+    function showDO(ordno) {
+        document.getElementById('doModalTitle').textContent = 'Delivery Order - ' + ordno;
+        document.getElementById('doModalBody').innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">Loading...</p>';
+        document.getElementById('doOverlay').classList.add('active');
+
+        fetch('del_dashboard_ajax.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'action=vieworder&ordno=' + encodeURIComponent(ordno)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                document.getElementById('doModalBody').innerHTML = '<p style="color:#dc2626;text-align:center;padding:40px;">' + escHtml(data.error) + '</p>';
+                return;
+            }
+            renderDO(data);
+        })
+        .catch(function() {
+            document.getElementById('doModalBody').innerHTML = '<p style="color:#dc2626;text-align:center;padding:40px;">Failed to load order. Please try again.</p>';
+        });
+    }
+
+    function renderDO(data) {
+        var o = data.order;
+        var c = data.customer;
+        var items = data.items || [];
+
+        var html = '<div class="do-m-company">';
+        html += '<h4>PARKWAY FURNITURE SDN BHD</h4>';
+        html += '<small>(CO. NO 771304-T)</small><br>';
+        html += '<small>TEL: 011-26114677/082-764677 HP:017-8129799</small>';
+        html += '<div class="do-m-title">DELIVERY ORDER</div>';
+        html += '</div>';
+
+        html += '<div class="do-m-info">';
+        html += '<div class="do-m-info-item"><span class="do-m-info-label">Order No:</span> <span>' + escHtml(o.ORDNO) + '</span></div>';
+        html += '<div class="do-m-info-item"><span class="do-m-info-label">Del. Date:</span> <span>' + escHtml(o.DELDATE) + '</span></div>';
+        html += '<div class="do-m-info-item"><span class="do-m-info-label">Customer:</span> <span>' + escHtml(o.CUSTOMER) + '</span></div>';
+        html += '<div class="do-m-info-item"><span class="do-m-info-label">Driver:</span> <span>' + escHtml(o.DRIVER) + '</span></div>';
+        if (c) {
+            html += '<div class="do-m-info-item full"><span class="do-m-info-label">Address:</span> <span>' + escHtml(c.ADDRESS || '') + '</span></div>';
+            html += '<div class="do-m-info-item"><span class="do-m-info-label">Tel:</span> <span>' + escHtml(c.HP || '') + '</span></div>';
+        }
+        html += '</div>';
+
+        html += '<table class="do-m-table"><thead><tr><th>No.</th><th>Description</th><th>Qty</th><th>Install</th></tr></thead><tbody>';
+        if (items.length === 0) {
+            html += '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">No items</td></tr>';
+        } else {
+            for (var i = 0; i < items.length; i++) {
+                var inst = (items[i].INSTALL === 'Y') ? '<span style="color:#f59e0b;font-weight:600;">Yes</span>' : '-';
+                html += '<tr><td>' + (i + 1) + '</td><td>' + escHtml(items[i].PDESC || '') + '</td><td>' + escHtml((items[i].QTY || '') + ' ' + (items[i].UOM || '')) + '</td><td>' + inst + '</td></tr>';
+            }
+        }
+        html += '</tbody></table>';
+
+        if (o.REMARK) {
+            html += '<div style="font-size:13px;margin-bottom:14px;"><strong>Remark:</strong> ' + escHtml(o.REMARK) + '</div>';
+        }
+
+        html += '<div class="do-m-sig">';
+        if (data.hasSigFile) {
+            html += '<img src="' + escHtml(data.sigPath) + '" alt="Signature">';
+            html += '<p>Customer Signature</p>';
+        } else {
+            html += '<p style="color:var(--text-muted);">No signature captured yet</p>';
+        }
+        html += '</div>';
+
+        if (o.LOCATION) {
+            html += '<div class="do-m-footer"><div><div class="do-m-footer-label">Location</div><div class="do-m-footer-value">' + escHtml(o.LOCATION) + '</div></div></div>';
+        }
+
+        document.getElementById('doModalBody').innerHTML = html;
+    }
+
+    function closeDO() {
+        document.getElementById('doOverlay').classList.remove('active');
     }
 
     function escHtml(s) {

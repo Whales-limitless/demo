@@ -268,34 +268,6 @@ body {
     </div>
 </div>
 
-<!-- PWA Install Prompt -->
-<div id="pwaInstallPrompt" style="display:none;position:fixed;bottom:20px;left:16px;right:16px;background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.18);padding:20px;z-index:9999;text-align:center;">
-  <p style="margin:0 0 14px;color:#1a1a1a;font-weight:600;font-size:15px;">Install PWSTAFF for a better experience!</p>
-  <button id="pwaInstallBtn" style="margin:4px;padding:12px 24px;border:none;border-radius:10px;background:#C8102E;color:#fff;font-weight:600;font-size:14px;cursor:pointer;">Install App</button>
-  <button id="pwaDismissBtn" style="margin:4px;padding:12px 24px;border:none;border-radius:10px;background:#e5e7eb;color:#1a1a1a;font-weight:600;font-size:14px;cursor:pointer;">Not Now</button>
-</div>
-
-<script>
-var pwaDeferredPrompt = null;
-window.addEventListener('beforeinstallprompt', function(e) {
-  e.preventDefault();
-  pwaDeferredPrompt = e;
-  document.getElementById('pwaInstallPrompt').style.display = 'block';
-});
-document.getElementById('pwaInstallBtn').addEventListener('click', function() {
-  if (!pwaDeferredPrompt) return;
-  document.getElementById('pwaInstallPrompt').style.display = 'none';
-  pwaDeferredPrompt.prompt();
-  pwaDeferredPrompt.userChoice.then(function() { pwaDeferredPrompt = null; });
-});
-document.getElementById('pwaDismissBtn').addEventListener('click', function() {
-  document.getElementById('pwaInstallPrompt').style.display = 'none';
-  pwaDeferredPrompt = null;
-});
-window.addEventListener('appinstalled', function() {
-  document.getElementById('pwaInstallPrompt').style.display = 'none';
-});
-</script>
 
 </body>
 </html>
