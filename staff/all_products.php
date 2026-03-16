@@ -308,8 +308,8 @@ var allCategories = [];
 var stockTakeBarcodes = {};
 
 var trendLabels = { green: 'Hot', yellow: 'Moderate', red: 'Slow', black: 'Dead' };
-var BATCH_SIZE = 2; // Categories per batch
-var SEARCH_BATCH_SIZE = 50; // Products per batch in search mode
+var BATCH_SIZE = 5; // Categories per batch (increased from 2)
+var SEARCH_BATCH_SIZE = 80; // Products per batch in search mode (increased from 50)
 var loadedIndex = 0; // Next category index to render
 var isLoading = false;
 var isSearchMode = false;
@@ -486,7 +486,7 @@ function renderProductCard(p, index) {
   if (p.stock_in_at) {
     tags += '<span class="tag tag-stock-in-date">Stock In: ' + formatRackDate(p.stock_in_at) + '</span>';
   }
-  return '<div class="product-card" data-id="' + p.id + '" data-name="' + escAttr(p.name.toLowerCase()) + '" data-sku="' + escAttr((p.sku || '').toLowerCase()) + '" data-barcode="' + escAttr((p.barcode || '').toLowerCase()) + '" style="animation-delay:' + (index+1)*0.03 + 's">' +
+  return '<div class="product-card" data-id="' + p.id + '" data-name="' + escAttr(p.name.toLowerCase()) + '" data-sku="' + escAttr((p.sku || '').toLowerCase()) + '" data-barcode="' + escAttr((p.barcode || '').toLowerCase()) + '" style="animation-delay:' + Math.min((index+1)*0.015, 0.3) + 's">' +
     '<div class="product-img-wrap"' + imgWrapOnclick + '>' + imgHtml + badgeHtml + '</div>' +
     '<div class="product-info">' +
       '<div class="product-name">' + escHtml(p.name) + '</div>' +
@@ -571,20 +571,26 @@ var observer = new IntersectionObserver(function(entries) {
 
 observer.observe(sentinel);
 
-// Load product data via AJAX then render
-fetch('all_products_ajax.php', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  body: ''
-})
-.then(function(r) { return r.json(); })
-.then(function(data) {
+// --- Stale-while-revalidate: show cached data instantly, refresh in background ---
+var CACHE_KEY = 'pw_all_products_data';
+var CACHE_TS_KEY = 'pw_all_products_ts';
+var CACHE_MAX_AGE = 120000; // 2 minutes — use cache if fresher than this
+
+function applyProductData(data) {
   if (data.error) {
     document.getElementById('initialLoading').innerHTML = '<p style="color:#dc2626;">Failed to load products. Please refresh.</p>';
     return;
   }
-  // Build stock take barcode lookup
+  stockTakeBarcodes = {};
   (data.stock_take_barcodes || []).forEach(function(b) { stockTakeBarcodes[b] = true; });
+
+  // Reset render state for fresh data
+  loadedIndex = 0;
+  isSearchMode = false;
+  searchResults = [];
+  searchRenderedCount = 0;
+  document.getElementById('productSections').innerHTML = '';
+
   initProductData(data.categories || []);
 
   var initialQuery = getUrlParam('q');
@@ -596,10 +602,73 @@ fetch('all_products_ajax.php', {
   } else {
     loadNextBatch();
   }
-})
-.catch(function() {
-  document.getElementById('initialLoading').innerHTML = '<p style="color:#dc2626;">Failed to load products. Please refresh.</p>';
-});
+}
+
+function fetchFreshData(isBackground) {
+  return fetch('all_products_ajax.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: ''
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.error) {
+      // Save to localStorage for next visit
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+      } catch(e) { /* storage full — ignore */ }
+    }
+    if (!isBackground) {
+      applyProductData(data);
+    } else if (!data.error) {
+      // Background refresh: silently update data without re-rendering
+      // (avoids jarring UI reset while user is browsing)
+      stockTakeBarcodes = {};
+      (data.stock_take_barcodes || []).forEach(function(b) { stockTakeBarcodes[b] = true; });
+      allCategories = data.categories || [];
+      allProductsFlat = [];
+      totalProducts = 0;
+      allCategories.forEach(function(cat) {
+        cat.subcategories.forEach(function(sc) {
+          totalProducts += sc.products.length;
+          sc.products.forEach(function(p) { allProductsFlat.push(p); });
+        });
+      });
+      document.getElementById('productTotal').textContent = totalProducts + ' products';
+    }
+  })
+  .catch(function() {
+    if (!isBackground) {
+      document.getElementById('initialLoading').innerHTML = '<p style="color:#dc2626;">Failed to load products. Please refresh.</p>';
+    }
+  });
+}
+
+// Try loading from localStorage first for instant display
+var cachedData = null;
+var cacheAge = Infinity;
+try {
+  var raw = localStorage.getItem(CACHE_KEY);
+  var ts = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
+  if (raw && ts) {
+    cacheAge = Date.now() - ts;
+    cachedData = JSON.parse(raw);
+  }
+} catch(e) { cachedData = null; }
+
+if (cachedData && cacheAge < CACHE_MAX_AGE) {
+  // Cache is fresh enough — show instantly, refresh in background
+  applyProductData(cachedData);
+  fetchFreshData(true);
+} else if (cachedData) {
+  // Cache is stale but exists — show it immediately, then refresh
+  applyProductData(cachedData);
+  fetchFreshData(true);
+} else {
+  // No cache — fetch and wait (first visit)
+  fetchFreshData(false);
+}
 
 function renderAllForSearch() {
   // Render remaining categories that haven't been loaded yet
