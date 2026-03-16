@@ -821,24 +821,8 @@ function printViewOrder() {
     printWin.print();
 }
 
-// ── State Persistence (scroll + filter) ────────────────
-function saveDashboardState() {
-    sessionStorage.setItem('dash_scroll', window.scrollY);
-    sessionStorage.setItem('dash_search', document.getElementById('searchInput').value);
-    sessionStorage.setItem('dash_type', currentTypeFilter);
-}
-function restoreDashboardState() {
-    var savedType = sessionStorage.getItem('dash_type');
-    if (savedType) setTypeFilter(savedType);
-    var savedSearch = sessionStorage.getItem('dash_search');
-    if (savedSearch) { document.getElementById('searchInput').value = savedSearch; applyClientFilters(); }
-    var savedScroll = sessionStorage.getItem('dash_scroll');
-    if (savedScroll) setTimeout(function() { window.scrollTo(0, parseInt(savedScroll)); }, 50);
-}
-window.addEventListener('beforeunload', saveDashboardState);
-
 // ── Init ───────────────────────────────────────────────
-restoreDashboardState();
+applyClientFilters();
 startPolling();
 </script>
 </body>
