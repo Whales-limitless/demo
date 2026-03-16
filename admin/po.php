@@ -902,6 +902,7 @@ function printPO(id) {
             html += '</style></head><body>';
 
             html += '<div class="po-header">';
+            html += '<div style="font-size:16px;font-weight:bold;margin-bottom:2px;">Parkway Departmental Store</div>';
             html += '<h1>PURCHASE ORDER</h1>';
             html += '<div class="po-number">' + escHtml(po.po_number) + '</div>';
             html += '</div>';
