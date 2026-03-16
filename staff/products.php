@@ -82,6 +82,14 @@ while ($sub = mysqli_fetch_assoc($sub_result)) {
         'products' => $products
     ];
 }
+// Fetch barcodes blocked by active stock take sessions (DRAFT or SUBMITTED)
+$stockTakeBarcodes = [];
+$stRes = mysqli_query($connect, "SELECT DISTINCT sti.`barcode` FROM `stock_take_item` sti INNER JOIN `stock_take` st ON st.`id` = sti.`stock_take_id` AND st.`status` IN ('DRAFT', 'SUBMITTED')");
+if ($stRes) {
+    while ($stRow = mysqli_fetch_assoc($stRes)) {
+        $stockTakeBarcodes[] = $stRow['barcode'];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -245,6 +253,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-add-cart.active { background: var(--primary); color: #fff; }
 .btn-add-cart.active:hover { background: var(--primary-dark); transform: translateY(-1px); }
 .btn-add-cart.disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
+.btn-add-cart.stock-take { background: #fef3c7; color: #92400e; cursor: not-allowed; font-size: 11px; }
 .cart-feedback { font-size: 12px; text-align: center; height: 16px; margin-top: 4px; }
 
 @media (max-width: 768px) { .main { padding: 16px 12px 80px; } .product-grid { gap: 10px; } .product-name { font-size: 12px; } .product-info { padding: 10px; } .category-title { font-size: 20px; } .toolbar { gap: 8px; } }
@@ -313,6 +322,8 @@ function escAttr(s) {
 }
 
 var subcategories = <?php echo json_encode($subcategories); ?>;
+var stockTakeBarcodes = {};
+<?php echo json_encode($stockTakeBarcodes); ?>.forEach(function(b) { stockTakeBarcodes[b] = true; });
 
 // All subcategories selected by default
 var selectedSubcats = {};
@@ -371,8 +382,21 @@ function renderProductCard(p, index) {
     tags += '<span class="tag tag-stock-in-date">Stock In: ' + formatRackDate(p.stock_in_at) + '</span>';
   }
 
-  var bc = p.inStock ? 'active' : 'disabled';
-  var bt = p.inStock ? 'Add to Cart' : 'Out of Stock';
+  var isStockTake = stockTakeBarcodes[p.barcode] || false;
+  var bc, bt, btnDisabled;
+  if (isStockTake) {
+    bc = 'stock-take';
+    bt = 'Active Stock Take Session';
+    btnDisabled = true;
+  } else if (p.inStock) {
+    bc = 'active';
+    bt = 'Add to Cart';
+    btnDisabled = false;
+  } else {
+    bc = 'disabled';
+    bt = 'Out of Stock';
+    btnDisabled = true;
+  }
 
   return '<div class="product-card" data-id="' + p.id + '" data-name="' + escAttr(p.name.toLowerCase()) + '" data-sku="' + escAttr((p.sku || '').toLowerCase()) + '" data-barcode="' + escAttr((p.barcode || '').toLowerCase()) + '">' +
     '<div class="product-img-wrap">' + imgHtml + badgeHtml + '</div>' +
@@ -386,7 +410,7 @@ function renderProductCard(p, index) {
           '<input type="number" class="qty-input" id="qty_' + p.id + '" value="1" min="1" max="99">' +
           '<button class="qty-btn" onclick="updateQty(\'plus\',' + p.id + ')">+</button>' +
         '</div>' +
-        '<button class="btn-add-cart ' + bc + '" ' + (p.inStock ? '' : 'disabled') + ' onclick="addToCart(' + p.id + ')">' + bt + '</button>' +
+        '<button class="btn-add-cart ' + bc + '" ' + (btnDisabled ? 'disabled' : '') + ' onclick="addToCart(' + p.id + ')">' + bt + '</button>' +
         '<div class="cart-feedback" id="feedback_' + p.id + '"></div>' +
       '</div>' +
     '</div>' +

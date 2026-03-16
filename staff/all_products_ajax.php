@@ -84,5 +84,14 @@ while ($cat = mysqli_fetch_assoc($cat_result)) {
     }
 }
 
-echo json_encode(['categories' => $allCategories]);
+// Fetch barcodes blocked by active stock take sessions (DRAFT or SUBMITTED)
+$stockTakeBarcodes = [];
+$stRes = mysqli_query($connect, "SELECT DISTINCT sti.`barcode` FROM `stock_take_item` sti INNER JOIN `stock_take` st ON st.`id` = sti.`stock_take_id` AND st.`status` IN ('DRAFT', 'SUBMITTED')");
+if ($stRes) {
+    while ($stRow = mysqli_fetch_assoc($stRes)) {
+        $stockTakeBarcodes[] = $stRow['barcode'];
+    }
+}
+
+echo json_encode(['categories' => $allCategories, 'stock_take_barcodes' => $stockTakeBarcodes]);
 ?>
