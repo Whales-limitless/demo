@@ -604,6 +604,8 @@ function applyProductData(data) {
   }
 }
 
+var _lastCacheJson = ''; // track what we displayed from cache
+
 function fetchFreshData(isBackground) {
   return fetch('all_products_ajax.php', {
     method: 'POST',
@@ -613,29 +615,25 @@ function fetchFreshData(isBackground) {
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (!data.error) {
+      var freshJson = JSON.stringify(data);
       // Save to localStorage for next visit
       try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        localStorage.setItem(CACHE_KEY, freshJson);
         localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
       } catch(e) { /* storage full — ignore */ }
+
+      if (isBackground) {
+        // Compare with what was displayed from cache —
+        // if anything changed (name, qty, image, etc.), re-render fully
+        if (freshJson !== _lastCacheJson) {
+          applyProductData(data);
+        }
+        // else: data is identical, no re-render needed
+        return;
+      }
     }
     if (!isBackground) {
       applyProductData(data);
-    } else if (!data.error) {
-      // Background refresh: silently update data without re-rendering
-      // (avoids jarring UI reset while user is browsing)
-      stockTakeBarcodes = {};
-      (data.stock_take_barcodes || []).forEach(function(b) { stockTakeBarcodes[b] = true; });
-      allCategories = data.categories || [];
-      allProductsFlat = [];
-      totalProducts = 0;
-      allCategories.forEach(function(cat) {
-        cat.subcategories.forEach(function(sc) {
-          totalProducts += sc.products.length;
-          sc.products.forEach(function(p) { allProductsFlat.push(p); });
-        });
-      });
-      document.getElementById('productTotal').textContent = totalProducts + ' products';
     }
   })
   .catch(function() {
@@ -657,12 +655,9 @@ try {
   }
 } catch(e) { cachedData = null; }
 
-if (cachedData && cacheAge < CACHE_MAX_AGE) {
-  // Cache is fresh enough — show instantly, refresh in background
-  applyProductData(cachedData);
-  fetchFreshData(true);
-} else if (cachedData) {
-  // Cache is stale but exists — show it immediately, then refresh
+if (cachedData) {
+  // Show cached data instantly, then refresh in background
+  _lastCacheJson = raw; // remember what we displayed so we can diff later
   applyProductData(cachedData);
   fetchFreshData(true);
 } else {
