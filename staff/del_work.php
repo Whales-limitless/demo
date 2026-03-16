@@ -277,6 +277,39 @@ if ($instQ) {
     var installBtnHtml = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload Installation Photos';
     var orderNo = <?php echo json_encode($order['ORDNO'] ?? ''); ?>;
 
+    // Compress an image file client-side to avoid exceeding PHP upload_max_filesize
+    // Returns a Promise that resolves to a compressed Blob (JPEG)
+    function compressImageFile(file, maxDim, quality) {
+        maxDim = maxDim || 1200;
+        quality = quality || 0.7;
+        return new Promise(function(resolve, reject) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var img = new Image();
+                img.onload = function() {
+                    var w = img.width, h = img.height;
+                    if (w > maxDim || h > maxDim) {
+                        if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+                        else { w = Math.round(w * maxDim / h); h = maxDim; }
+                    }
+                    var canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    canvas.toBlob(function(blob) {
+                        if (blob) resolve(blob);
+                        else reject(new Error('Compression failed'));
+                    }, 'image/jpeg', quality);
+                };
+                img.onerror = function() { reject(new Error('Failed to load image')); };
+                img.src = e.target.result;
+            };
+            reader.onerror = function() { reject(new Error('Failed to read file')); };
+            reader.readAsDataURL(file);
+        });
+    }
+
     // Save each photo as a SEPARATE pending record (compressed individually)
     // This ensures: 1) each photo is small (~150-300KB vs 3-10MB raw)
     //               2) each photo syncs independently (one failure doesn't block others)
@@ -326,15 +359,31 @@ if ($instQ) {
             return;
         }
 
-        var formData = new FormData();
-        formData.append('action', 'upload');
-        formData.append('id', orderId);
+        // Compress all selected photos before uploading to avoid exceeding PHP upload limits
+        var compressPromises = [];
         for (var i = 1; i <= 3; i++) {
             var input = document.getElementById('file' + i);
-            if (input.files && input.files[0]) formData.append('image' + i, input.files[0]);
+            if (input.files && input.files[0]) {
+                (function(idx, file) {
+                    compressPromises.push(
+                        compressImageFile(file, 1200, 0.7).then(function(blob) {
+                            return { idx: idx, blob: blob };
+                        })
+                    );
+                })(i, input.files[0]);
+            }
         }
 
-        fetch('del_work_ajax.php', { method: 'POST', body: formData })
+        Promise.all(compressPromises).then(function(results) {
+            var formData = new FormData();
+            formData.append('action', 'upload');
+            formData.append('id', orderId);
+            for (var r = 0; r < results.length; r++) {
+                formData.append('image' + results[r].idx, results[r].blob, 'photo' + results[r].idx + '.jpg');
+            }
+
+            return fetch('del_work_ajax.php', { method: 'POST', body: formData });
+        })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             btn.disabled = false;
@@ -418,16 +467,32 @@ if ($instQ) {
             return;
         }
 
-        var formData = new FormData();
-        formData.append('action', 'upload_install');
-        formData.append('id', orderId);
+        // Compress all selected install photos before uploading
+        var compressPromises = [];
         for (var i = 0; i < installItemIds.length; i++) {
             var itemId = installItemIds[i];
             var input = document.getElementById('installFile' + itemId);
-            if (input && input.files && input.files[0]) formData.append('install_img_' + itemId, input.files[0]);
+            if (input && input.files && input.files[0]) {
+                (function(id, file) {
+                    compressPromises.push(
+                        compressImageFile(file, 1200, 0.7).then(function(blob) {
+                            return { id: id, blob: blob };
+                        })
+                    );
+                })(itemId, input.files[0]);
+            }
         }
 
-        fetch('del_work_ajax.php', { method: 'POST', body: formData })
+        Promise.all(compressPromises).then(function(results) {
+            var formData = new FormData();
+            formData.append('action', 'upload_install');
+            formData.append('id', orderId);
+            for (var r = 0; r < results.length; r++) {
+                formData.append('install_img_' + results[r].id, results[r].blob, 'install_' + results[r].id + '.jpg');
+            }
+
+            return fetch('del_work_ajax.php', { method: 'POST', body: formData });
+        })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             btn.disabled = false;
