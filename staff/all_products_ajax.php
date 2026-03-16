@@ -7,6 +7,11 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     exit;
 }
 
+// Enable gzip compression for large JSON responses
+if (!ob_start('ob_gzhandler')) {
+    ob_start();
+}
+
 require_once 'dbconnection.php';
 $connect->set_charset("utf8mb4");
 
@@ -57,7 +62,7 @@ while ($row = mysqli_fetch_assoc($catSubRes)) {
 
 // Fetch all visible products in one query
 $prodMap = []; // cat_code => sub_code => [products]
-$prodRes = mysqli_query($connect, "SELECT id, name, description, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity, cat_code, sub_code FROM PRODUCTS WHERE (checked != 'N' OR checked IS NULL) ORDER BY name ASC");
+$prodRes = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity, cat_code, sub_code FROM PRODUCTS WHERE (checked != 'N' OR checked IS NULL) ORDER BY name ASC");
 while ($prod = mysqli_fetch_assoc($prodRes)) {
     $prod['id'] = intval($prod['id']);
     $prod['quantity'] = intval($prod['quantity']);
@@ -74,17 +79,25 @@ while ($prod = mysqli_fetch_assoc($prodRes)) {
         } else {
             $prod['trend'] = 'black';
         }
-        $prod['trend_qty'] = $ordered;
-    } else {
-        $prod['trend'] = null;
-        $prod['trend_qty'] = 0;
     }
 
-    $prod['uom_conversions'] = $uomMap[$prod['barcode']] ?? [];
+    // Attach UOM conversions (strip redundant barcode field to save payload)
+    $uomRaw = $uomMap[$prod['barcode']] ?? [];
+    if (!empty($uomRaw)) {
+        $prod['uom_conversions'] = array_map(function($u) {
+            return ['from_uom' => $u['from_uom'], 'to_uom' => $u['to_uom'], 'conversion_factor' => $u['conversion_factor']];
+        }, $uomRaw);
+    }
 
+    // Strip null/empty fields to reduce JSON size
     $cc = $prod['cat_code'];
     $sc = $prod['sub_code'];
     unset($prod['cat_code'], $prod['sub_code']);
+    if (empty($prod['rack_location'])) unset($prod['rack_location']);
+    if (empty($prod['rack_updated_at'])) unset($prod['rack_updated_at']);
+    if (empty($prod['stock_in_at'])) unset($prod['stock_in_at']);
+    if (empty($prod['image'])) unset($prod['image']);
+
     $prodMap[$cc][$sc][] = $prod;
 }
 

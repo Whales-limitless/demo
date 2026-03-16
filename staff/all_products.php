@@ -244,6 +244,8 @@ function closeUomModal() {
   document.getElementById('uomModalOverlay').classList.remove('active');
 }
 
+var descriptionCache = {};
+
 function openDetailModal(productId) {
   var p = findProduct(productId);
   if (!p) return;
@@ -264,12 +266,25 @@ function openDetailModal(productId) {
   document.getElementById('detailModalName').textContent = p.name;
 
   var descEl = document.getElementById('detailModalDesc');
-  if (p.description) {
-    descEl.textContent = p.description;
-    descEl.classList.remove('empty');
+  if (descriptionCache[productId] !== undefined) {
+    var desc = descriptionCache[productId];
+    descEl.textContent = desc || 'No description available.';
+    descEl.className = 'detail-modal-desc' + (desc ? '' : ' empty');
   } else {
-    descEl.textContent = 'No description available.';
-    descEl.classList.add('empty');
+    descEl.textContent = 'Loading...';
+    descEl.className = 'detail-modal-desc empty';
+    fetch('product_detail_ajax.php?id=' + productId)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var desc = data.description || '';
+        descriptionCache[productId] = desc;
+        descEl.textContent = desc || 'No description available.';
+        descEl.className = 'detail-modal-desc' + (desc ? '' : ' empty');
+      })
+      .catch(function() {
+        descEl.textContent = 'No description available.';
+        descEl.className = 'detail-modal-desc empty';
+      });
   }
 
   var uomSection = document.getElementById('detailModalUom');
