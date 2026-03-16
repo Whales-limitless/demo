@@ -178,13 +178,11 @@ $hasSigFile = file_exists(__DIR__ . '/' . $sigPath);
                 <?php if ($hasSigFile): ?>
                 <img src="<?php echo htmlspecialchars($sigPath); ?>" alt="Signature">
                 <p>Customer Signature</p>
-                <?php else: ?>
-                <p style="color:var(--text-muted);">No signature captured yet</p>
+                <?php endif; ?>
                 <a href="del_sign.php?ordno=<?php echo urlencode($ordno); ?>&id=<?php echo (int)$order['ID']; ?>" class="sign-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                    Capture Signature
+                    <?php echo $hasSigFile ? 'Re-capture Signature' : 'Capture Signature'; ?>
                 </a>
-                <?php endif; ?>
             </div>
 
             <div class="do-footer">
