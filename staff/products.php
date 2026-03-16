@@ -388,14 +388,10 @@ function renderProductCard(p, index) {
     bc = 'stock-take';
     bt = 'Active Stock Take Session';
     btnDisabled = true;
-  } else if (p.inStock) {
+  } else {
     bc = 'active';
     bt = 'Add to Cart';
     btnDisabled = false;
-  } else {
-    bc = 'disabled';
-    bt = 'Out of Stock';
-    btnDisabled = true;
   }
 
   return '<div class="product-card" data-id="' + p.id + '" data-name="' + escAttr(p.name.toLowerCase()) + '" data-sku="' + escAttr((p.sku || '').toLowerCase()) + '" data-barcode="' + escAttr((p.barcode || '').toLowerCase()) + '">' +
@@ -573,7 +569,7 @@ function findProduct(id) {
 
 function addToCart(productId) {
   var product = findProduct(productId);
-  if (!product || !product.inStock) return;
+  if (!product) return;
 
   var qty = parseInt(document.getElementById('qty_' + productId).value) || 1;
 
