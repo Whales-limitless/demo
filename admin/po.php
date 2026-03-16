@@ -56,6 +56,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-action { padding: 5px 12px; border: none; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); display: inline-block; margin: 1px; color: #fff; }
 .btn-edit { background: #3b82f6; } .btn-edit:hover { background: #2563eb; }
 .btn-view { background: #6366f1; } .btn-view:hover { background: #4f46e5; }
+.btn-print { background: #0ea5e9; } .btn-print:hover { background: #0284c7; }
 .btn-approve { background: #16a34a; } .btn-approve:hover { background: #15803d; }
 .btn-cancel-po { background: #ef4444; } .btn-cancel-po:hover { background: #dc2626; }
 .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
@@ -250,6 +251,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             <div class="modal-body" id="viewBody">
             </div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-info text-white" id="viewPrintBtn" onclick="printCurrentPO();" style="margin-right:auto;"><i class="fas fa-print"></i> Print</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -413,6 +415,7 @@ function renderPOTable(pos) {
         html += '<td>' + escHtml(po.created_by || '-') + '</td>';
         html += '<td style="white-space:nowrap">';
         html += '<button class="btn-action btn-view" onclick="viewPO(' + po.id + ');"><i class="fas fa-eye"></i></button> ';
+        html += '<button class="btn-action btn-print" onclick="printPO(' + po.id + ');"><i class="fas fa-print"></i></button> ';
         if (po.status === 'DRAFT') {
             html += '<button class="btn-action btn-edit" onclick="editPO(' + po.id + ');"><i class="fas fa-pen"></i></button> ';
             html += '<button class="btn-action btn-approve" onclick="approvePO(' + po.id + ', \'' + escHtml(po.po_number) + '\');"><i class="fas fa-check"></i></button> ';
@@ -806,7 +809,9 @@ function savePO() {
 }
 
 // ==================== VIEW PO ====================
+var currentViewPOId = null;
 function viewPO(id) {
+    currentViewPOId = id;
     $.ajax({
         type: 'POST', url: 'po_ajax.php', data: { action: 'get', id: id }, dataType: 'json',
         success: function(data) {
@@ -851,6 +856,108 @@ function viewPO(id) {
             document.getElementById('viewTitle').innerHTML = '<i class="fas fa-file-invoice"></i> ' + escHtml(po.po_number);
             document.getElementById('viewBody').innerHTML = html;
             viewModal.show();
+        }
+    });
+}
+
+// ==================== PRINT PO ====================
+function printCurrentPO() {
+    if (currentViewPOId) printPO(currentViewPOId);
+}
+
+function printPO(id) {
+    $.ajax({
+        type: 'POST', url: 'po_ajax.php', data: { action: 'get', id: id }, dataType: 'json',
+        success: function(data) {
+            if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
+            var po = data.po;
+            var items = data.items || [];
+
+            var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>PO - ' + escHtml(po.po_number) + '</title>';
+            html += '<style>';
+            html += '@page { size: A4; margin: 20mm; }';
+            html += 'body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #1a1a1a; margin: 0; padding: 0; }';
+            html += '.po-header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #1a1a1a; padding-bottom: 12px; }';
+            html += '.po-header h1 { font-size: 22px; margin: 0 0 4px; }';
+            html += '.po-header .po-number { font-size: 16px; font-weight: bold; }';
+            html += '.info-grid { display: flex; flex-wrap: wrap; gap: 0; margin-bottom: 20px; }';
+            html += '.info-col { width: 50%; }';
+            html += '.info-row { margin-bottom: 6px; }';
+            html += '.info-label { font-weight: bold; display: inline-block; width: 130px; }';
+            html += '.status-badge { display: inline-block; padding: 2px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; text-transform: uppercase; }';
+            html += '.status-draft { background: #fef3c7; color: #92400e; }';
+            html += '.status-approved { background: #dbeafe; color: #1e40af; }';
+            html += '.status-received, .status-partially_received { background: #dcfce7; color: #166534; }';
+            html += '.status-cancelled { background: #fee2e2; color: #991b1b; }';
+            html += 'table { width: 100%; border-collapse: collapse; margin-top: 16px; }';
+            html += 'th { background: #1a1a1a; color: #fff; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; }';
+            html += 'td { padding: 7px 10px; border-bottom: 1px solid #e5e7eb; font-size: 12px; }';
+            html += 'tr:nth-child(even) { background: #f9fafb; }';
+            html += '.text-right { text-align: right; }';
+            html += '.total-row { font-weight: bold; border-top: 2px solid #1a1a1a; }';
+            html += '.footer { margin-top: 40px; display: flex; justify-content: space-between; }';
+            html += '.sign-block { width: 200px; text-align: center; }';
+            html += '.sign-line { border-top: 1px solid #1a1a1a; margin-top: 60px; padding-top: 6px; font-size: 11px; }';
+            html += '@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }';
+            html += '</style></head><body>';
+
+            html += '<div class="po-header">';
+            html += '<h1>PURCHASE ORDER</h1>';
+            html += '<div class="po-number">' + escHtml(po.po_number) + '</div>';
+            html += '</div>';
+
+            var statusLower = (po.status || '').toLowerCase();
+            html += '<div class="info-grid">';
+            html += '<div class="info-col">';
+            html += '<div class="info-row"><span class="info-label">Status:</span><span class="status-badge status-' + statusLower + '">' + escHtml(po.status) + '</span></div>';
+            html += '<div class="info-row"><span class="info-label">Supplier:</span>' + escHtml(po.supplier_name || '-') + '</div>';
+            html += '<div class="info-row"><span class="info-label">Order Date:</span>' + escHtml(po.order_date || '-') + '</div>';
+            html += '<div class="info-row"><span class="info-label">Expected Date:</span>' + escHtml(po.expected_date || '-') + '</div>';
+            html += '</div>';
+            html += '<div class="info-col">';
+            html += '<div class="info-row"><span class="info-label">Created By:</span>' + escHtml(po.created_by || '-') + '</div>';
+            if (po.approved_by) {
+                html += '<div class="info-row"><span class="info-label">Approved By:</span>' + escHtml(po.approved_by) + '</div>';
+                html += '<div class="info-row"><span class="info-label">Approved Date:</span>' + escHtml(po.approved_date || '-') + '</div>';
+            }
+            if (po.remark) {
+                html += '<div class="info-row"><span class="info-label">Remark:</span>' + escHtml(po.remark) + '</div>';
+            }
+            html += '</div>';
+            html += '</div>';
+
+            html += '<table>';
+            html += '<thead><tr><th>#</th><th>Product</th><th>Barcode</th><th>UOM</th><th class="text-right">Ordered</th><th class="text-right">Received</th></tr></thead>';
+            html += '<tbody>';
+            var totalOrdered = 0;
+            items.forEach(function(item, i) {
+                var ordered = parseFloat(item.qty_ordered || 0);
+                var received = parseFloat(item.qty_received || 0);
+                totalOrdered += ordered;
+                html += '<tr>';
+                html += '<td>' + (i + 1) + '</td>';
+                html += '<td>' + escHtml(item.product_desc) + '</td>';
+                html += '<td>' + escHtml(item.barcode) + '</td>';
+                html += '<td>' + escHtml(item.uom || '-') + '</td>';
+                html += '<td class="text-right">' + ordered.toFixed(2) + '</td>';
+                html += '<td class="text-right">' + received.toFixed(2) + '</td>';
+                html += '</tr>';
+            });
+            html += '<tr class="total-row"><td colspan="4" class="text-right">Total</td><td class="text-right">' + totalOrdered.toFixed(2) + '</td><td></td></tr>';
+            html += '</tbody></table>';
+
+            html += '<div class="footer">';
+            html += '<div class="sign-block"><div class="sign-line">Prepared By</div></div>';
+            html += '<div class="sign-block"><div class="sign-line">Approved By</div></div>';
+            html += '</div>';
+
+            html += '</body></html>';
+
+            var printWin = window.open('', '_blank');
+            printWin.document.write(html);
+            printWin.document.close();
+            printWin.focus();
+            printWin.print();
         }
     });
 }

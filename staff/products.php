@@ -177,8 +177,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .oos-section { margin-top: 40px; padding-top: 24px; border-top: 2px dashed #d1d5db; }
 .oos-heading { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 14px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
 .oos-count { background: #fee2e2; color: var(--primary); font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 10px; }
-.oos-section .product-card { opacity: 0.7; }
-@media (hover: hover) and (pointer: fine) { .oos-section .product-card:hover { opacity: 1; } }
+.oos-section .product-card { opacity: 1; }
 
 .product-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 
