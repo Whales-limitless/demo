@@ -57,7 +57,7 @@ while ($row = mysqli_fetch_assoc($catSubRes)) {
 
 // Fetch all visible products in one query
 $prodMap = []; // cat_code => sub_code => [products]
-$prodRes = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity, cat_code, sub_code FROM PRODUCTS WHERE (checked != 'N' OR checked IS NULL) ORDER BY name ASC");
+$prodRes = mysqli_query($connect, "SELECT id, name, description, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity, cat_code, sub_code FROM PRODUCTS WHERE (checked != 'N' OR checked IS NULL) ORDER BY name ASC");
 while ($prod = mysqli_fetch_assoc($prodRes)) {
     $prod['id'] = intval($prod['id']);
     $prod['quantity'] = intval($prod['quantity']);

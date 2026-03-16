@@ -63,7 +63,7 @@ while ($sub = mysqli_fetch_assoc($sub_result)) {
 }
 
 // Fetch all products for this category in one query
-$prod_result = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity, sub_code FROM PRODUCTS WHERE cat_code = '$escaped_cat' AND (checked != 'N' OR checked IS NULL) ORDER BY name ASC");
+$prod_result = mysqli_query($connect, "SELECT id, name, description, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity, sub_code FROM PRODUCTS WHERE cat_code = '$escaped_cat' AND (checked != 'N' OR checked IS NULL) ORDER BY name ASC");
 while ($prod = mysqli_fetch_assoc($prod_result)) {
     $prod['id'] = intval($prod['id']);
     $prod['quantity'] = intval($prod['quantity']);
@@ -296,6 +296,23 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 @media (min-width: 993px) { .product-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 1200px) { .product-grid { grid-template-columns: repeat(4, 1fr); } }
 
+/* Product Detail Modal */
+.detail-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; align-items: center; justify-content: center; padding: 16px; }
+.detail-modal-overlay.active { display: flex; }
+.detail-modal { background: var(--surface); border-radius: var(--radius); width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); animation: fadeUp 0.25s ease; }
+.detail-modal-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; border-radius: var(--radius) var(--radius) 0 0; background: var(--bg); }
+.detail-modal-noimg { width: 100%; aspect-ratio: 1; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 14px; font-weight: 600; border-radius: var(--radius) var(--radius) 0 0; }
+.detail-modal-body { padding: 20px; }
+.detail-modal-name { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
+.detail-modal-desc { font-size: 14px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px; white-space: pre-line; }
+.detail-modal-desc.empty { font-style: italic; color: #d1d5db; }
+.detail-modal-uom-title { font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.detail-modal-uom-title .uom-icon { font-size: 16px; color: #1d4ed8; }
+.detail-modal .uom-modal-table { width: 100%; margin: 0; }
+.detail-modal-close { display: block; margin: 16px 20px 20px; width: calc(100% - 40px); padding: 14px; border: none; border-radius: 12px; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+.detail-modal-close:hover { background: #e5e7eb; }
+.product-img-wrap { cursor: pointer; }
+
 </style>
 </head>
 <body>
@@ -370,6 +387,54 @@ function closeUomModal() {
   document.getElementById('uomModalOverlay').classList.remove('active');
 }
 
+function openDetailModal(productId) {
+  var p = findProduct(productId);
+  if (!p) return;
+
+  var imgEl = document.getElementById('detailModalImg');
+  var noImgEl = document.getElementById('detailModalNoImg');
+  if (p.image) {
+    imgEl.src = '/img/' + p.image;
+    imgEl.alt = p.name;
+    imgEl.style.display = 'block';
+    noImgEl.style.display = 'none';
+  } else {
+    imgEl.style.display = 'none';
+    noImgEl.style.display = 'flex';
+    noImgEl.textContent = p.sku || 'NO IMAGE';
+  }
+
+  document.getElementById('detailModalName').textContent = p.name;
+
+  var descEl = document.getElementById('detailModalDesc');
+  if (p.description) {
+    descEl.textContent = p.description;
+    descEl.classList.remove('empty');
+  } else {
+    descEl.textContent = 'No description available.';
+    descEl.classList.add('empty');
+  }
+
+  var uomSection = document.getElementById('detailModalUom');
+  if (p.uom_conversions && p.uom_conversions.length > 0) {
+    var rows = p.uom_conversions.map(function(u) {
+      var factor = u.conversion_factor % 1 === 0 ? u.conversion_factor.toFixed(0) : u.conversion_factor;
+      return '<tr><td>' + escHtml(u.from_uom) + '</td><td>' + escHtml(u.to_uom) + '</td><td>1 ' + escHtml(u.from_uom) + ' = ' + factor + ' ' + escHtml(u.to_uom) + '</td></tr>';
+    }).join('');
+    uomSection.innerHTML = '<div class="detail-modal-uom-title"><span class="uom-icon">&#9878;</span> UOM Conversion</div>' +
+      '<table class="uom-modal-table"><thead><tr><th>From</th><th>To</th><th>Conversion</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    uomSection.style.display = 'block';
+  } else {
+    uomSection.style.display = 'none';
+  }
+
+  document.getElementById('detailModalOverlay').classList.add('active');
+}
+
+function closeDetailModal() {
+  document.getElementById('detailModalOverlay').classList.remove('active');
+}
+
 var subcategories = <?php echo json_encode($subcategories); ?>;
 var stockTakeBarcodes = {};
 <?php echo json_encode($stockTakeBarcodes); ?>.forEach(function(b) { stockTakeBarcodes[b] = true; });
@@ -404,6 +469,7 @@ function renderProductCard(p, index) {
   } else {
     imgHtml = '<div class="no-img-product">' + escHtml(p.sku || 'NO IMAGE') + '</div>';
   }
+  var imgWrapOnclick = ' onclick="openDetailModal(' + p.id + ')"';
 
   // Trend indicator badge (replaces stock badge when trend config is active)
   var badgeHtml;
@@ -430,10 +496,6 @@ function renderProductCard(p, index) {
   if (p.stock_in_at) {
     tags += '<span class="tag tag-stock-in-date">Stock In: ' + formatRackDate(p.stock_in_at) + '</span>';
   }
-  if (p.uom_conversions && p.uom_conversions.length > 0) {
-    tags += '<span class="tag tag-uom tag-btn" onclick="openUomModal(\'' + escAttr(p.name.replace(/'/g, "\\'")) + '\', ' + escAttr(JSON.stringify(p.uom_conversions)) + ')"><span class="uom-icon">&#9878;</span> UOM</span>';
-  }
-
   var isStockTake = stockTakeBarcodes[p.barcode] || false;
   var bc, bt, btnDisabled;
   if (isStockTake) {
@@ -447,7 +509,7 @@ function renderProductCard(p, index) {
   }
 
   return '<div class="product-card" data-id="' + p.id + '" data-name="' + escAttr(p.name.toLowerCase()) + '" data-sku="' + escAttr((p.sku || '').toLowerCase()) + '" data-barcode="' + escAttr((p.barcode || '').toLowerCase()) + '">' +
-    '<div class="product-img-wrap">' + imgHtml + badgeHtml + '</div>' +
+    '<div class="product-img-wrap"' + imgWrapOnclick + '>' + imgHtml + badgeHtml + '</div>' +
     '<div class="product-info">' +
       '<div class="product-name">' + escHtml(p.name) + '</div>' +
       '<div class="product-tags">' + tags + '</div>' +
@@ -854,6 +916,20 @@ document.addEventListener('DOMContentLoaded', function() {
       <tbody id="uomModalBody"></tbody>
     </table>
     <button class="uom-modal-close" onclick="closeUomModal()">Close</button>
+  </div>
+</div>
+
+<!-- Product Detail Modal -->
+<div class="detail-modal-overlay" id="detailModalOverlay" onclick="if(event.target===this)closeDetailModal()">
+  <div class="detail-modal">
+    <img class="detail-modal-img" id="detailModalImg" src="" alt="">
+    <div class="detail-modal-noimg" id="detailModalNoImg" style="display:none;"></div>
+    <div class="detail-modal-body">
+      <div class="detail-modal-name" id="detailModalName"></div>
+      <div class="detail-modal-desc" id="detailModalDesc"></div>
+      <div id="detailModalUom"></div>
+    </div>
+    <button class="detail-modal-close" onclick="closeDetailModal()">Close</button>
   </div>
 </div>
 
