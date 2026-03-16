@@ -7,6 +7,33 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     exit;
 }
 
+// --- Server-side file cache (30 seconds TTL) ---
+$cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+if (!is_dir($cacheDir)) {
+    @mkdir($cacheDir, 0755, true);
+}
+$cacheFile = $cacheDir . '/all_products.json';
+$cacheTTL = 30; // seconds
+
+// Allow force-refresh via request parameter
+$forceRefresh = isset($_POST['refresh']) || isset($_GET['refresh']);
+
+if (!$forceRefresh && file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTTL) {
+    // Serve from cache — skip all DB queries
+    header('X-Cache: HIT');
+    header('Cache-Control: private, max-age=' . $cacheTTL);
+    if (ob_start('ob_gzhandler')) {
+        readfile($cacheFile);
+        ob_end_flush();
+    } else {
+        readfile($cacheFile);
+    }
+    exit;
+}
+
+header('X-Cache: MISS');
+header('Cache-Control: private, max-age=' . $cacheTTL);
+
 require_once 'dbconnection.php';
 $connect->set_charset("utf8mb4");
 
@@ -120,5 +147,19 @@ if ($stRes) {
     }
 }
 
-echo json_encode(['categories' => $allCategories, 'stock_take_barcodes' => $stockTakeBarcodes]);
+$json = json_encode(['categories' => $allCategories, 'stock_take_barcodes' => $stockTakeBarcodes]);
+
+// Write to cache file atomically
+$tmpFile = $cacheFile . '.tmp.' . getmypid();
+if (@file_put_contents($tmpFile, $json) !== false) {
+    @rename($tmpFile, $cacheFile);
+}
+
+// Output with gzip if supported
+if (ob_start('ob_gzhandler')) {
+    echo $json;
+    ob_end_flush();
+} else {
+    echo $json;
+}
 ?>
