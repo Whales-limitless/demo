@@ -369,6 +369,83 @@ $img3 = $checkrow["IMG3"];
 			function preview3() {
 				thumb3.src=URL.createObjectURL(event.target.files[0]);
 			}
+
+			// Compress an image file client-side to avoid exceeding PHP upload_max_filesize
+			function compressImageFile(file, maxDim, quality) {
+				maxDim = maxDim || 1200;
+				quality = quality || 0.7;
+				return new Promise(function(resolve, reject) {
+					var reader = new FileReader();
+					reader.onload = function(e) {
+						var img = new Image();
+						img.onload = function() {
+							var w = img.width, h = img.height;
+							if (w > maxDim || h > maxDim) {
+								if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+								else { w = Math.round(w * maxDim / h); h = maxDim; }
+							}
+							var canvas = document.createElement('canvas');
+							canvas.width = w;
+							canvas.height = h;
+							canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+							canvas.toBlob(function(blob) {
+								if (blob) resolve(blob);
+								else reject(new Error('Compression failed'));
+							}, 'image/jpeg', quality);
+						};
+						img.onerror = function() { reject(new Error('Failed to load image')); };
+						img.src = e.target.result;
+					};
+					reader.onerror = function() { reject(new Error('Failed to read file')); };
+					reader.readAsDataURL(file);
+				});
+			}
+
+			// Intercept form submit to compress images before uploading
+			document.querySelector('form').addEventListener('submit', function(e) {
+				var fileInputs = [
+					document.querySelector('input[name="image1"]'),
+					document.querySelector('input[name="image2"]'),
+					document.querySelector('input[name="image3"]')
+				];
+				var hasFiles = fileInputs.some(function(inp) { return inp && inp.files && inp.files[0]; });
+
+				// If "done" button was clicked (no files to compress), let form submit normally
+				if (!hasFiles) return;
+
+				// Check if this is the Upload button (name="submit")
+				var submitBtn = document.querySelector('input[name="submit"]');
+				if (!document.activeElement || document.activeElement.name !== 'submit') return;
+
+				e.preventDefault();
+
+				var compressPromises = [];
+				fileInputs.forEach(function(inp, idx) {
+					if (inp && inp.files && inp.files[0]) {
+						compressPromises.push(
+							compressImageFile(inp.files[0], 1200, 0.7).then(function(blob) {
+								return { name: 'image' + (idx + 1), blob: blob, fileName: 'photo' + (idx + 1) + '.jpg' };
+							})
+						);
+					}
+				});
+
+				Promise.all(compressPromises).then(function(results) {
+					var formData = new FormData();
+					formData.append('submit', 'Upload');
+					results.forEach(function(r) {
+						formData.append(r.name, r.blob, r.fileName);
+					});
+
+					// Submit via fetch, then reload to process the response
+					var form = document.querySelector('form');
+					fetch(form.action || window.location.href, { method: 'POST', body: formData })
+					.then(function() { window.location.reload(); })
+					.catch(function() { alert('Upload failed. Please try again.'); });
+				}).catch(function() {
+					alert('Failed to compress images. Please try again.');
+				});
+			});
 		</script>
 	</body>
 </html>
