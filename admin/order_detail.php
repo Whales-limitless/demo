@@ -128,6 +128,13 @@ uksort($grouped_items, function($a, $b) {
     if ($b === 'Unassigned') return -1;
     return strcmp($a, $b);
 });
+// Sort items within each rack group by rack_remark ascending
+foreach ($grouped_items as &$items) {
+    usort($items, function($a, $b) {
+        return strcmp($a['rack_remark'] ?? '', $b['rack_remark'] ?? '');
+    });
+}
+unset($items);
 
 // Status label
 $statusLabel = ($rowstatus === 'DONE') ? 'Done' : (($rowstatus === 'DELETED') ? 'Deleted' : 'Pending');
