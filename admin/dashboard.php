@@ -269,7 +269,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <td><?php echo htmlspecialchars($order['ADMINRMK'] ?? ''); ?></td>
                         <td><?php echo htmlspecialchars($order['branch_name'] ?? $order['branch_code'] ?? ''); ?></td>
                         <td style="white-space:nowrap">
-                            <a href="order_detail.php?salnum=<?php echo $salnum; ?>" class="btn-action btn-view"><i class="fas fa-eye"></i></a>
+                            <button type="button" onclick="viewOrder('<?php echo $salnum; ?>');" class="btn-action btn-view"><i class="fas fa-eye"></i></button>
                             <button type="button" onclick="openEditModal('<?php echo $salnum; ?>', '<?php echo htmlspecialchars($order['ADMINRMK'] ?? '', ENT_QUOTES); ?>', '<?php echo $order['PURCHASEDATE'] ?? ''; ?>');" class="btn-action btn-edit"><i class="fas fa-pen"></i></button>
                             <?php if (($_SESSION['admin_type'] ?? '') === 'A'): ?>
                             <button type="button" onclick="donebtn('<?php echo $salnum; ?>');" class="btn-action btn-done"><i class="fas fa-check"></i></button>
@@ -311,6 +311,24 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-success" onclick="saveEdit();"><i class="fas fa-check"></i> Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- View Order Modal -->
+<div class="modal fade" id="viewOrderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable" style="max-width:380px;">
+    <div class="modal-content">
+      <div class="modal-header" style="padding:10px 16px;">
+        <h6 class="modal-title" id="viewOrderTitle" style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;margin:0;"><i class="fas fa-eye"></i> Order Detail</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="viewOrderBody" style="padding:8px 12px;font-size:12px;">
+      </div>
+      <div class="modal-footer" style="padding:8px 16px;">
+        <button type="button" class="btn btn-sm btn-primary" onclick="printViewOrder();"><i class="fas fa-print"></i> Print</button>
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -507,7 +525,7 @@ function renderTable(orders) {
         html += '<td>' + rmk + '</td>';
         html += '<td>' + branch + '</td>';
         html += '<td style="white-space:nowrap">';
-        html += '<a href="order_detail.php?salnum=' + salnum + '" class="btn-action btn-view"><i class="fas fa-eye"></i></a>';
+        html += '<button type="button" onclick="viewOrder(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-view"><i class="fas fa-eye"></i></button>';
         html += '<button type="button" onclick="openEditModal(\'' + salnum.replace(/'/g, "\\'") + '\', \'' + (o.ADMINRMK||'').replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\', \'' + (o.PURCHASEDATE||'') + '\');" class="btn-action btn-edit"><i class="fas fa-pen"></i></button>';
         if (isAdminType) {
             html += '<button type="button" onclick="donebtn(\'' + salnum.replace(/'/g, "\\'") + '\');" class="btn-action btn-done"><i class="fas fa-check"></i></button>';
@@ -654,6 +672,153 @@ function manualRefresh() {
         btn.classList.remove('spinning');
         btn.disabled = false;
     }, 800);
+}
+
+// ── View Order Modal ───────────────────────────────────
+var viewOrderModalInstance = null;
+var lastViewOrderData = null;
+
+function viewOrder(salnum) {
+    if (!viewOrderModalInstance) {
+        viewOrderModalInstance = new bootstrap.Modal(document.getElementById('viewOrderModal'));
+    }
+    document.getElementById('viewOrderBody').innerHTML = '<div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin" style="font-size:20px;"></i></div>';
+    document.getElementById('viewOrderTitle').innerHTML = '<i class="fas fa-eye"></i> ' + esc(salnum);
+    viewOrderModalInstance.show();
+
+    $.post('admin_ajax.php', { action: 'view_order', salnum: salnum }, function(data) {
+        lastViewOrderData = data;
+        var html = '';
+
+        // Header
+        html += '<div style="text-align:center;border-bottom:1px dashed #1a1a1a;padding-bottom:6px;margin-bottom:8px;">';
+        html += '<div style="font-weight:700;font-size:13px;margin-bottom:4px;">Purchase Order</div>';
+        if (data.merchant_name) html += '<div style="font-weight:700;font-size:13px;">' + esc(data.merchant_name) + '</div>';
+        if (data.merchant_addr) html += '<div style="font-size:10px;color:#6b7280;">' + esc(data.merchant_addr) + '</div>';
+        html += '</div>';
+
+        // TO
+        if (data.to) html += '<div style="font-size:14px;font-weight:700;margin-bottom:6px;">TO: ' + esc(data.to) + '</div>';
+
+        // Info
+        html += '<table style="width:100%;font-size:11px;margin-bottom:8px;">';
+        html += '<tr><td style="color:#6b7280;white-space:nowrap;">Order ID</td><td style="width:8px;">:</td><td><strong>' + esc(data.salnum) + '</strong></td></tr>';
+        if (data.branch) html += '<tr><td style="color:#6b7280;">Branch</td><td>:</td><td>' + esc(data.branch) + '</td></tr>';
+        var dateStr = data.date ? data.date.split('-').reverse().join('/') : '';
+        html += '<tr><td style="color:#6b7280;">Delivery Date</td><td>:</td><td>' + esc(dateStr) + ' ' + esc(data.time || '') + '</td></tr>';
+        html += '<tr><td style="color:#6b7280;">Staff</td><td>:</td><td>' + esc(data.name || '') + '</td></tr>';
+        html += '</table>';
+
+        // Items grouped by rack
+        var grouped = data.grouped_items || {};
+        for (var rack in grouped) {
+            var items = grouped[rack];
+            var isUnassigned = rack === 'Unassigned';
+            html += '<div style="background:' + (isUnassigned ? '#fef3c7' : '#f0f4ff') + ';border-left:3px solid ' + (isUnassigned ? '#f59e0b' : '#3b82f6') + ';padding:4px 6px;margin-top:6px;border-radius:2px 2px 0 0;display:flex;align-items:center;gap:4px;">';
+            html += '<i class="fas fa-' + (isUnassigned ? 'question-circle' : 'warehouse') + '" style="color:' + (isUnassigned ? '#f59e0b' : '#3b82f6') + ';font-size:10px;"></i>';
+            html += '<span style="font-weight:700;font-size:11px;color:' + (isUnassigned ? '#92400e' : '#1e40af') + ';">' + esc(rack) + '</span>';
+            html += '<span style="font-size:9px;color:#6b7280;">(' + items.length + ' item' + (items.length > 1 ? 's' : '') + ')</span>';
+            html += '</div>';
+            html += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:0;">';
+            html += '<thead><tr><td style="width:15%;border-top:1px dashed #1a1a1a;border-bottom:1px dashed #1a1a1a;padding:4px 2px;font-weight:600;font-size:13px;">Qty</td>';
+            html += '<td style="width:50%;border-top:1px dashed #1a1a1a;border-bottom:1px dashed #1a1a1a;padding:4px 2px;font-weight:600;font-size:13px;">Item</td>';
+            html += '<td style="width:35%;border-top:1px dashed #1a1a1a;border-bottom:1px dashed #1a1a1a;padding:4px 2px;font-weight:600;font-size:13px;text-align:right;">Rack Remark</td></tr></thead>';
+            html += '<tbody>';
+            for (var j = 0; j < items.length; j++) {
+                html += '<tr><td style="padding:3px 2px;border-bottom:1px dotted #ddd;font-size:13px;">' + items[j].qty + '</td>';
+                html += '<td style="padding:3px 2px;border-bottom:1px dotted #ddd;font-size:13px;">' + esc(items[j].pdesc) + '</td>';
+                html += '<td style="padding:3px 2px;border-bottom:1px dotted #ddd;font-size:9px;color:#6b7280;font-style:italic;text-align:right;">' + esc(items[j].rack_remark || '') + '</td></tr>';
+            }
+            html += '</tbody></table>';
+        }
+
+        html += '<div style="border-top:1px dashed #1a1a1a;padding-top:6px;margin-top:8px;font-size:10px;color:#6b7280;text-align:center;">--- End ---</div>';
+
+        document.getElementById('viewOrderBody').innerHTML = html;
+    }, 'json');
+}
+
+function printViewOrder() {
+    if (!lastViewOrderData) return;
+    var d = lastViewOrderData;
+    var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Order ' + esc(d.salnum) + '</title>';
+    html += '<style>';
+    html += '@page { size: 80mm auto; margin: 2mm; }';
+    html += 'body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a1a; margin: 0; padding: 4px; max-width: 80mm; }';
+    html += '.header { text-align: center; border-bottom: 1px dashed #1a1a1a; padding-bottom: 6px; margin-bottom: 8px; }';
+    html += '.info-tbl td { padding: 1px 2px; vertical-align: top; }';
+    html += '.info-tbl .lbl { color: #6b7280; white-space: nowrap; }';
+    html += '.rack-hdr { padding: 4px 6px; margin-top: 6px; border-left: 3px solid #3b82f6; background: #f0f4ff; font-weight: 700; font-size: 11px; }';
+    html += '.rack-hdr.un { border-left-color: #f59e0b; background: #fef3c7; }';
+    html += '.items-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }';
+    html += '.items-tbl thead td { border-top: 1px dashed #1a1a1a; border-bottom: 1px dashed #1a1a1a; padding: 4px 2px; font-weight: 600; }';
+    html += '.items-tbl tbody td { padding: 3px 2px; border-bottom: 1px dotted #ddd; }';
+    html += '.text-right { text-align: right; }';
+    html += '.footer { border-top: 1px dashed #1a1a1a; padding-top: 6px; text-align: center; font-size: 10px; color: #6b7280; margin-top: 8px; }';
+    html += '</style></head><body>';
+
+    html += '<div class="header">';
+    html += '<div style="font-weight:700;font-size:13px;margin-bottom:4px;">Purchase Order</div>';
+    if (d.merchant_name) html += '<div style="font-weight:700;font-size:13px;">' + esc(d.merchant_name) + '</div>';
+    if (d.merchant_addr) html += '<div style="font-size:10px;color:#6b7280;">' + esc(d.merchant_addr) + '</div>';
+    html += '</div>';
+
+    if (d.to) html += '<div style="font-size:14px;font-weight:700;margin-bottom:6px;">TO: ' + esc(d.to) + '</div>';
+
+    var dateStr = d.date ? d.date.split('-').reverse().join('/') : '';
+    html += '<table class="info-tbl" style="width:100%;margin-bottom:8px;">';
+    html += '<tr><td class="lbl">Order ID</td><td style="width:8px;">:</td><td><strong>' + esc(d.salnum) + '</strong></td></tr>';
+    if (d.branch) html += '<tr><td class="lbl">Branch</td><td>:</td><td>' + esc(d.branch) + '</td></tr>';
+    html += '<tr><td class="lbl">Delivery Date</td><td>:</td><td>' + esc(dateStr) + ' ' + esc(d.time || '') + '</td></tr>';
+    html += '<tr><td class="lbl">Staff</td><td>:</td><td>' + esc(d.name || '') + '</td></tr>';
+    html += '</table>';
+
+    var grouped = d.grouped_items || {};
+    for (var rack in grouped) {
+        var items = grouped[rack];
+        var isUn = rack === 'Unassigned';
+        html += '<div class="rack-hdr' + (isUn ? ' un' : '') + '">' + esc(rack) + ' (' + items.length + ')</div>';
+        html += '<table class="items-tbl"><thead><tr><td style="width:15%;">Qty</td><td style="width:50%;">Item</td><td style="width:35%;" class="text-right">Rack Remark</td></tr></thead><tbody>';
+        for (var j = 0; j < items.length; j++) {
+            html += '<tr><td>' + items[j].qty + '</td><td>' + esc(items[j].pdesc) + '</td><td class="text-right" style="font-size:9px;color:#6b7280;font-style:italic;">' + esc(items[j].rack_remark || '') + '</td></tr>';
+        }
+        html += '</tbody></table>';
+    }
+    html += '<div class="footer">--- End ---</div>';
+
+    // Office copy
+    html += '<div style="page-break-before:always;"></div>';
+    html += '<div class="header">';
+    html += '<div style="font-weight:700;font-size:13px;margin-bottom:4px;">Purchase Order</div>';
+    if (d.merchant_name) html += '<div style="font-weight:700;font-size:13px;">' + esc(d.merchant_name) + '</div>';
+    if (d.merchant_addr) html += '<div style="font-size:10px;color:#6b7280;">' + esc(d.merchant_addr) + '</div>';
+    html += '</div>';
+    if (d.to) html += '<div style="font-size:14px;font-weight:700;margin-bottom:6px;">TO: ' + esc(d.to) + '</div>';
+    html += '<table class="info-tbl" style="width:100%;margin-bottom:8px;">';
+    html += '<tr><td class="lbl">Order ID</td><td style="width:8px;">:</td><td><strong>' + esc(d.salnum) + '</strong></td></tr>';
+    if (d.branch) html += '<tr><td class="lbl">Branch</td><td>:</td><td>' + esc(d.branch) + '</td></tr>';
+    html += '<tr><td class="lbl">Delivery Date</td><td>:</td><td>' + esc(dateStr) + ' ' + esc(d.time || '') + '</td></tr>';
+    html += '<tr><td class="lbl">Staff</td><td>:</td><td>' + esc(d.name || '') + '</td></tr>';
+    html += '</table>';
+    for (var rack in grouped) {
+        var items = grouped[rack];
+        var isUn = rack === 'Unassigned';
+        html += '<div class="rack-hdr' + (isUn ? ' un' : '') + '">' + esc(rack) + ' (' + items.length + ')</div>';
+        html += '<table class="items-tbl"><thead><tr><td style="width:15%;">Qty</td><td style="width:50%;">Item</td><td style="width:35%;" class="text-right">Rack Remark</td></tr></thead><tbody>';
+        for (var j = 0; j < items.length; j++) {
+            html += '<tr><td>' + items[j].qty + '</td><td>' + esc(items[j].pdesc) + '</td><td class="text-right" style="font-size:9px;color:#6b7280;font-style:italic;">' + esc(items[j].rack_remark || '') + '</td></tr>';
+        }
+        html += '</tbody></table>';
+    }
+    html += '<div style="margin-top:10px;font-size:10px;">OFFICE COPY</div>';
+    html += '<div class="footer">--- End ---</div>';
+    html += '</body></html>';
+
+    var printWin = window.open('', '_blank');
+    printWin.document.write(html);
+    printWin.document.close();
+    printWin.focus();
+    printWin.print();
 }
 
 // ── Init ───────────────────────────────────────────────

@@ -212,6 +212,92 @@ if ($action === "done") {
     }
     echo json_encode($response);
 
+// ===================== VIEW ORDER DETAIL (AJAX) =====================
+} elseif ($action === "view_order") {
+    header('Content-Type: application/json; charset=utf-8');
+    $salnum = $connect->real_escape_string($_POST['salnum'] ?? '');
+
+    // Update view status
+    $connect->query("UPDATE `orderlist` SET view_status = '1' WHERE SALNUM = '$salnum'");
+
+    // Fetch order header
+    $getdata = $connect->query("SELECT * FROM `orderlist` WHERE SALNUM = '$salnum' LIMIT 1");
+    if (!$getdata || $getdata->num_rows === 0) {
+        echo json_encode(['error' => 'Order not found']);
+        exit;
+    }
+    $row = $getdata->fetch_assoc();
+    $raccode    = $row['ACCODE'] ?? '';
+    $rowname    = $row['NAME'] ?? '';
+    $rowoutlet  = $row['OUTLET'] ?? '';
+    $rowdate    = $row['SDATE'] ?? '';
+    $rowttime   = $row['TTIME'] ?? '';
+    $rowto      = $row['TXTTO'] ?? '';
+    $rowbranchcode = $row['branch_code'] ?? '';
+    $rowstatus  = $row['STATUS'] ?? '';
+
+    // Branch name
+    $rowbranchname = '';
+    if ($rowbranchcode !== '') {
+        $br_q = $connect->query("SELECT `name` FROM `branch` WHERE `code` = '" . $connect->real_escape_string($rowbranchcode) . "' LIMIT 1");
+        if ($br_q && $br_row = $br_q->fetch_assoc()) $rowbranchname = $br_row['name'];
+        else $rowbranchname = $rowbranchcode;
+    }
+
+    // Merchant info
+    $mer_name = $mer_addr = '';
+    $get_merchant = $connect->query("SELECT * FROM outlet WHERE CODE = '" . $connect->real_escape_string($rowoutlet) . "'");
+    if ($get_merchant && $m_row = $get_merchant->fetch_assoc()) {
+        $mer_name = $m_row['PDESC'] ?? '';
+        $mer_addr = $m_row['ADDRESS'] ?? '';
+    }
+
+    // Get order items with rack info
+    $grouped = [];
+    $item_query = $connect->query("SELECT * FROM `orderlist` WHERE SALNUM = '$salnum' AND PDESC <> 'USE POINTS'");
+    if ($item_query) {
+        while ($irow = $item_query->fetch_assoc()) {
+            $barcode = $connect->real_escape_string($irow['BARCODE'] ?? '');
+            $rack_code = '';
+            $rack_q = $connect->query("SELECT r.`code` FROM `rack_product` rp JOIN `rack` r ON rp.`rack_id` = r.`id` WHERE rp.`barcode` = '$barcode' AND r.`status` = 'ACTIVE' ORDER BY r.`code` ASC LIMIT 1");
+            if ($rack_q && $rr = $rack_q->fetch_assoc()) $rack_code = $rr['code'];
+            $rack_remark = '';
+            $remark_q = $connect->query("SELECT `rack` FROM `PRODUCTS` WHERE `barcode` = '$barcode' LIMIT 1");
+            if ($remark_q && $rr2 = $remark_q->fetch_assoc()) $rack_remark = $rr2['rack'] ?? '';
+
+            $rackKey = !empty($rack_code) ? $rack_code : 'Unassigned';
+            $grouped[$rackKey][] = [
+                'barcode' => $irow['BARCODE'] ?? '',
+                'pdesc'   => $irow['PDESC'] ?? '',
+                'qty'     => (float)($irow['QTY'] ?? 0),
+                'rack_remark' => $rack_remark
+            ];
+        }
+    }
+    // Sort rack groups
+    uksort($grouped, function($a, $b) {
+        if ($a === 'Unassigned') return 1;
+        if ($b === 'Unassigned') return -1;
+        return strcmp($a, $b);
+    });
+    foreach ($grouped as &$items) {
+        usort($items, function($a, $b) { return strcmp($a['rack_remark'] ?? '', $b['rack_remark'] ?? ''); });
+    }
+    unset($items);
+
+    echo json_encode([
+        'salnum' => $salnum,
+        'name' => $rowname,
+        'date' => $rowdate,
+        'time' => $rowttime,
+        'to' => $rowto,
+        'branch' => $rowbranchname,
+        'status' => $rowstatus,
+        'merchant_name' => $mer_name,
+        'merchant_addr' => $mer_addr,
+        'grouped_items' => $grouped
+    ]);
+
 // ===================== ACKNOWLEDGE SOUND =====================
 } elseif ($action === "noted") {
     header('Content-Type: application/json; charset=utf-8');
