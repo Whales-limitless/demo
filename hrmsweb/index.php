@@ -358,68 +358,6 @@ $isLoggedIn = true;
             display: none;
         }
         
-        /* PWA Install Prompt Styles */
-        #installPrompt {
-            position: fixed;
-            bottom: 100px; /* Above bottom nav */
-            left: 20px;
-            right: 20px;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 8px 25px rgba(35, 52, 70, 0.2);
-            z-index: 1001; /* Above bottom nav */
-            text-align: center;
-            display: none;
-        }
-
-        #installPrompt p {
-            margin: 0 0 15px 0;
-            color: var(--secondary-color);
-            font-size: 15px;
-            font-weight: 500;
-        }
-
-        #installPrompt button {
-            margin: 5px;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        #installBtn {
-            background: var(--secondary-color);
-            color: white;
-        }
-
-        #installBtn:hover {
-            background: #1a252f;
-            transform: translateY(-2px);
-        }
-
-        #dismissBtn, #iosCloseBtn {
-            background: #6c757d;
-            color: white;
-        }
-
-        #dismissBtn:hover, #iosCloseBtn:hover {
-            background: #545b62;
-        }
-
-        /* Responsive */
-        @media (max-width: 480px) {
-            #installPrompt {
-                bottom: 90px;
-                left: 15px;
-                right: 15px;
-                padding: 18px;
-            }
-        }
     </style>
 </head>
 <body>
@@ -570,17 +508,9 @@ $isLoggedIn = true;
         <i class="fas fa-spinner fa-spin me-2"></i> Refreshing...
     </div>
     
-    <!-- PWA Install Prompt -->
-     <div id="installPrompt">
-        <p><i class="fas fa-mobile-alt me-2"></i>Install HRMS app for better experience!</p>
-        <button id="installBtn"><i class="fas fa-download me-2"></i>Install App</button>
-        <button id="dismissBtn">Not Now</button>
-    </div> 
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // PWA Variables
-        let deferredPrompt;
         let userData = {};
         let attendanceTimer = null;
         
@@ -626,108 +556,13 @@ $isLoggedIn = true;
                 });
         }
         
-        // Handle install prompt
-        window.addEventListener('beforeinstallprompt', (e) => {
-            debugLog('beforeinstallprompt event fired!');
-            
-            // Prevent Chrome from automatically showing the prompt
-            e.preventDefault();
-            // Stash the event so it can be triggered later
-            deferredPrompt = e;
-            
-            // Show custom install prompt
-            document.getElementById('installPrompt').style.display = 'block';
-            debugLog('Install prompt shown');
-        });
-        
-        // Install button click handler
-        function handleInstallClick() {
-            debugLog('Install button clicked');
-            if (!deferredPrompt) {
-                debugLog('No deferredPrompt available');
-                return;
-            }
-            
-            // Hide the prompt
-            document.getElementById('installPrompt').style.display = 'none';
-            // Show the browser's install prompt
-            deferredPrompt.prompt();
-            debugLog('Install prompt shown to user');
-            
-            // Wait for the user to respond to the prompt
-            deferredPrompt.userChoice.then((choiceResult) => {
-                if (choiceResult.outcome === 'accepted') {
-                    debugLog('User accepted the install prompt');
-                } else {
-                    debugLog('User dismissed the install prompt');
-                }
-                deferredPrompt = null;
-            });
-        }
-        
-        // Dismiss button click handler
-        function handleDismissClick() {
-            debugLog('User dismissed install prompt');
-            document.getElementById('installPrompt').style.display = 'none';
-            deferredPrompt = null;
-        }
-        
-        // Listen for successful installation
-        window.addEventListener('appinstalled', (evt) => {
-            debugLog('App was installed successfully');
-        });
-        
-        // iOS Detection and instructions
-        function isIOS() {
-            return /iPad|iPhone|iPod/.test(navigator.userAgent);
-        }
-        
-        function isInStandaloneMode() {
-            return ('standalone' in window.navigator) && (window.navigator.standalone);
-        }
-        
-        function handleiOSInstall() {
-            if (isIOS() && !isInStandaloneMode()) {
-                debugLog('iOS device detected, showing manual instructions');
-                setTimeout(() => {
-                    const installPrompt = document.getElementById('installPrompt');
-                    if (!installPrompt.style.display || installPrompt.style.display === 'none') {
-                        installPrompt.innerHTML = `
-                            <p><i class="fas fa-info-circle me-2"></i><strong>Install HRMS on iOS:</strong></p>
-                            <p>1. Tap the Share button <strong><i class="fas fa-share"></i></strong></p>
-                            <p>2. Tap "Add to Home Screen"</p>
-                            <button id="iosCloseBtn" onclick="document.getElementById('installPrompt').style.display = 'none'">Got it!</button>
-                        `;
-                        installPrompt.style.display = 'block';
-                        debugLog('iOS install instructions shown');
-                    }
-                }, 3000);
-            }
-        }
-        
-        // Add event listeners for PWA
-        function addPWAEventListeners() {
-            // Install button
-            const installBtn = document.getElementById('installBtn');
-            if (installBtn) {
-                installBtn.addEventListener('click', handleInstallClick);
-            }
-            
-            // Dismiss button  
-            const dismissBtn = document.getElementById('dismissBtn');
-            if (dismissBtn) {
-                dismissBtn.addEventListener('click', handleDismissClick);
-            }
-        }
         
         document.addEventListener('DOMContentLoaded', function() {
             loadUserData();
             initializeData();
             
-            // Add PWA initialization
+            // PWA initialization
             initializePWA();
-            addPWAEventListeners();
-            handleiOSInstall();
             
             // Pull to refresh simulation
             let startY = 0;
