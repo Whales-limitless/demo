@@ -474,6 +474,9 @@ if ($driverCode !== '') {
             html += '<p>Customer Signature</p>';
         } else {
             html += '<p style="color:var(--text-muted);">No signature captured yet</p>';
+            html += '<a href="del_sign.php?ordno=' + encodeURIComponent(o.ORDNO) + '&id=' + o.ID + '" style="display:inline-flex;align-items:center;gap:6px;padding:10px 24px;background:#C8102E;color:#fff;border:none;border-radius:10px;font-family:DM Sans,sans-serif;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;margin-top:12px;">';
+            html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
+            html += 'Capture Signature</a>';
         }
         html += '</div>';
 
