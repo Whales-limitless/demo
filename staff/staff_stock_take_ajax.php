@@ -242,6 +242,52 @@ if ($action === 'list_sessions') {
         echo json_encode(['error' => $e->getMessage()]);
     }
 
+} elseif ($action === 'update_product_desc') {
+    $itemId = intval($_POST['item_id'] ?? 0);
+    $newDesc = trim($_POST['new_desc'] ?? '');
+
+    if ($itemId <= 0 || $newDesc === '') {
+        echo json_encode(['error' => 'Invalid data.']);
+        exit;
+    }
+
+    // Get the barcode from the stock_take_item
+    $stmt = $connect->prepare("SELECT `barcode` FROM `stock_take_item` WHERE `id` = ? LIMIT 1");
+    $stmt->bind_param("i", $itemId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) {
+        echo json_encode(['error' => 'Item not found.']);
+        exit;
+    }
+
+    $barcode = $row['barcode'];
+    $connect->begin_transaction();
+
+    try {
+        // Update stock_take_item description
+        $stmt = $connect->prepare("UPDATE `stock_take_item` SET `product_desc` = ? WHERE `id` = ?");
+        $stmt->bind_param("si", $newDesc, $itemId);
+        $stmt->execute();
+        $stmt->close();
+
+        // Update PRODUCTS.name so it stays in sync
+        if ($barcode !== '') {
+            $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `name` = ? WHERE `barcode` = ?");
+            $stmt->bind_param("ss", $newDesc, $barcode);
+            $stmt->execute();
+            $stmt->close();
+        }
+
+        $connect->commit();
+        echo json_encode(['success' => true, 'new_desc' => $newDesc]);
+    } catch (Exception $e) {
+        $connect->rollback();
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+
 } else {
     echo json_encode(['error' => 'Invalid action.']);
 }

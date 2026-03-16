@@ -448,6 +448,32 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             color: var(--text);
             line-height: 1.4;
             margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        .item-description .desc-text {
+            flex: 1;
+        }
+
+        .item-description .edit-desc-btn {
+            flex-shrink: 0;
+            background: none;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 3px 6px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 12px;
+            line-height: 1;
+            transition: all 0.2s;
+        }
+
+        .item-description .edit-desc-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: #fef2f2;
         }
 
         .item-fields {
@@ -1004,7 +1030,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                         '<span class="item-barcode">' + escapeHtml(item.barcode || 'N/A') + '</span>' +
                         rackTagsHtml +
                     '</div>' +
-                    '<div class="item-description">' + escapeHtml(item.description || 'No description') + '</div>' +
+                    '<div class="item-description"><span class="desc-text">' + escapeHtml(item.description || 'No description') + '</span><button class="edit-desc-btn" onclick="editProductDesc(' + escapeAttr(item.id) + ', this)" title="Edit name">&#9998;</button></div>' +
                     (isSubmittedItem && item.counted_at ? '<div class="submitted-date">Submitted: ' + escapeHtml(item.counted_at) + '</div>' : '') +
                     '<div class="item-fields">' +
                         '<div class="item-field">' +
@@ -1225,6 +1251,56 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                       .replace(/'/g, '&#39;')
                       .replace(/</g, '&lt;')
                       .replace(/>/g, '&gt;');
+        }
+
+        // ---- Edit Product Description ----
+        function editProductDesc(itemId, btn) {
+            const card = btn.closest('.item-card');
+            const descSpan = card.querySelector('.desc-text');
+            const currentDesc = descSpan.textContent;
+
+            Swal.fire({
+                title: 'Edit Product Name',
+                input: 'textarea',
+                inputValue: currentDesc,
+                inputAttributes: { autocapitalize: 'off', style: 'font-size:14px;' },
+                showCancelButton: true,
+                confirmButtonText: 'Save',
+                confirmButtonColor: '#C8102E',
+                inputValidator: (value) => {
+                    if (!value || !value.trim()) return 'Product name cannot be empty.';
+                }
+            }).then(result => {
+                if (!result.isConfirmed) return;
+                const newDesc = result.value.trim();
+                if (newDesc === currentDesc) return;
+
+                fetch('staff_stock_take_ajax.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=update_product_desc&item_id=' + encodeURIComponent(itemId) + '&new_desc=' + encodeURIComponent(newDesc)
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        descSpan.textContent = newDesc;
+                        // Update in-memory data
+                        const item = currentItems.find(i => i.id == itemId);
+                        if (item) {
+                            item.description = newDesc;
+                            item.product_desc = newDesc;
+                        }
+                        // Update card data attribute for search
+                        card.setAttribute('data-description', newDesc.toLowerCase());
+                        Swal.fire({ icon: 'success', title: 'Updated', text: 'Product name has been updated.', timer: 1500, showConfirmButton: false });
+                    } else {
+                        Swal.fire({ icon: 'error', text: data.error || 'Failed to update.' });
+                    }
+                })
+                .catch(() => {
+                    Swal.fire({ icon: 'error', text: 'Network error. Please try again.' });
+                });
+            });
         }
 
         // ---- Rack Management ----
