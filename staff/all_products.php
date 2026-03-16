@@ -138,6 +138,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-add-cart { width: 100%; padding: 10px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; transition: all var(--transition); display: flex; align-items: center; justify-content: center; gap: 6px; }
 .btn-add-cart.active { background: var(--primary); color: #fff; }
 .btn-add-cart.active:hover { background: var(--primary-dark); transform: translateY(-1px); }
+.btn-add-cart.stock-take { background: #fef3c7; color: #92400e; cursor: not-allowed; font-size: 11px; }
 .cart-feedback { font-size: 12px; text-align: center; height: 16px; margin-top: 4px; }
 
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 15px; }
@@ -210,6 +211,7 @@ function formatRackDate(dt) {
 }
 
 var allCategories = [];
+var stockTakeBarcodes = {};
 
 var trendLabels = { green: 'Hot', yellow: 'Moderate', red: 'Slow', black: 'Dead' };
 var BATCH_SIZE = 2; // Categories per batch
@@ -402,7 +404,9 @@ function renderProductCard(p, index) {
           '<input type="number" class="qty-input" id="qty_' + p.id + '" value="1" min="1" max="99">' +
           '<button class="qty-btn" onclick="updateQty(\'plus\',' + p.id + ')">+</button>' +
         '</div>' +
-        '<button class="btn-add-cart active" onclick="addToCart(' + p.id + ')">Add to Cart</button>' +
+        (stockTakeBarcodes[p.barcode] ?
+          '<button class="btn-add-cart stock-take" disabled>Active Stock Take Session</button>' :
+          '<button class="btn-add-cart active" onclick="addToCart(' + p.id + ')">Add to Cart</button>') +
         '<div class="cart-feedback" id="feedback_' + p.id + '"></div>' +
       '</div>' +
     '</div>' +
@@ -485,6 +489,8 @@ fetch('all_products_ajax.php', {
     document.getElementById('initialLoading').innerHTML = '<p style="color:#dc2626;">Failed to load products. Please refresh.</p>';
     return;
   }
+  // Build stock take barcode lookup
+  (data.stock_take_barcodes || []).forEach(function(b) { stockTakeBarcodes[b] = true; });
   initProductData(data.categories || []);
 
   var initialQuery = getUrlParam('q');
