@@ -110,6 +110,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .tag-stock-in-date { background: #ecfdf5; color: #059669; font-size: 9px; }
 .tag-btn { cursor: pointer; transition: all var(--transition); }
 .tag-btn:hover { opacity: 0.8; transform: translateY(-1px); }
+.tag-uom { background: #dbeafe; color: #1d4ed8; position: relative; }
+.uom-icon { font-size: 12px; }
+.uom-tooltip { display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #1e293b; color: #f8fafc; border-radius: 10px; padding: 10px 14px; min-width: 170px; z-index: 50; box-shadow: 0 4px 16px rgba(0,0,0,0.2); white-space: nowrap; }
+.uom-tooltip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #1e293b; }
+.uom-tooltip.active { display: flex; flex-direction: column; gap: 4px; }
+.uom-tooltip-title { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+.uom-tooltip-row { font-size: 12px; font-weight: 600; padding: 2px 0; }
 
 .rack-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; justify-content: center; align-items: center; padding: 16px; }
 .rack-modal-overlay.active { display: flex; }
@@ -197,6 +204,19 @@ function escHtml(s) {
 function escAttr(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+function showUomInfo(el, e) {
+  e.stopPropagation();
+  var tip = el.querySelector('.uom-tooltip');
+  if (!tip) return;
+  var isOpen = tip.classList.contains('active');
+  // Close all other tooltips first
+  document.querySelectorAll('.uom-tooltip.active').forEach(function(t) { t.classList.remove('active'); });
+  if (!isOpen) tip.classList.add('active');
+}
+document.addEventListener('click', function() {
+  document.querySelectorAll('.uom-tooltip.active').forEach(function(t) { t.classList.remove('active'); });
+});
 
 function formatRackDate(dt) {
   if (!dt) return '';
@@ -390,6 +410,15 @@ function renderProductCard(p, index) {
   }
   if (p.stock_in_at) {
     tags += '<span class="tag tag-stock-in-date">Stock In: ' + formatRackDate(p.stock_in_at) + '</span>';
+  }
+  if (p.uom_conversions && p.uom_conversions.length > 0) {
+    tags += '<span class="tag tag-uom tag-btn" onclick="showUomInfo(this, event)"><span class="uom-icon">&#9878;</span> UOM' +
+      '<span class="uom-tooltip"><span class="uom-tooltip-title">UOM Conversion</span>' +
+      p.uom_conversions.map(function(u) {
+        var factor = u.conversion_factor % 1 === 0 ? u.conversion_factor.toFixed(0) : u.conversion_factor;
+        return '<span class="uom-tooltip-row">1 ' + escHtml(u.from_uom) + ' = ' + factor + ' ' + escHtml(u.to_uom) + '</span>';
+      }).join('') +
+      '</span></span>';
   }
 
   return '<div class="product-card" data-id="' + p.id + '" data-name="' + escAttr(p.name.toLowerCase()) + '" data-sku="' + escAttr((p.sku || '').toLowerCase()) + '" data-barcode="' + escAttr((p.barcode || '').toLowerCase()) + '" style="animation-delay:' + (index+1)*0.03 + 's">' +
