@@ -54,7 +54,7 @@ if ($ordno === '') { header("Location: del_dashboard.php"); exit; }
     <?php include 'navbar.php'; ?>
 
     <header class="page-header">
-        <a href="del_vieworder.php?ordno=<?php echo urlencode($ordno); ?>" class="back-btn">
+        <a href="del_dashboard.php?showdo=<?php echo urlencode($ordno); ?>" class="back-btn">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
             </svg>
@@ -81,7 +81,7 @@ if ($ordno === '') { header("Location: del_dashboard.php"); exit; }
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     Save
                 </button>
-                <a href="del_vieworder.php?ordno=<?php echo urlencode($ordno); ?>" style="text-decoration:none;">
+                <a href="del_dashboard.php?showdo=<?php echo urlencode($ordno); ?>" style="text-decoration:none;">
                     <button type="button" class="btn-cancel">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         Cancel
@@ -181,7 +181,7 @@ if ($ordno === '') { header("Location: del_dashboard.php"); exit; }
 
         var imgData = canvas.toDataURL('image/png');
         var bodyStr = 'action=save&ordno=' + encodeURIComponent(signOrdno) + '&img_data=' + encodeURIComponent(imgData);
-        var returnUrl = 'del_vieworder.php?ordno=' + encodeURIComponent(signOrdno);
+        var returnUrl = 'del_dashboard.php?showdo=' + encodeURIComponent(signOrdno);
 
         if (!navigator.onLine) {
             OfflineSync.addPending('signature', 'Signature - ' + signOrdno, {
