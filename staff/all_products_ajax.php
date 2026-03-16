@@ -34,6 +34,16 @@ if ($tcRes && $tcRow = mysqli_fetch_assoc($tcRes)) {
     }
 }
 
+// Fetch all UOM conversions keyed by barcode
+$uomMap = [];
+$uomRes = mysqli_query($connect, "SELECT `barcode`, `from_uom`, `to_uom`, `conversion_factor` FROM `uom_conversion` ORDER BY `barcode`, `from_uom`");
+if ($uomRes) {
+    while ($uRow = mysqli_fetch_assoc($uomRes)) {
+        $uRow['conversion_factor'] = floatval($uRow['conversion_factor']);
+        $uomMap[$uRow['barcode']][] = $uRow;
+    }
+}
+
 // Fetch all categories with their subcategories and products
 $cat_result = mysqli_query($connect, "SELECT DISTINCT cat_code, cat_name, MIN(sort_no) AS sort_order FROM category GROUP BY cat_code, cat_name ORDER BY sort_order ASC, cat_name ASC");
 $allCategories = [];
@@ -64,6 +74,8 @@ while ($cat = mysqli_fetch_assoc($cat_result)) {
                 $prod['trend'] = null;
                 $prod['trend_qty'] = 0;
             }
+
+            $prod['uom_conversions'] = $uomMap[$prod['barcode']] ?? [];
 
             $products[] = $prod;
         }
