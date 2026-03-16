@@ -595,6 +595,15 @@ if ($driverCode !== '') {
     updateOnlineIndicator();
     window.addEventListener('online', updateOnlineIndicator);
     window.addEventListener('offline', updateOnlineIndicator);
+
+    // Auto-open DO modal if redirected from signature page
+    (function() {
+        var params = new URLSearchParams(window.location.search);
+        var autoShowOrdno = params.get('showdo');
+        if (autoShowOrdno) {
+            showDO(autoShowOrdno);
+        }
+    })();
     </script>
 </body>
 </html>
