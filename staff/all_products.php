@@ -11,7 +11,9 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>All Products - Inventory</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="components.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -390,7 +392,7 @@ function clearSearch() {
 function renderProductCard(p, index) {
   var imgHtml;
   if (p.image) {
-    imgHtml = '<img class="product-img" src="/img/' + escAttr(p.image) + '" alt="' + escAttr(p.name) + '" loading="lazy">';
+    imgHtml = '<img class="product-img" src="/img/' + escAttr(p.image) + '" alt="' + escAttr(p.name) + '" loading="lazy" decoding="async">';
   } else {
     imgHtml = '<div class="no-img-product">' + escHtml(p.sku || 'NO IMAGE') + '</div>';
   }
