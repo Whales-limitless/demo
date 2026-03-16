@@ -184,7 +184,7 @@ if ($action === "done") {
 
     // Aggregate orders directly from orderlist - simple query, no JOINs
     $orders = [];
-    $orderResult = $connect->query("SELECT SALNUM, ACCODE, MAX(NAME) AS NAME, MAX(ADMINRMK) AS ADMINRMK, MAX(TXTTO) AS TXTTO, MAX(SDATE) AS SDATE, MAX(TTIME) AS TTIME, SUM(QTY) AS SUMQTY, MAX(PURCHASEDATE) AS PURCHASEDATE, MAX(branch_code) AS branch_code FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM, ACCODE ORDER BY SALNUM DESC");
+    $orderResult = $connect->query("SELECT SALNUM, ACCODE, MAX(NAME) AS NAME, MAX(ADMINRMK) AS ADMINRMK, MAX(TXTTO) AS TXTTO, MAX(SDATE) AS SDATE, MAX(TTIME) AS TTIME, SUM(QTY) AS SUMQTY, MAX(PURCHASEDATE) AS PURCHASEDATE, MAX(branch_code) AS branch_code, MAX(PTYPE) AS PTYPE FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM, ACCODE ORDER BY SALNUM DESC");
     if ($orderResult) {
         while ($r = $orderResult->fetch_assoc()) {
             $bc = $r['branch_code'] ?? '';

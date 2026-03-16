@@ -39,7 +39,7 @@ if ($mRes) { while ($m = $mRes->fetch_assoc()) $memberHP[$m['ACCODE']] = $m['HP'
 
 // Aggregate orders directly from orderlist - simple query, no JOINs
 $orders = [];
-$orderResult = $connect->query("SELECT SALNUM, ACCODE, MAX(NAME) AS NAME, MAX(ADMINRMK) AS ADMINRMK, MAX(TXTTO) AS TXTTO, MAX(SDATE) AS SDATE, MAX(TTIME) AS TTIME, SUM(QTY) AS SUMQTY, MAX(PURCHASEDATE) AS PURCHASEDATE, MAX(branch_code) AS branch_code FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM, ACCODE ORDER BY SALNUM DESC");
+$orderResult = $connect->query("SELECT SALNUM, ACCODE, MAX(NAME) AS NAME, MAX(ADMINRMK) AS ADMINRMK, MAX(TXTTO) AS TXTTO, MAX(SDATE) AS SDATE, MAX(TTIME) AS TTIME, SUM(QTY) AS SUMQTY, MAX(PURCHASEDATE) AS PURCHASEDATE, MAX(branch_code) AS branch_code, MAX(PTYPE) AS PTYPE FROM `orderlist` WHERE STATUS != 'DONE' AND STATUS != 'DELETED' AND BARCODE <> 'PT' GROUP BY SALNUM, ACCODE ORDER BY SALNUM DESC");
 if ($orderResult) {
     while ($r = $orderResult->fetch_assoc()) {
         $bc = $r['branch_code'] ?? '';
@@ -141,6 +141,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .search-box input:focus { border-color: var(--primary); }
 .search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; }
 .order-count { font-size: 13px; color: var(--text-muted); }
+.type-filters { display: flex; gap: 6px; }
+.type-filter-btn { padding: 6px 14px; border: 1px solid #d1d5db; border-radius: 8px; background: var(--surface); font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); color: var(--text-muted); }
+.type-filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.type-filter-btn:hover:not(.active) { border-color: var(--primary); color: var(--primary); }
 
 /* Table */
 .orders-table {
@@ -220,6 +224,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <!-- Orders Table -->
     <div class="table-card">
         <div class="table-toolbar">
+            <div class="type-filters">
+                <button class="type-filter-btn active" data-type="ALL" onclick="setTypeFilter('ALL')">All</button>
+                <button class="type-filter-btn" data-type="PURCHASE" onclick="setTypeFilter('PURCHASE')">Purchase</button>
+                <button class="type-filter-btn" data-type="STOCKIN" onclick="setTypeFilter('STOCKIN')">Stock In</button>
+            </div>
             <div class="search-box">
                 <i class="fas fa-search"></i>
                 <input type="text" id="searchInput" placeholder="Search orders...">
@@ -250,7 +259,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     <?php foreach ($orders as $i => $order):
                         $salnum = htmlspecialchars($order['SALNUM'] ?? '');
                     ?>
-                    <tr data-salnum="<?php echo $salnum; ?>">
+                    <tr data-salnum="<?php echo $salnum; ?>" data-ptype="<?php echo htmlspecialchars($order['PTYPE'] ?? 'PURCHASE'); ?>">
                         <td><?php echo $i + 1; ?></td>
                         <td><?php echo !empty($order['SDATE']) ? date('d/m/Y', strtotime($order['SDATE'])) : ''; ?></td>
                         <td><?php echo htmlspecialchars($order['TTIME'] ?? ''); ?></td>
@@ -426,6 +435,36 @@ function doPoll() {
 
 // ── Render Table ───────────────────────────────────────
 
+var currentTypeFilter = 'ALL';
+
+function setTypeFilter(type) {
+    currentTypeFilter = type;
+    document.querySelectorAll('.type-filter-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-type') === type);
+    });
+    applyClientFilters();
+}
+
+function applyClientFilters() {
+    var query = (document.getElementById('searchInput').value || '').toLowerCase();
+    var rows = document.querySelectorAll('#ordersBody tr:not(.no-results)');
+    var num = 0;
+    rows.forEach(function(row) {
+        var ptype = row.getAttribute('data-ptype') || 'PURCHASE';
+        var typeMatch = currentTypeFilter === 'ALL' || ptype === currentTypeFilter;
+        var text = row.textContent.toLowerCase();
+        var searchMatch = !query || text.indexOf(query) > -1;
+        if (typeMatch && searchMatch) {
+            row.style.display = '';
+            num++;
+            row.cells[0].textContent = num;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    document.getElementById('orderCount').textContent = num + ' order(s)';
+}
+
 function renderTable(orders) {
     var tbody = document.getElementById('ordersBody');
     var query = (document.getElementById('searchInput').value || '').toLowerCase();
@@ -449,14 +488,16 @@ function renderTable(orders) {
         var txtto   = esc(o.TXTTO || '');
         var rmk     = esc(o.ADMINRMK || '');
         var branch  = esc(o.branch_name || o.branch_code || '');
+        var ptype   = o.PTYPE || 'PURCHASE';
         var isNew   = !knownSalnums[o.SALNUM];
 
+        var typeMatch = currentTypeFilter === 'ALL' || ptype === currentTypeFilter;
         var searchStr = ((o.SALNUM||'') + ' ' + (o.NAME||'') + ' ' + (o.TXTTO||'') + ' ' + (o.ADMINRMK||'') + ' ' + (o.SDATE||'')).toLowerCase();
-        var show = !query || searchStr.indexOf(query) > -1;
+        var show = typeMatch && (!query || searchStr.indexOf(query) > -1);
 
         if (show) num++;
 
-        html += '<tr data-salnum="' + salnum + '"' + (isNew ? ' class="row-new"' : '') + (show ? '' : ' style="display:none;"') + '>';
+        html += '<tr data-salnum="' + salnum + '" data-ptype="' + esc(ptype) + '"' + (isNew ? ' class="row-new"' : '') + (show ? '' : ' style="display:none;"') + '>';
         html += '<td>' + (show ? num : '') + '</td>';
         html += '<td>' + sdate + '</td>';
         html += '<td>' + ttime + '</td>';
@@ -508,20 +549,7 @@ document.addEventListener('visibilitychange', function() {
 // ── Search filter ──────────────────────────────────────
 
 document.getElementById('searchInput').addEventListener('input', function() {
-    var query = this.value.toLowerCase();
-    var rows = document.querySelectorAll('#ordersBody tr:not(.no-results)');
-    var num = 0;
-    rows.forEach(function(row) {
-        var text = row.textContent.toLowerCase();
-        if (!query || text.indexOf(query) > -1) {
-            row.style.display = '';
-            num++;
-            row.cells[0].textContent = num;
-        } else {
-            row.style.display = 'none';
-        }
-    });
-    document.getElementById('orderCount').textContent = num + ' order(s)';
+    applyClientFilters();
 });
 
 // ── Acknowledge ────────────────────────────────────────
