@@ -44,53 +44,68 @@ if ($uomRes) {
     }
 }
 
-// Fetch all categories with their subcategories and products
-$cat_result = mysqli_query($connect, "SELECT DISTINCT cat_code, cat_name, MIN(sort_no) AS sort_order FROM category GROUP BY cat_code, cat_name ORDER BY sort_order ASC, cat_name ASC");
-$allCategories = [];
-while ($cat = mysqli_fetch_assoc($cat_result)) {
-    $sub_result = mysqli_query($connect, "SELECT DISTINCT sub_code, sub_cat, MIN(sort_no) AS sort_order FROM category WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat['cat_code']) . "' GROUP BY sub_code, sub_cat ORDER BY sort_order ASC, sub_cat ASC");
-    $subcategories = [];
-    while ($sub = mysqli_fetch_assoc($sub_result)) {
-        $prod_result = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity FROM PRODUCTS WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat['cat_code']) . "' AND sub_code = '" . mysqli_real_escape_string($connect, $sub['sub_code']) . "' AND (checked != 'N' OR checked IS NULL) ORDER BY name ASC");
-        $products = [];
-        while ($prod = mysqli_fetch_assoc($prod_result)) {
-            $prod['id'] = intval($prod['id']);
-            $prod['quantity'] = intval($prod['quantity']);
-            $prod['inStock'] = $prod['quantity'] > 0;
+// Fetch all categories and subcategories in one query
+$catSubMap = []; // cat_code => ['name' => ..., 'sort' => ..., 'subs' => [sub_code => ['name' => ..., 'sort' => ...]]]
+$catSubRes = mysqli_query($connect, "SELECT cat_code, cat_name, sub_code, sub_cat, MIN(sort_no) AS sort_order FROM category GROUP BY cat_code, cat_name, sub_code, sub_cat ORDER BY MIN(sort_no) ASC, cat_name ASC, sub_cat ASC");
+while ($row = mysqli_fetch_assoc($catSubRes)) {
+    $cc = $row['cat_code'];
+    if (!isset($catSubMap[$cc])) {
+        $catSubMap[$cc] = ['name' => $row['cat_name'], 'sort' => $row['sort_order'], 'subs' => []];
+    }
+    $catSubMap[$cc]['subs'][$row['sub_code']] = ['name' => $row['sub_cat'], 'sort' => $row['sort_order']];
+}
 
-            if ($trendConfig) {
-                $ordered = $trendMap[$prod['barcode']] ?? 0;
-                if ($ordered >= (int)$trendConfig['green_min']) {
-                    $prod['trend'] = 'green';
-                } elseif ($ordered >= (int)$trendConfig['yellow_min']) {
-                    $prod['trend'] = 'yellow';
-                } elseif ($ordered >= (int)$trendConfig['red_min']) {
-                    $prod['trend'] = 'red';
-                } else {
-                    $prod['trend'] = 'black';
-                }
-                $prod['trend_qty'] = $ordered;
-            } else {
-                $prod['trend'] = null;
-                $prod['trend_qty'] = 0;
-            }
+// Fetch all visible products in one query
+$prodMap = []; // cat_code => sub_code => [products]
+$prodRes = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity, cat_code, sub_code FROM PRODUCTS WHERE (checked != 'N' OR checked IS NULL) ORDER BY name ASC");
+while ($prod = mysqli_fetch_assoc($prodRes)) {
+    $prod['id'] = intval($prod['id']);
+    $prod['quantity'] = intval($prod['quantity']);
+    $prod['inStock'] = $prod['quantity'] > 0;
 
-            $prod['uom_conversions'] = $uomMap[$prod['barcode']] ?? [];
-
-            $products[] = $prod;
+    if ($trendConfig) {
+        $ordered = $trendMap[$prod['barcode']] ?? 0;
+        if ($ordered >= (int)$trendConfig['green_min']) {
+            $prod['trend'] = 'green';
+        } elseif ($ordered >= (int)$trendConfig['yellow_min']) {
+            $prod['trend'] = 'yellow';
+        } elseif ($ordered >= (int)$trendConfig['red_min']) {
+            $prod['trend'] = 'red';
+        } else {
+            $prod['trend'] = 'black';
         }
+        $prod['trend_qty'] = $ordered;
+    } else {
+        $prod['trend'] = null;
+        $prod['trend_qty'] = 0;
+    }
+
+    $prod['uom_conversions'] = $uomMap[$prod['barcode']] ?? [];
+
+    $cc = $prod['cat_code'];
+    $sc = $prod['sub_code'];
+    unset($prod['cat_code'], $prod['sub_code']);
+    $prodMap[$cc][$sc][] = $prod;
+}
+
+// Assemble the response structure
+$allCategories = [];
+foreach ($catSubMap as $catCode => $catData) {
+    $subcategories = [];
+    foreach ($catData['subs'] as $subCode => $subData) {
+        $products = $prodMap[$catCode][$subCode] ?? [];
         if (count($products) > 0) {
             $subcategories[] = [
-                'id' => $sub['sub_code'],
-                'name' => $sub['sub_cat'],
+                'id' => $subCode,
+                'name' => $subData['name'],
                 'products' => $products
             ];
         }
     }
     if (count($subcategories) > 0) {
         $allCategories[] = [
-            'id' => $cat['cat_code'],
-            'name' => $cat['cat_name'],
+            'id' => $catCode,
+            'name' => $catData['name'],
             'subcategories' => $subcategories
         ];
     }

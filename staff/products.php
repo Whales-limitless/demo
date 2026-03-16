@@ -55,43 +55,52 @@ if ($uomRes) {
 }
 
 // Fetch subcategories for this category
-$sub_result = mysqli_query($connect, "SELECT DISTINCT sub_code, sub_cat, MIN(sort_no) AS sort_order FROM category WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat_code) . "' GROUP BY sub_code, sub_cat ORDER BY sort_order ASC, sub_cat ASC");
-$subcategories = [];
+$escaped_cat = mysqli_real_escape_string($connect, $cat_code);
+$sub_result = mysqli_query($connect, "SELECT DISTINCT sub_code, sub_cat, MIN(sort_no) AS sort_order FROM category WHERE cat_code = '$escaped_cat' GROUP BY sub_code, sub_cat ORDER BY sort_order ASC, sub_cat ASC");
+$subMap = [];
 while ($sub = mysqli_fetch_assoc($sub_result)) {
-    // Fetch products matching this category and subcategory
-    $prod_result = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity FROM PRODUCTS WHERE cat_code = '" . mysqli_real_escape_string($connect, $cat_code) . "' AND sub_code = '" . mysqli_real_escape_string($connect, $sub['sub_code']) . "' AND (checked != 'N' OR checked IS NULL) ORDER BY name ASC");
-    $products = [];
-    while ($prod = mysqli_fetch_assoc($prod_result)) {
-        $prod['id'] = intval($prod['id']);
-        $prod['quantity'] = intval($prod['quantity']);
-        $prod['inStock'] = $prod['quantity'] > 0;
+    $subMap[$sub['sub_code']] = ['name' => $sub['sub_cat'], 'products' => []];
+}
 
-        // Compute trend indicator
-        if ($trendConfig) {
-            $ordered = $trendMap[$prod['barcode']] ?? 0;
-            if ($ordered >= (int)$trendConfig['green_min']) {
-                $prod['trend'] = 'green';
-            } elseif ($ordered >= (int)$trendConfig['yellow_min']) {
-                $prod['trend'] = 'yellow';
-            } elseif ($ordered >= (int)$trendConfig['red_min']) {
-                $prod['trend'] = 'red';
-            } else {
-                $prod['trend'] = 'black';
-            }
-            $prod['trend_qty'] = $ordered;
+// Fetch all products for this category in one query
+$prod_result = mysqli_query($connect, "SELECT id, name, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity, sub_code FROM PRODUCTS WHERE cat_code = '$escaped_cat' AND (checked != 'N' OR checked IS NULL) ORDER BY name ASC");
+while ($prod = mysqli_fetch_assoc($prod_result)) {
+    $prod['id'] = intval($prod['id']);
+    $prod['quantity'] = intval($prod['quantity']);
+    $prod['inStock'] = $prod['quantity'] > 0;
+
+    if ($trendConfig) {
+        $ordered = $trendMap[$prod['barcode']] ?? 0;
+        if ($ordered >= (int)$trendConfig['green_min']) {
+            $prod['trend'] = 'green';
+        } elseif ($ordered >= (int)$trendConfig['yellow_min']) {
+            $prod['trend'] = 'yellow';
+        } elseif ($ordered >= (int)$trendConfig['red_min']) {
+            $prod['trend'] = 'red';
         } else {
-            $prod['trend'] = null;
-            $prod['trend_qty'] = 0;
+            $prod['trend'] = 'black';
         }
-
-        $prod['uom_conversions'] = $uomMap[$prod['barcode']] ?? [];
-
-        $products[] = $prod;
+        $prod['trend_qty'] = $ordered;
+    } else {
+        $prod['trend'] = null;
+        $prod['trend_qty'] = 0;
     }
+
+    $prod['uom_conversions'] = $uomMap[$prod['barcode']] ?? [];
+
+    $sc = $prod['sub_code'];
+    unset($prod['sub_code']);
+    if (isset($subMap[$sc])) {
+        $subMap[$sc]['products'][] = $prod;
+    }
+}
+
+$subcategories = [];
+foreach ($subMap as $subCode => $subData) {
     $subcategories[] = [
-        'id' => $sub['sub_code'],
-        'name' => $sub['sub_cat'],
-        'products' => $products
+        'id' => $subCode,
+        'name' => $subData['name'],
+        'products' => $subData['products']
     ];
 }
 // Fetch barcodes blocked by active stock take sessions (DRAFT or SUBMITTED)
@@ -109,7 +118,9 @@ if ($stRes) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?php echo htmlspecialchars($category['name']); ?> - Inventory</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="components.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -389,7 +400,7 @@ var trendLabels = { green: 'Hot', yellow: 'Moderate', red: 'Slow', black: 'Dead'
 function renderProductCard(p, index) {
   var imgHtml;
   if (p.image) {
-    imgHtml = '<img class="product-img" src="/img/' + escAttr(p.image) + '" alt="' + escAttr(p.name) + '">';
+    imgHtml = '<img class="product-img" src="/img/' + escAttr(p.image) + '" alt="' + escAttr(p.name) + '" loading="lazy" decoding="async">';
   } else {
     imgHtml = '<div class="no-img-product">' + escHtml(p.sku || 'NO IMAGE') + '</div>';
   }
