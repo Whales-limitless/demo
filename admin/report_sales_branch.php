@@ -70,6 +70,20 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="filter-bar">
         <label>Start Date:</label><input type="date" id="startDate" value="<?php echo date('Y-m-01'); ?>">
         <label>End Date:</label><input type="date" id="endDate" value="<?php echo date('Y-m-d'); ?>">
+        <input type="text" id="searchInput" placeholder="Search barcode or product..." style="flex:1;max-width:250px;">
+        <div style="position:relative;" id="branchFilterWrap">
+            <button type="button" id="branchFilterBtn" onclick="toggleBranchDropdown();" style="padding:7px 14px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                <i class="fas fa-building"></i> <span id="branchFilterLabel">All Branches</span> <i class="fas fa-chevron-down" style="font-size:10px;"></i>
+            </button>
+            <div id="branchDropdown" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:100;min-width:220px;max-height:300px;overflow-y:auto;padding:8px 0;">
+                <div style="padding:6px 14px;border-bottom:1px solid #e5e7eb;">
+                    <label style="font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                        <input type="checkbox" id="branchSelectAll" checked onchange="toggleAllBranches(this.checked);"> All Branches
+                    </label>
+                </div>
+                <div id="branchCheckboxes" style="padding:4px 0;"></div>
+            </div>
+        </div>
         <div class="toggle-bar">
             <button id="btnSummary" class="active" onclick="setMode('summary')">Summary</button>
             <button id="btnDetailed" onclick="setMode('detailed')">Detailed</button>
@@ -118,8 +132,80 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script>
 var dtTable = null;
 var reportMode = 'summary';
+var allBranches = [];
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+// ==================== BRANCH FILTER ====================
+function loadBranches() {
+    $.post('branch_ajax.php', { action: 'list' }, function(data) {
+        allBranches = data.branches || [];
+        var container = document.getElementById('branchCheckboxes');
+        if (allBranches.length === 0) {
+            container.innerHTML = '<div style="padding:8px 14px;color:#6b7280;font-size:12px;">No branches found</div>';
+            return;
+        }
+        var html = '';
+        allBranches.forEach(function(br) {
+            html += '<label style="display:flex;align-items:center;gap:8px;padding:5px 14px;font-size:13px;cursor:pointer;">' +
+                '<input type="checkbox" class="branch-cb" value="' + escHtml(br.code) + '" checked> ' +
+                escHtml(br.name) + '</label>';
+        });
+        container.innerHTML = html;
+        container.querySelectorAll('.branch-cb').forEach(function(cb) {
+            cb.addEventListener('change', updateBranchLabel);
+        });
+    }, 'json');
+}
+
+function toggleBranchDropdown() {
+    var dd = document.getElementById('branchDropdown');
+    dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+
+document.addEventListener('click', function(e) {
+    var wrap = document.getElementById('branchFilterWrap');
+    if (wrap && !wrap.contains(e.target)) {
+        document.getElementById('branchDropdown').style.display = 'none';
+    }
+});
+
+function toggleAllBranches(checked) {
+    document.querySelectorAll('.branch-cb').forEach(function(cb) { cb.checked = checked; });
+    updateBranchLabel();
+}
+
+function updateBranchLabel() {
+    var cbs = document.querySelectorAll('.branch-cb');
+    var checked = document.querySelectorAll('.branch-cb:checked');
+    var allCb = document.getElementById('branchSelectAll');
+
+    if (checked.length === 0 || checked.length === cbs.length) {
+        allCb.checked = true;
+        cbs.forEach(function(cb) { cb.checked = true; });
+        document.getElementById('branchFilterLabel').textContent = 'All Branches';
+    } else {
+        allCb.checked = false;
+        var names = [];
+        checked.forEach(function(cb) {
+            var br = allBranches.find(function(b) { return b.code === cb.value; });
+            if (br) names.push(br.name);
+        });
+        document.getElementById('branchFilterLabel').textContent = names.length <= 2 ? names.join(', ') : checked.length + ' branches';
+    }
+}
+
+function getSelectedBranches() {
+    var cbs = document.querySelectorAll('.branch-cb');
+    var checked = document.querySelectorAll('.branch-cb:checked');
+    if (checked.length === 0 || checked.length === cbs.length) return [];
+    var codes = [];
+    checked.forEach(function(cb) { codes.push(cb.value); });
+    return codes;
+}
+
+document.addEventListener('DOMContentLoaded', function() { loadBranches(); });
+
+// ==================== REPORT ====================
 function setMode(mode) {
     reportMode = mode;
     document.getElementById('btnSummary').classList.toggle('active', mode === 'summary');
@@ -131,8 +217,14 @@ function generateReport() {
     var postData = {
         action: action,
         start_date: document.getElementById('startDate').value,
-        end_date: document.getElementById('endDate').value
+        end_date: document.getElementById('endDate').value,
+        search: document.getElementById('searchInput').value.trim()
     };
+
+    var selBranches = getSelectedBranches();
+    for (var bi = 0; bi < selBranches.length; bi++) {
+        postData['branches[' + bi + ']'] = selBranches[bi];
+    }
 
     document.getElementById('reportContent').innerHTML = '<p style="text-align:center;padding:40px;"><i class="fas fa-spinner fa-spin"></i> Loading...</p>';
 
