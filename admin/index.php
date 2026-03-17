@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/../staff/session_security.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
 // If already logged in, redirect to dashboard
@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($result->num_rows > 0) {
             $user = $result->fetch_assoc();
+            set_session_fingerprint();
             $_SESSION['admin_logged_in'] = true;
             $_SESSION['admin_user'] = $username;
             $_SESSION['admin_name'] = $user['USER_NAME'] ?? $user['USERNAME'] ?? $username;

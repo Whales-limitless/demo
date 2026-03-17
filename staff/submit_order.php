@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/session_security.php';
 require_once 'dbconnection.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 

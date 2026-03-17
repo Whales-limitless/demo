@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/../staff/session_security.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
 header('Content-Type: application/json; charset=utf-8');

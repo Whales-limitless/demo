@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/session_security.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true) {
     http_response_code(403);
