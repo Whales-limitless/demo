@@ -725,14 +725,16 @@ function viewOrder(salnum) {
             html += '<td style="width:35%;border-top:1px dashed #1a1a1a;border-bottom:1px dashed #1a1a1a;padding:4px 2px;font-weight:600;font-size:13px;text-align:right;">Rack Remark</td></tr></thead>';
             html += '<tbody>';
             for (var j = 0; j < items.length; j++) {
-                html += '<tr><td style="padding:3px 2px;border-bottom:1px dashed #1a1a1a;font-size:13px;">' + items[j].qty + '</td>';
-                html += '<td style="padding:3px 2px;border-bottom:1px dashed #1a1a1a;font-size:13px;">' + esc(items[j].pdesc) + '</td>';
-                html += '<td style="padding:3px 2px;border-bottom:1px dashed #1a1a1a;font-size:9px;color:#6b7280;font-style:italic;text-align:right;">' + esc(items[j].rack_remark || '') + '</td></tr>';
+                var isLast = (j === items.length - 1);
+                var bb = isLast ? 'none' : '1px dashed #1a1a1a';
+                html += '<tr><td style="padding:3px 2px;border-bottom:' + bb + ';font-size:13px;">' + items[j].qty + '</td>';
+                html += '<td style="padding:3px 2px;border-bottom:' + bb + ';font-size:13px;">' + esc(items[j].pdesc) + '</td>';
+                html += '<td style="padding:3px 2px;border-bottom:' + bb + ';font-size:9px;color:#6b7280;font-style:italic;text-align:right;">' + esc(items[j].rack_remark || '') + '</td></tr>';
             }
             html += '</tbody></table>';
         }
 
-        html += '<div style="border-top:1px dashed #1a1a1a;padding-top:6px;margin-top:8px;font-size:10px;color:#6b7280;text-align:center;">--- End ---</div>';
+        html += '<div style="padding-top:6px;margin-top:8px;font-size:10px;color:#6b7280;text-align:center;">--- End ---</div>';
 
         document.getElementById('viewOrderBody').innerHTML = html;
     }, 'json');
@@ -753,8 +755,9 @@ function printViewOrder() {
     html += '.items-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }';
     html += '.items-tbl thead td { border-top: 1px dashed #1a1a1a; border-bottom: 1px dashed #1a1a1a; padding: 4px 2px; font-weight: 600; }';
     html += '.items-tbl tbody td { padding: 3px 2px; border-bottom: 1px dashed #1a1a1a; }';
+    html += '.items-tbl tbody tr:last-child td { border-bottom: none; }';
     html += '.text-right { text-align: right; }';
-    html += '.footer { border-top: 1px dashed #1a1a1a; padding-top: 6px; text-align: center; font-size: 10px; color: #6b7280; margin-top: 8px; }';
+    html += '.footer { padding-top: 6px; text-align: center; font-size: 10px; color: #6b7280; margin-top: 8px; }';
     html += '</style></head><body>';
 
     html += '<div class="header">';
