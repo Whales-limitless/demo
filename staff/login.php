@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/session_security.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
 // If already logged in as user, redirect to home
@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($result->num_rows > 0) {
             $user = $result->fetch_assoc();
+            set_session_fingerprint();
             $_SESSION['user_logged_in'] = true;
             $_SESSION['user_id'] = $user['ID'] ?? '';
             $_SESSION['user_username'] = $username;

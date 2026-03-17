@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/session_security.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true) {
