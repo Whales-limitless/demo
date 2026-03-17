@@ -247,7 +247,7 @@ body {
     font-weight: 600;
     font-size: 13px;
 }
-.items-table tbody td { padding: 3px 2px; border-bottom: 1px dotted #ddd; font-size: 13px; }
+.items-table tbody td { padding: 3px 2px; border-bottom: 1px dashed var(--text); font-size: 13px; }
 .items-table .text-right { text-align: right; }
 .items-table .rack-remark { font-size: 9px; color: var(--text-muted); font-style: italic; }
 .items-table tfoot td { padding: 3px 2px; }
