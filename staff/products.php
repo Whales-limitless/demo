@@ -234,7 +234,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .trend-badge.trend-black .trend-dot { background: #1a1a1a; }
 
 .product-info { padding: 12px; display: flex; flex-direction: column; flex: 1; }
-.product-name { font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.product-name { font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+.product-name:hover { color: var(--primary); }
 
 .product-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 .tag { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
@@ -511,7 +512,7 @@ function renderProductCard(p, index) {
   return '<div class="product-card" data-id="' + p.id + '" data-name="' + escAttr(p.name.toLowerCase()) + '" data-sku="' + escAttr((p.sku || '').toLowerCase()) + '" data-barcode="' + escAttr((p.barcode || '').toLowerCase()) + '">' +
     '<div class="product-img-wrap"' + imgWrapOnclick + '>' + imgHtml + badgeHtml + '</div>' +
     '<div class="product-info">' +
-      '<div class="product-name">' + escHtml(p.name) + '</div>' +
+      '<div class="product-name" onclick="openEditNameModal(' + p.id + ')">' + escHtml(p.name) + '</div>' +
       '<div class="product-tags">' + tags + '</div>' +
       '<div class="qty-label">Qty: <span>' + p.quantity + '</span></div>' +
       '<div class="product-actions">' +
@@ -735,6 +736,72 @@ function addToCart(productId) {
   } catch(e) {}
 })();
 
+// ==================== EDIT PRODUCT NAME MODAL ====================
+var editNameProductId = null;
+
+function openEditNameModal(productId) {
+  var p = findProduct(productId);
+  if (!p) return;
+  editNameProductId = productId;
+  document.getElementById('editNameInput').value = p.name;
+  document.getElementById('editNameModalOverlay').classList.add('active');
+  document.getElementById('editNameInput').focus();
+  document.getElementById('editNameInput').select();
+}
+
+function closeEditNameModal() {
+  document.getElementById('editNameModalOverlay').classList.remove('active');
+  editNameProductId = null;
+}
+
+function saveProductName() {
+  if (!editNameProductId) return;
+  var val = document.getElementById('editNameInput').value.trim();
+  if (!val) { alert('Product name cannot be empty'); return; }
+  var btn = document.querySelector('#editNameModalOverlay .btn-save');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', 'product_name_ajax.php', true);
+  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4) {
+      btn.disabled = false;
+      btn.textContent = 'Save';
+      if (xhr.status === 200) {
+        try {
+          var resp = JSON.parse(xhr.responseText);
+          if (resp.success) {
+            updateProductNameInData(editNameProductId, resp.name);
+            closeEditNameModal();
+          } else {
+            alert('Failed: ' + (resp.error || 'Unknown error'));
+          }
+        } catch(e) { alert('Failed to update product name'); }
+      } else {
+        alert('Failed to update product name');
+      }
+    }
+  };
+  xhr.send('action=update_name&id=' + editNameProductId + '&name=' + encodeURIComponent(val));
+}
+
+function updateProductNameInData(productId, newName) {
+  subcategories.forEach(function(sc) {
+    sc.products.forEach(function(p) {
+      if (p.id === productId) {
+        p.name = newName;
+      }
+    });
+  });
+  var card = document.querySelector('.product-card[data-id="' + productId + '"]');
+  if (card) {
+    var nameEl = card.querySelector('.product-name');
+    if (nameEl) nameEl.textContent = newName;
+    card.setAttribute('data-name', newName.toLowerCase());
+  }
+}
+
 // ==================== RACK MODALS ====================
 var rackEditProductId = null;
 var rackListCache = null;
@@ -876,8 +943,27 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('rackRemarkModalOverlay').addEventListener('click', function(e) {
     if (e.target === this) closeRackRemarkModal();
   });
+  document.getElementById('editNameModalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeEditNameModal();
+  });
+  document.getElementById('editNameInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') saveProductName();
+  });
 });
 </script>
+
+<!-- Edit Product Name Modal -->
+<div class="rack-modal-overlay" id="editNameModalOverlay">
+  <div class="rack-modal">
+    <h3>Edit Product Name</h3>
+    <label>Product Name</label>
+    <input type="text" id="editNameInput" placeholder="Enter product name...">
+    <div class="rack-modal-actions">
+      <button class="btn-cancel" onclick="closeEditNameModal()">Cancel</button>
+      <button class="btn-save" onclick="saveProductName()">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- Rack Edit Modal -->
 <div class="rack-modal-overlay" id="rackModalOverlay">
