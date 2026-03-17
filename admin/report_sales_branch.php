@@ -70,6 +70,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="filter-bar">
         <label>Start Date:</label><input type="date" id="startDate" value="<?php echo date('Y-m-01'); ?>">
         <label>End Date:</label><input type="date" id="endDate" value="<?php echo date('Y-m-d'); ?>">
+        <input type="text" id="searchInput" placeholder="Search barcode or product..." style="flex:1;max-width:250px;">
         <div class="toggle-bar">
             <button id="btnSummary" class="active" onclick="setMode('summary')">Summary</button>
             <button id="btnDetailed" onclick="setMode('detailed')">Detailed</button>
@@ -131,7 +132,8 @@ function generateReport() {
     var postData = {
         action: action,
         start_date: document.getElementById('startDate').value,
-        end_date: document.getElementById('endDate').value
+        end_date: document.getElementById('endDate').value,
+        search: document.getElementById('searchInput').value.trim()
     };
 
     document.getElementById('reportContent').innerHTML = '<p style="text-align:center;padding:40px;"><i class="fas fa-spinner fa-spin"></i> Loading...</p>';

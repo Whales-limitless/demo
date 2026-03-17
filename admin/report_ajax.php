@@ -337,9 +337,18 @@ if ($action === 'stock_movement') {
 
 // ── Sales by Branch Report ──
 } elseif ($action === 'sales_by_branch') {
+    $search = trim($_POST['search'] ?? '');
     $where = "WHERE o.SDATE >= ? AND o.SDATE <= ? AND o.STATUS = 'DONE' AND o.BARCODE <> 'PT'";
     $params = [$startDate, $endDate];
     $types = "ss";
+
+    if ($search !== '') {
+        $where .= " AND (o.BARCODE LIKE ? OR o.PDESC LIKE ?)";
+        $searchParam = '%' . $search . '%';
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $types .= "ss";
+    }
 
     // Orders store the actual branch in `branch_code` column (e.g. BR0001),
     // while `OUTLET` is just the sales channel (always 'WEB').
@@ -425,9 +434,18 @@ if ($action === 'stock_movement') {
 
 // ── Sales by Branch Detailed Report (grouped by branch, itemized orders) ──
 } elseif ($action === 'sales_by_branch_detailed') {
+    $search = trim($_POST['search'] ?? '');
     $where = "WHERE o.SDATE >= ? AND o.SDATE <= ? AND o.STATUS = 'DONE' AND o.BARCODE <> 'PT'";
     $params = [$startDate, $endDate];
     $types = "ss";
+
+    if ($search !== '') {
+        $where .= " AND (o.BARCODE LIKE ? OR o.PDESC LIKE ?)";
+        $searchParam = '%' . $search . '%';
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $types .= "ss";
+    }
 
     $hasBranch = $connect->query("SHOW TABLES LIKE 'branch'")->num_rows > 0;
 
