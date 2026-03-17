@@ -350,6 +350,16 @@ if ($action === 'stock_movement') {
         $types .= "ss";
     }
 
+    $branches = $_POST['branches'] ?? [];
+    if (!empty($branches) && is_array($branches)) {
+        $placeholders = implode(',', array_fill(0, count($branches), '?'));
+        $where .= " AND o.branch_code IN ($placeholders)";
+        foreach ($branches as $bc) {
+            $params[] = $bc;
+            $types .= "s";
+        }
+    }
+
     // Orders store the actual branch in `branch_code` column (e.g. BR0001),
     // while `OUTLET` is just the sales channel (always 'WEB').
     // Join via branch_code to get the real branch name.
@@ -445,6 +455,16 @@ if ($action === 'stock_movement') {
         $params[] = $searchParam;
         $params[] = $searchParam;
         $types .= "ss";
+    }
+
+    $branches = $_POST['branches'] ?? [];
+    if (!empty($branches) && is_array($branches)) {
+        $placeholders = implode(',', array_fill(0, count($branches), '?'));
+        $where .= " AND o.branch_code IN ($placeholders)";
+        foreach ($branches as $bc) {
+            $params[] = $bc;
+            $types .= "s";
+        }
     }
 
     $hasBranch = $connect->query("SHOW TABLES LIKE 'branch'")->num_rows > 0;
