@@ -23,7 +23,7 @@ session_set_cookie_params([
     'domain'   => '',               // Current domain only
     'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
     'httponly'  => true,             // Prevent JavaScript access (not synced by Chrome)
-    'samesite' => 'Strict'          // Prevent cross-site cookie sending
+    'samesite' => 'Lax'             // Lax allows PWA home screen app to keep session
 ]);
 
 session_start();
