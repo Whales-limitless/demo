@@ -1,15 +1,5 @@
 <?php
 require_once __DIR__ . '/session_security.php';
-require_once __DIR__ . '/persistent_login.php';
-
-// Revoke persistent token for this device before destroying session
-if (!empty($_SESSION['user_username'])) {
-    include_once __DIR__ . '/dbconnection.php';
-    if ($connect) {
-        revoke_persistent_token($connect, $_SESSION['user_username'], 'staff');
-    }
-}
-clear_persistent_cookie();
 
 session_unset();
 session_destroy();
