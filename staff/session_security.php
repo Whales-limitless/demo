@@ -23,6 +23,9 @@ session_start();
  * Validate the session fingerprint.
  * If the fingerprint doesn't match (different device using synced cookie),
  * destroy the session and redirect to login.
+ *
+ * If an existing session has no fingerprint yet (logged in before this update),
+ * silently add one so the user is not disrupted.
  */
 if (isset($_SESSION['_fingerprint'])) {
     $current_fingerprint = _generate_fingerprint();
@@ -52,6 +55,25 @@ if (isset($_SESSION['_fingerprint'])) {
         }
         exit;
     }
+} elseif (!empty($_SESSION['user_logged_in']) || !empty($_SESSION['admin_logged_in'])) {
+    // Existing session from before the update — backfill fingerprint so they
+    // stay logged in without interruption.
+    $_SESSION['_fingerprint'] = _generate_fingerprint();
+}
+
+/**
+ * Auto-restore from persistent cookie when the session is empty (e.g. browser
+ * was closed and reopened). This runs on EVERY page that includes this file,
+ * so users stay logged in seamlessly as long as the pw_remember cookie is valid.
+ */
+if (empty($_SESSION['user_logged_in']) && empty($_SESSION['admin_logged_in'])) {
+    // Determine portal from current path
+    $script = $_SERVER['SCRIPT_NAME'] ?? '';
+    $_auto_portal = (strpos($script, '/admin/') !== false) ? 'admin' : 'staff';
+    if (try_persistent_restore($_auto_portal)) {
+        // Session restored — no redirect needed, page continues normally
+    }
+    unset($_auto_portal);
 }
 
 /**
@@ -83,63 +105,68 @@ function set_session_fingerprint(): void {
  * @return bool True if session was restored
  */
 function try_persistent_restore(string $portal = 'staff'): bool {
-    require_once __DIR__ . '/persistent_login.php';
+    try {
+        require_once __DIR__ . '/persistent_login.php';
 
-    if (empty($_COOKIE[PERSISTENT_COOKIE_NAME])) {
-        return false;
-    }
+        if (empty($_COOKIE[PERSISTENT_COOKIE_NAME])) {
+            return false;
+        }
 
-    include_once __DIR__ . '/dbconnection.php';
-    global $connect;
+        include_once __DIR__ . '/dbconnection.php';
+        global $connect;
 
-    if (!$connect) {
-        return false;
-    }
+        if (!$connect || $connect->connect_errno) {
+            return false;
+        }
 
-    $user = restore_persistent_session($connect, $portal);
-    if (!$user) {
-        return false;
-    }
+        $user = restore_persistent_session($connect, $portal);
+        if (!$user) {
+            return false;
+        }
 
-    // Bind session to this device
-    set_session_fingerprint();
+        // Bind session to this device
+        set_session_fingerprint();
 
-    if ($portal === 'admin') {
-        $_SESSION['admin_logged_in'] = true;
-        $_SESSION['admin_user'] = $user['USER1'] ?? '';
-        $_SESSION['admin_name'] = $user['USER_NAME'] ?? $user['USERNAME'] ?? $user['USER1'] ?? '';
-        $_SESSION['admin_level'] = $user['LEVEL'] ?? 0;
-        $_SESSION['admin_type'] = $user['TYPE'] ?? '';
-        $_SESSION['admin_outlet'] = $user['OUTLET'] ?? '';
-        $_SESSION['admin_permission'] = $user['PERMISSION'] ?? 'FULL';
-    } else {
-        $_SESSION['user_logged_in'] = true;
-        $_SESSION['user_id'] = $user['ID'] ?? '';
-        $_SESSION['user_username'] = $user['USER1'] ?? '';
-        $_SESSION['user_name'] = $user['USER_NAME'] ?? $user['USERNAME'] ?? $user['USER1'] ?? '';
-        $_SESSION['user_code'] = $user['USERNAME'] ?? '';
-        $_SESSION['user_level'] = $user['LEVEL'] ?? 0;
-        $_SESSION['user_outlet'] = $user['OUTLET'] ?? '';
-        $_SESSION['user_dept'] = $user['DEPT'] ?? '';
-        $_SESSION['user_type'] = $user['TYPE'] ?? 'S';
-        $_SESSION['user_permission'] = $user['PERMISSION'] ?? 'FULL';
+        if ($portal === 'admin') {
+            $_SESSION['admin_logged_in'] = true;
+            $_SESSION['admin_user'] = $user['USER1'] ?? '';
+            $_SESSION['admin_name'] = $user['USER_NAME'] ?? $user['USERNAME'] ?? $user['USER1'] ?? '';
+            $_SESSION['admin_level'] = $user['LEVEL'] ?? 0;
+            $_SESSION['admin_type'] = $user['TYPE'] ?? '';
+            $_SESSION['admin_outlet'] = $user['OUTLET'] ?? '';
+            $_SESSION['admin_permission'] = $user['PERMISSION'] ?? 'FULL';
+        } else {
+            $_SESSION['user_logged_in'] = true;
+            $_SESSION['user_id'] = $user['ID'] ?? '';
+            $_SESSION['user_username'] = $user['USER1'] ?? '';
+            $_SESSION['user_name'] = $user['USER_NAME'] ?? $user['USERNAME'] ?? $user['USER1'] ?? '';
+            $_SESSION['user_code'] = $user['USERNAME'] ?? '';
+            $_SESSION['user_level'] = $user['LEVEL'] ?? 0;
+            $_SESSION['user_outlet'] = $user['OUTLET'] ?? '';
+            $_SESSION['user_dept'] = $user['DEPT'] ?? '';
+            $_SESSION['user_type'] = $user['TYPE'] ?? 'S';
+            $_SESSION['user_permission'] = $user['PERMISSION'] ?? 'FULL';
 
-        // Load branch name
-        $_SESSION['user_branch_code'] = $user['OUTLET'] ?? '';
-        $_SESSION['user_branch_name'] = '';
-        if (!empty($user['OUTLET'])) {
-            $brStmt = $connect->prepare("SELECT `name` FROM `branch` WHERE `code` = ? LIMIT 1");
-            if ($brStmt) {
-                $brStmt->bind_param("s", $user['OUTLET']);
-                $brStmt->execute();
-                $brResult = $brStmt->get_result();
-                if ($brResult && $brRow = $brResult->fetch_assoc()) {
-                    $_SESSION['user_branch_name'] = $brRow['name'];
+            // Load branch name
+            $_SESSION['user_branch_code'] = $user['OUTLET'] ?? '';
+            $_SESSION['user_branch_name'] = '';
+            if (!empty($user['OUTLET'])) {
+                $brStmt = $connect->prepare("SELECT `name` FROM `branch` WHERE `code` = ? LIMIT 1");
+                if ($brStmt) {
+                    $brStmt->bind_param("s", $user['OUTLET']);
+                    $brStmt->execute();
+                    $brResult = $brStmt->get_result();
+                    if ($brResult && $brRow = $brResult->fetch_assoc()) {
+                        $_SESSION['user_branch_name'] = $brRow['name'];
+                    }
+                    $brStmt->close();
                 }
-                $brStmt->close();
             }
         }
-    }
 
-    return true;
+        return true;
+    } catch (\Throwable $e) {
+        // Prevent 500 errors — if persistent restore fails, just fall through to login
+        return false;
+    }
 }
