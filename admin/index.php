@@ -2,9 +2,13 @@
 require_once __DIR__ . '/../staff/session_security.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
-// If already logged in, redirect to dashboard
+// If already logged in, redirect to the correct portal
 if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
     header("Location: dashboard.php");
+    exit;
+}
+if (isset($_SESSION['user_logged_in']) && $_SESSION['user_logged_in'] === true) {
+    header("Location: /staff/index.php");
     exit;
 }
 
