@@ -8,6 +8,12 @@ if (isset($_SESSION['user_logged_in']) && $_SESSION['user_logged_in'] === true) 
     exit;
 }
 
+// Try to restore from persistent cookie (device-specific)
+if (try_persistent_restore('staff')) {
+    header("Location: index.php");
+    exit;
+}
+
 // Handle login form submission
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -27,6 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($result->num_rows > 0) {
             $user = $result->fetch_assoc();
             set_session_fingerprint();
+            // Issue device-specific persistent login token
+            require_once __DIR__ . '/persistent_login.php';
+            issue_persistent_token($connect, $username, 'staff');
             $_SESSION['user_logged_in'] = true;
             $_SESSION['user_id'] = $user['ID'] ?? '';
             $_SESSION['user_username'] = $username;

@@ -73,3 +73,73 @@ function set_session_fingerprint(): void {
     session_regenerate_id(true);  // Destroy old session, create new ID
     $_SESSION['_fingerprint'] = _generate_fingerprint();
 }
+
+/**
+ * Attempt to restore a session from a persistent login cookie.
+ * Call this on pages that require authentication, AFTER checking that
+ * the normal session is not active.
+ *
+ * @param string $portal 'staff' or 'admin'
+ * @return bool True if session was restored
+ */
+function try_persistent_restore(string $portal = 'staff'): bool {
+    require_once __DIR__ . '/persistent_login.php';
+
+    if (empty($_COOKIE[PERSISTENT_COOKIE_NAME])) {
+        return false;
+    }
+
+    include_once __DIR__ . '/dbconnection.php';
+    global $connect;
+
+    if (!$connect) {
+        return false;
+    }
+
+    $user = restore_persistent_session($connect, $portal);
+    if (!$user) {
+        return false;
+    }
+
+    // Bind session to this device
+    set_session_fingerprint();
+
+    if ($portal === 'admin') {
+        $_SESSION['admin_logged_in'] = true;
+        $_SESSION['admin_user'] = $user['USER1'] ?? '';
+        $_SESSION['admin_name'] = $user['USER_NAME'] ?? $user['USERNAME'] ?? $user['USER1'] ?? '';
+        $_SESSION['admin_level'] = $user['LEVEL'] ?? 0;
+        $_SESSION['admin_type'] = $user['TYPE'] ?? '';
+        $_SESSION['admin_outlet'] = $user['OUTLET'] ?? '';
+        $_SESSION['admin_permission'] = $user['PERMISSION'] ?? 'FULL';
+    } else {
+        $_SESSION['user_logged_in'] = true;
+        $_SESSION['user_id'] = $user['ID'] ?? '';
+        $_SESSION['user_username'] = $user['USER1'] ?? '';
+        $_SESSION['user_name'] = $user['USER_NAME'] ?? $user['USERNAME'] ?? $user['USER1'] ?? '';
+        $_SESSION['user_code'] = $user['USERNAME'] ?? '';
+        $_SESSION['user_level'] = $user['LEVEL'] ?? 0;
+        $_SESSION['user_outlet'] = $user['OUTLET'] ?? '';
+        $_SESSION['user_dept'] = $user['DEPT'] ?? '';
+        $_SESSION['user_type'] = $user['TYPE'] ?? 'S';
+        $_SESSION['user_permission'] = $user['PERMISSION'] ?? 'FULL';
+
+        // Load branch name
+        $_SESSION['user_branch_code'] = $user['OUTLET'] ?? '';
+        $_SESSION['user_branch_name'] = '';
+        if (!empty($user['OUTLET'])) {
+            $brStmt = $connect->prepare("SELECT `name` FROM `branch` WHERE `code` = ? LIMIT 1");
+            if ($brStmt) {
+                $brStmt->bind_param("s", $user['OUTLET']);
+                $brStmt->execute();
+                $brResult = $brStmt->get_result();
+                if ($brResult && $brRow = $brResult->fetch_assoc()) {
+                    $_SESSION['user_branch_name'] = $brRow['name'];
+                }
+                $brStmt->close();
+            }
+        }
+    }
+
+    return true;
+}
