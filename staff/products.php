@@ -437,6 +437,7 @@ function closeDetailModal() {
 }
 
 var subcategories = <?php echo json_encode($subcategories); ?>;
+var highlightProductId = <?php echo isset($_GET['highlight']) ? intval($_GET['highlight']) : 'null'; ?>;
 var stockTakeBarcodes = {};
 <?php echo json_encode($stockTakeBarcodes); ?>.forEach(function(b) { stockTakeBarcodes[b] = true; });
 
@@ -537,6 +538,25 @@ function renderSections(filteredSubs) {
     return;
   }
 
+  // If a product was highlighted from search suggestion, show it first
+  var highlightHtml = '';
+  if (highlightProductId) {
+    var hlProduct = null;
+    list.forEach(function(sc) {
+      sc.products.forEach(function(p) {
+        if (p.id === highlightProductId) hlProduct = p;
+      });
+    });
+    if (hlProduct) {
+      highlightHtml = '<div class="subcat-section">' +
+        '<h3 class="subcat-heading">Search Result</h3>' +
+        '<div class="product-grid">' + renderProductCard(hlProduct, 0) + '</div>' +
+      '</div>';
+    }
+    // Clear so it only applies on first render
+    highlightProductId = null;
+  }
+
   var allOOS = [];
   var html = list.map(function(sc) {
     var inStock = sc.products.filter(function(p) { return p.inStock; });
@@ -556,7 +576,7 @@ function renderSections(filteredSubs) {
       '<div class="product-grid">' + allOOS.map(function(p, i) { return renderProductCard(p, i); }).join('') + '</div></div>';
   }
 
-  sections.innerHTML = html + oosHtml;
+  sections.innerHTML = highlightHtml + html + oosHtml;
 
   var q = document.getElementById('productSearchInput').value;
   if (q) filterProducts(q);
