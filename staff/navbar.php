@@ -304,7 +304,8 @@ if ('serviceWorker' in navigator) {
       }
 
       var stockClass = p.inStock ? 'in-stock' : 'out-of-stock';
-      var stockText = p.inStock ? 'Qty: ' + p.qoh : 'Out of Stock';
+      var availQty = p.available_qty !== undefined ? p.available_qty : p.qoh;
+      var stockText = p.inStock ? 'Qty: ' + availQty : 'Out of Stock';
 
       var catLink = p.cat_code ? 'products.php?cat=' + encodeURIComponent(p.cat_code) + '&highlight=' + encodeURIComponent(p.id) : '#';
 

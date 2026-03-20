@@ -50,6 +50,15 @@ $stmt->bind_param("sss", $normalizedLike, $altLike, $altLike2);
 $stmt->execute();
 $result = $stmt->get_result();
 
+// Compute pending order quantities per barcode
+$pendingQtyMap = [];
+$pendingRes = $connect->query("SELECT BARCODE, SUM(QTY) AS pending_qty FROM `orderlist` WHERE STATUS = 'PENDING' AND PTYPE = 'PURCHASE' AND QTY > 0 GROUP BY BARCODE");
+if ($pendingRes) {
+    while ($pRow = $pendingRes->fetch_assoc()) {
+        $pendingQtyMap[$pRow['BARCODE']] = (int)$pRow['pending_qty'];
+    }
+}
+
 $products = [];
 $seen = [];
 while ($row = $result->fetch_assoc()) {
@@ -59,7 +68,10 @@ while ($row = $result->fetch_assoc()) {
 
     $row['id'] = (int)$row['id'];
     $row['qoh'] = (int)$row['qoh'];
-    $row['inStock'] = $row['qoh'] > 0;
+    $pending = $pendingQtyMap[$row['barcode']] ?? 0;
+    $row['pending_qty'] = $pending;
+    $row['available_qty'] = max(0, $row['qoh'] - $pending);
+    $row['inStock'] = $row['available_qty'] > 0;
     $products[] = $row;
 }
 $stmt->close();
