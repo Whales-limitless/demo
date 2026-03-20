@@ -610,8 +610,6 @@ function applyProductData(data) {
   }
 }
 
-var _lastCacheJson = ''; // track what we displayed from cache
-
 function fetchFreshData(isBackground) {
   return fetch('all_products_ajax.php', {
     method: 'POST',
@@ -629,12 +627,10 @@ function fetchFreshData(isBackground) {
       } catch(e) { /* storage full — ignore */ }
 
       if (isBackground) {
-        // Compare with what was displayed from cache —
-        // if anything changed (name, qty, image, etc.), re-render fully
-        if (freshJson !== _lastCacheJson) {
-          applyProductData(data);
-        }
-        // else: data is identical, no re-render needed
+        // Data is saved to localStorage above — next page load will use it.
+        // Do NOT re-render the page; the cached version is only seconds old
+        // and a full DOM wipe + rebuild causes a visible flash/refresh.
+        // Fresh data after order submission is already handled by cache-bust.
         return;
       }
     }
@@ -663,7 +659,6 @@ try {
 
 if (cachedData) {
   // Show cached data instantly, then refresh in background
-  _lastCacheJson = raw; // remember what we displayed so we can diff later
   applyProductData(cachedData);
   fetchFreshData(true);
 } else {
