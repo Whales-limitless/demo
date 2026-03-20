@@ -252,7 +252,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     </div>
                 </div>
                 <div class="row">
-                    <div class="col-md-12 mb-3"><label class="form-label fw-semibold">Location</label><input type="text" id="fLocation" class="form-control" readonly></div>
+                    <div class="col-md-6 mb-3"><label class="form-label fw-semibold">Location</label><input type="text" id="fLocation" class="form-control" readonly></div>
+                    <div class="col-md-6 mb-3"><label class="form-label fw-semibold">Address</label><input type="text" id="fAddress" class="form-control" readonly></div>
                 </div>
                 <div class="mb-3"><label class="form-label fw-semibold">Remark</label><textarea id="fRemark" class="form-control" rows="2" placeholder="Delivery notes..."></textarea></div>
 
@@ -330,8 +331,9 @@ function onCustomerChange() {
     var sel = document.getElementById('fCustomer');
     var opt = sel.options[sel.selectedIndex];
     var loc = opt.getAttribute('data-location') || '';
+    var addr = opt.getAttribute('data-address') || '';
     document.getElementById('fLocation').value = loc;
-    // Location data loaded, distance/commission no longer displayed
+    document.getElementById('fAddress').value = addr;
 }
 
 function addItem() {
@@ -364,6 +366,7 @@ function openCreateModal() {
     document.getElementById('fDeldate').value = '<?php echo date("Y-m-d"); ?>';
     $('#fCustomer').val('').trigger('change');
     document.getElementById('fLocation').value = '';
+    document.getElementById('fAddress').value = '';
     document.getElementById('fRemark').value = '';
     orderItems = [];
     renderItems();
