@@ -82,25 +82,13 @@ while ($row = mysqli_fetch_assoc($catSubRes)) {
     $catSubMap[$cc]['subs'][$row['sub_code']] = ['name' => $row['sub_cat'], 'sort' => $row['sort_order']];
 }
 
-// Compute pending order quantities per barcode (PURCHASE orders not yet DONE)
-$pendingQtyMap = [];
-$pendingRes = mysqli_query($connect, "SELECT BARCODE, SUM(QTY) AS pending_qty FROM `orderlist` WHERE STATUS = 'PENDING' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') AND QTY > 0 GROUP BY BARCODE");
-if ($pendingRes) {
-    while ($pRow = mysqli_fetch_assoc($pendingRes)) {
-        $pendingQtyMap[$pRow['BARCODE']] = intval($pRow['pending_qty']);
-    }
-}
-
 // Fetch all visible products in one query
 $prodMap = []; // cat_code => sub_code => [products]
 $prodRes = mysqli_query($connect, "SELECT id, name, description, stkcode AS sku, barcode, img1 AS image, rack AS rack_location, rack_updated_at, stock_in_at, IFNULL(qoh, 0) AS quantity, cat_code, sub_code FROM PRODUCTS WHERE (checked != 'N' OR checked IS NULL) ORDER BY name ASC");
 while ($prod = mysqli_fetch_assoc($prodRes)) {
     $prod['id'] = intval($prod['id']);
     $prod['quantity'] = intval($prod['quantity']);
-    $pending = $pendingQtyMap[$prod['barcode']] ?? 0;
-    $prod['pending_qty'] = $pending;
-    $prod['available_qty'] = max(0, $prod['quantity'] - $pending);
-    $prod['inStock'] = $prod['available_qty'] > 0;
+    $prod['inStock'] = $prod['quantity'] > 0;
 
     if ($trendConfig) {
         $ordered = $trendMap[$prod['barcode']] ?? 0;

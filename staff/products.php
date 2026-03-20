@@ -54,15 +54,6 @@ if ($uomRes) {
     }
 }
 
-// Compute pending order quantities per barcode (PURCHASE orders not yet DONE)
-$pendingQtyMap = [];
-$pendingRes = mysqli_query($connect, "SELECT BARCODE, SUM(QTY) AS pending_qty FROM `orderlist` WHERE STATUS = 'PENDING' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') AND QTY > 0 GROUP BY BARCODE");
-if ($pendingRes) {
-    while ($pRow = mysqli_fetch_assoc($pendingRes)) {
-        $pendingQtyMap[$pRow['BARCODE']] = intval($pRow['pending_qty']);
-    }
-}
-
 // Fetch subcategories for this category
 $escaped_cat = mysqli_real_escape_string($connect, $cat_code);
 $sub_result = mysqli_query($connect, "SELECT DISTINCT sub_code, sub_cat, MIN(sort_no) AS sort_order FROM category WHERE cat_code = '$escaped_cat' GROUP BY sub_code, sub_cat ORDER BY sort_order ASC, sub_cat ASC");
@@ -76,10 +67,7 @@ $prod_result = mysqli_query($connect, "SELECT id, name, description, stkcode AS 
 while ($prod = mysqli_fetch_assoc($prod_result)) {
     $prod['id'] = intval($prod['id']);
     $prod['quantity'] = intval($prod['quantity']);
-    $pending = $pendingQtyMap[$prod['barcode']] ?? 0;
-    $prod['pending_qty'] = $pending;
-    $prod['available_qty'] = max(0, $prod['quantity'] - $pending);
-    $prod['inStock'] = $prod['available_qty'] > 0;
+    $prod['inStock'] = $prod['quantity'] > 0;
 
     if ($trendConfig) {
         $ordered = $trendMap[$prod['barcode']] ?? 0;
@@ -527,7 +515,7 @@ function renderProductCard(p, index) {
     '<div class="product-info">' +
       '<div class="product-name" onclick="openEditNameModal(' + p.id + ')">' + escHtml(p.name) + '</div>' +
       '<div class="product-tags">' + tags + '</div>' +
-      '<div class="qty-label">Qty: <span>' + p.available_qty + '</span>' + (p.pending_qty > 0 ? ' <span style="font-size:10px;color:var(--primary);font-weight:600;">(' + p.pending_qty + ' pending)</span>' : '') + '</div>' +
+      '<div class="qty-label">Qty: <span>' + p.quantity + '</span></div>' +
       '<div class="product-actions">' +
         '<div class="qty-row">' +
           '<button class="qty-btn" onclick="updateQty(\'minus\',' + p.id + ')">−</button>' +
@@ -730,9 +718,8 @@ function addToCart(productId) {
     if (cart[i].id === productId) { existing = cart[i]; break; }
   }
 
-  var availQty = product.available_qty;
   if (existing) {
-    existing.qty = Math.min(existing.qty + qty, availQty);
+    existing.qty = Math.min(existing.qty + qty, product.quantity);
   } else {
     cart.push({
       id: product.id,
@@ -741,8 +728,8 @@ function addToCart(productId) {
       barcode: product.barcode || '',
       img: product.image ? '/img/' + product.image : '',
       rack: product.rack_location || null,
-      qty: Math.min(qty, availQty),
-      maxQty: availQty,
+      qty: qty,
+      maxQty: product.quantity,
       checked: true
     });
   }
