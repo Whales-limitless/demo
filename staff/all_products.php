@@ -330,6 +330,11 @@ function initProductData(categories) {
     cat.subcategories.forEach(function(sc) {
       totalProducts += sc.products.length;
       sc.products.forEach(function(p) {
+        // Ensure available_qty/pending_qty exist (stale cache may lack them)
+        if (typeof p.available_qty === 'undefined') {
+          p.pending_qty = 0;
+          p.available_qty = p.quantity;
+        }
         allProductsFlat.push(p);
       });
     });
