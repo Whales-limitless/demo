@@ -509,7 +509,7 @@ function renderTable(orders) {
         var isNew   = !knownSalnums[o.SALNUM];
 
         var typeMatch = currentTypeFilter === 'ALL' || ptype === currentTypeFilter;
-        var searchStr = ((o.SALNUM||'') + ' ' + (o.NAME||'') + ' ' + (o.TXTTO||'') + ' ' + (o.ADMINRMK||'') + ' ' + (o.SDATE||'')).toLowerCase();
+        var searchStr = ((o.SALNUM||'') + ' ' + (o.NAME||'') + ' ' + (o.TXTTO||'') + ' ' + (o.ADMINRMK||'') + ' ' + (o.SDATE||'') + ' ' + (o.branch_name||o.branch_code||'')).toLowerCase();
         var show = typeMatch && (!query || searchStr.indexOf(query) > -1);
 
         if (show) num++;

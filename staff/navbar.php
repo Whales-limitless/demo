@@ -306,7 +306,7 @@ if ('serviceWorker' in navigator) {
       var stockClass = p.inStock ? 'in-stock' : 'out-of-stock';
       var stockText = p.inStock ? 'Qty: ' + p.qoh : 'Out of Stock';
 
-      var catLink = p.cat_code ? 'products.php?cat=' + encodeURIComponent(p.cat_code) : '#';
+      var catLink = p.cat_code ? 'products.php?cat=' + encodeURIComponent(p.cat_code) + '&highlight=' + encodeURIComponent(p.id) : '#';
 
       return '<a href="' + catLink + '" class="search-result-item">' +
         imgHtml +
