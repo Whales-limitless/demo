@@ -344,6 +344,85 @@ function initProductData(categories) {
   dataLoaded = true;
 }
 
+// In-place patch: update in-memory data + visible DOM without full re-render
+function patchProductData(freshData) {
+  // Build lookup: id → fresh product data
+  var freshMap = {};
+  (freshData.categories || []).forEach(function(cat) {
+    cat.subcategories.forEach(function(sc) {
+      sc.products.forEach(function(p) {
+        freshMap[p.id] = p;
+      });
+    });
+  });
+
+  // Update stock-take barcodes
+  stockTakeBarcodes = {};
+  (freshData.stock_take_barcodes || []).forEach(function(b) { stockTakeBarcodes[b] = true; });
+
+  // Patch each in-memory product and its rendered card
+  allProductsFlat.forEach(function(p) {
+    var f = freshMap[p.id];
+    if (!f) return;
+    var qtyChanged = p.quantity !== f.quantity || p.pending_qty !== f.pending_qty;
+    var rackChanged = p.rack_location !== f.rack_location;
+    var nameChanged = p.name !== f.name;
+
+    // Update in-memory data
+    p.quantity = f.quantity;
+    p.pending_qty = f.pending_qty || 0;
+    p.available_qty = f.available_qty != null ? f.available_qty : Math.max(0, f.quantity - (f.pending_qty || 0));
+    p.inStock = p.available_qty > 0;
+    p.rack_location = f.rack_location;
+    p.rack_updated_at = f.rack_updated_at;
+    p.stock_in_at = f.stock_in_at;
+    p.name = f.name;
+    p.image = f.image;
+    p.trend = f.trend;
+    p.trend_qty = f.trend_qty;
+    p.uom_conversions = f.uom_conversions;
+
+    // Patch visible DOM elements
+    var card = document.querySelector('.product-card[data-id="' + p.id + '"]');
+    if (!card) return;
+
+    if (qtyChanged) {
+      var qtyEl = card.querySelector('.qty-label');
+      if (qtyEl) qtyEl.innerHTML = 'Qty: <span>' + p.quantity + '</span>';
+    }
+    if (nameChanged) {
+      var nameEl = card.querySelector('.product-name');
+      if (nameEl) nameEl.textContent = p.name;
+      card.setAttribute('data-name', p.name.toLowerCase());
+    }
+    if (rackChanged) {
+      var rackEl = card.querySelector('.tag-rack');
+      if (rackEl) rackEl.textContent = p.rack_location || 'No Rack';
+    }
+  });
+
+  // For categories not yet rendered (lazy-loaded), replace with fresh data
+  // so they render with up-to-date values when scrolled into view.
+  var freshCats = freshData.categories || [];
+  var freshCatMap = {};
+  freshCats.forEach(function(c) { freshCatMap[c.id] = c; });
+  for (var ci = loadedIndex; ci < allCategories.length; ci++) {
+    var fc = freshCatMap[allCategories[ci].id];
+    if (fc) {
+      allCategories[ci] = fc;
+      // Also ensure available_qty exists on fresh products
+      fc.subcategories.forEach(function(sc) {
+        sc.products.forEach(function(p) {
+          if (typeof p.available_qty === 'undefined') {
+            p.pending_qty = 0;
+            p.available_qty = p.quantity;
+          }
+        });
+      });
+    }
+  }
+}
+
 // Get URL query parameter
 function getUrlParam(name) {
   var params = new URLSearchParams(window.location.search);
@@ -610,8 +689,6 @@ function applyProductData(data) {
   }
 }
 
-var _lastCacheJson = ''; // track what we displayed from cache
-
 function fetchFreshData(isBackground) {
   return fetch('all_products_ajax.php', {
     method: 'POST',
@@ -629,12 +706,8 @@ function fetchFreshData(isBackground) {
       } catch(e) { /* storage full — ignore */ }
 
       if (isBackground) {
-        // Compare with what was displayed from cache —
-        // if anything changed (name, qty, image, etc.), re-render fully
-        if (freshJson !== _lastCacheJson) {
-          applyProductData(data);
-        }
-        // else: data is identical, no re-render needed
+        // Update in-memory data and patch DOM in-place (no full re-render flash)
+        patchProductData(data);
         return;
       }
     }
@@ -663,7 +736,6 @@ try {
 
 if (cachedData) {
   // Show cached data instantly, then refresh in background
-  _lastCacheJson = raw; // remember what we displayed so we can diff later
   applyProductData(cachedData);
   fetchFreshData(true);
 } else {
