@@ -140,6 +140,7 @@ if ($action === 'list') {
     $perPage = max(10, min(100, intval($_POST['per_page'] ?? 50)));
     $search = trim($_POST['search'] ?? '');
     $catFilter = trim($_POST['cat'] ?? '');
+    $subCatFilter = trim($_POST['sub_cat'] ?? '');
     $statusFilter = trim($_POST['status'] ?? '');
 
     $where = "1=1";
@@ -172,6 +173,11 @@ if ($action === 'list') {
     if ($catFilter !== '') {
         $where .= " AND `cat` = ?";
         $params[] = $catFilter;
+        $types .= "s";
+    }
+    if ($subCatFilter !== '') {
+        $where .= " AND `sub_cat` = ?";
+        $params[] = $subCatFilter;
         $types .= "s";
     }
     if ($statusFilter === 'active') {
