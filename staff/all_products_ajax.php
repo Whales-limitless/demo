@@ -84,7 +84,7 @@ while ($row = mysqli_fetch_assoc($catSubRes)) {
 
 // Compute pending order quantities per barcode (PURCHASE orders not yet DONE)
 $pendingQtyMap = [];
-$pendingRes = mysqli_query($connect, "SELECT BARCODE, SUM(QTY) AS pending_qty FROM `orderlist` WHERE STATUS = 'PENDING' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') AND QTY > 0 GROUP BY BARCODE");
+$pendingRes = mysqli_query($connect, "SELECT BARCODE, SUM(QTY) AS pending_qty FROM `orderlist` WHERE STATUS = 'PENDING' AND PTYPE = 'PURCHASE' AND QTY > 0 GROUP BY BARCODE");
 if ($pendingRes) {
     while ($pRow = mysqli_fetch_assoc($pendingRes)) {
         $pendingQtyMap[$pRow['BARCODE']] = intval($pRow['pending_qty']);

@@ -52,7 +52,7 @@ $result = $stmt->get_result();
 
 // Compute pending order quantities per barcode
 $pendingQtyMap = [];
-$pendingRes = $connect->query("SELECT BARCODE, SUM(QTY) AS pending_qty FROM `orderlist` WHERE STATUS = 'PENDING' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') AND QTY > 0 GROUP BY BARCODE");
+$pendingRes = $connect->query("SELECT BARCODE, SUM(QTY) AS pending_qty FROM `orderlist` WHERE STATUS = 'PENDING' AND PTYPE = 'PURCHASE' AND QTY > 0 GROUP BY BARCODE");
 if ($pendingRes) {
     while ($pRow = $pendingRes->fetch_assoc()) {
         $pendingQtyMap[$pRow['BARCODE']] = (int)$pRow['pending_qty'];
