@@ -54,13 +54,23 @@ if ($uomRes) {
     }
 }
 
-// Compute pending order quantities per barcode (PURCHASE orders not yet DONE)
+// Pending qty: use short-lived file cache shared with search endpoint
 $pendingQtyMap = [];
-$pendingRes = mysqli_query($connect, "SELECT BARCODE, SUM(QTY) AS pending_qty FROM `orderlist` WHERE STATUS = 'PENDING' AND PTYPE = 'PURCHASE' AND QTY > 0 GROUP BY BARCODE");
-if ($pendingRes) {
-    while ($pRow = mysqli_fetch_assoc($pendingRes)) {
-        $pendingQtyMap[$pRow['BARCODE']] = intval($pRow['pending_qty']);
+$pendingCacheDir = sys_get_temp_dir() . '/pw_product_cache';
+if (!is_dir($pendingCacheDir)) { @mkdir($pendingCacheDir, 0755, true); }
+$pendingCacheFile = $pendingCacheDir . '/pending_qty.json';
+$pendingCacheTTL = 10; // seconds
+
+if (file_exists($pendingCacheFile) && (time() - filemtime($pendingCacheFile)) < $pendingCacheTTL) {
+    $pendingQtyMap = json_decode(file_get_contents($pendingCacheFile), true) ?: [];
+} else {
+    $pendingRes = mysqli_query($connect, "SELECT BARCODE, SUM(QTY) AS pending_qty FROM `orderlist` WHERE STATUS = 'PENDING' AND PTYPE = 'PURCHASE' AND QTY > 0 GROUP BY BARCODE");
+    if ($pendingRes) {
+        while ($pRow = mysqli_fetch_assoc($pendingRes)) {
+            $pendingQtyMap[$pRow['BARCODE']] = intval($pRow['pending_qty']);
+        }
     }
+    @file_put_contents($pendingCacheFile, json_encode($pendingQtyMap));
 }
 
 // Fetch subcategories for this category
