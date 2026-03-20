@@ -13,6 +13,14 @@
 // 30-day session cookie so users stay logged in across browser restarts
 $sessionLifetime = 30 * 24 * 60 * 60; // 30 days in seconds
 
+// Use a dedicated session save path so other PHP apps' garbage collection
+// (which may use the default 24-minute gc_maxlifetime) cannot delete our sessions
+$sessionSavePath = sys_get_temp_dir() . '/pw_sessions';
+if (!is_dir($sessionSavePath)) {
+    mkdir($sessionSavePath, 0700, true);
+}
+ini_set('session.save_path', $sessionSavePath);
+
 // Extend server-side session garbage collection to match
 ini_set('session.gc_maxlifetime', $sessionLifetime);
 
