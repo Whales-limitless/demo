@@ -127,6 +127,14 @@ foreach ($items as $item) {
     }
 }
 
+if ($insertedCount > 0) {
+    // Bust the product cache so available_qty reflects the new order immediately
+    $cacheFile = sys_get_temp_dir() . '/pw_product_cache/all_products.json';
+    if (file_exists($cacheFile)) {
+        @unlink($cacheFile);
+    }
+}
+
 if ($insertedCount > 0 && empty($errors)) {
     echo json_encode(['success' => true, 'salnum' => $salnum, 'inserted' => $insertedCount]);
 } elseif ($insertedCount > 0) {

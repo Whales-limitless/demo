@@ -297,6 +297,9 @@ function finishOrder() {
           if (resp.success) {
             sessionStorage.removeItem('confirmItems');
             sessionStorage.removeItem('cart');
+            // Bust client-side product cache so qty updates immediately
+            localStorage.removeItem('pw_all_products_data');
+            localStorage.removeItem('pw_all_products_ts');
             // Redirect to preview/print page
             window.location.href = 'stockin_preview.php?salnum=' + encodeURIComponent(resp.salnum);
           } else {
