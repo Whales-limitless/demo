@@ -129,8 +129,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     <i class="fas fa-search"></i>
                     <input type="text" id="searchInput" placeholder="Search products..." oninput="debouncedFetch();">
                 </div>
-                <select id="filterCategory" class="filter-select" onchange="fetchProducts(1);">
+                <select id="filterCategory" class="filter-select" onchange="loadSubCategoryFilter(); fetchProducts(1);">
                     <option value="">All Categories</option>
+                </select>
+                <select id="filterSubCategory" class="filter-select" onchange="fetchProducts(1);">
+                    <option value="">All Sub Categories</option>
                 </select>
                 <select id="filterStatus" class="filter-select" onchange="fetchProducts(1);">
                     <option value="">All Status</option>
@@ -276,13 +279,14 @@ function fetchProducts(page) {
     currentPage = page;
     var search = document.getElementById('searchInput').value.trim();
     var cat = document.getElementById('filterCategory').value;
+    var subCat = document.getElementById('filterSubCategory').value;
     var status = document.getElementById('filterStatus').value;
 
     document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
 
     $.ajax({
         type: 'POST', url: 'product_ajax.php',
-        data: { action: 'list', page: page, per_page: 50, search: search, cat: cat, status: status },
+        data: { action: 'list', page: page, per_page: 50, search: search, cat: cat, sub_cat: subCat, status: status },
         dataType: 'json',
         success: function(data) {
             totalProducts = data.total || 0;
@@ -668,6 +672,19 @@ function loadCategoryFilter() {
             sel.innerHTML += '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>';
         });
         sel.value = val;
+    }, 'json');
+}
+
+function loadSubCategoryFilter() {
+    var cat = document.getElementById('filterCategory').value;
+    var sel = document.getElementById('filterSubCategory');
+    sel.innerHTML = '<option value="">All Sub Categories</option>';
+    if (!cat) return;
+
+    $.post('product_ajax.php', { action: 'subcategories', cat: cat }, function(subs) {
+        (subs || []).forEach(function(s) {
+            sel.innerHTML += '<option value="' + escHtml(s) + '">' + escHtml(s) + '</option>';
+        });
     }, 'json');
 }
 
