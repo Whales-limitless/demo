@@ -49,6 +49,68 @@ if ($subCatResult) {
     }
 }
 
+// Fetch subcategories that have active stock take sessions (DRAFT/SUBMITTED) with progress & last update
+$activeSubCats = [];
+$activeSubCatResult = $connect->query("
+    SELECT st.`filter_cat`, st.`filter_sub_cat`, st.`session_code`, st.`status`,
+           COUNT(sti.id) AS total_items,
+           SUM(CASE WHEN sti.status = 'COUNTED' THEN 1 ELSE 0 END) AS counted_items,
+           GREATEST(
+               COALESCE(st.`created_at`, '1970-01-01'),
+               COALESCE(st.`submitted_at`, '1970-01-01'),
+               COALESCE(MAX(sti.`counted_at`), '1970-01-01')
+           ) AS last_update
+    FROM `stock_take` st
+    LEFT JOIN `stock_take_item` sti ON sti.`stock_take_id` = st.`id`
+    WHERE st.`status` IN ('DRAFT', 'SUBMITTED')
+      AND st.`filter_sub_cat` IS NOT NULL AND st.`filter_sub_cat` != ''
+    GROUP BY st.`id`
+");
+if ($activeSubCatResult) {
+    while ($r = $activeSubCatResult->fetch_assoc()) {
+        $r['total_items'] = intval($r['total_items']);
+        $r['counted_items'] = intval($r['counted_items']);
+        $activeSubCats[] = $r;
+    }
+}
+
+// Fetch categories that have active stock take sessions (including FULL type)
+$activeCats = [];
+$activeCatResult = $connect->query("
+    SELECT DISTINCT `filter_cat`
+    FROM `stock_take`
+    WHERE `status` IN ('DRAFT', 'SUBMITTED')
+      AND `filter_cat` IS NOT NULL AND `filter_cat` != ''
+");
+if ($activeCatResult) {
+    while ($r = $activeCatResult->fetch_assoc()) {
+        $activeCats[] = $r['filter_cat'];
+    }
+}
+
+// Check if there's any active FULL stock take with progress & last update
+$activeFullSession = null;
+$fullChk = $connect->query("
+    SELECT st.`session_code`, st.`status`,
+           COUNT(sti.id) AS total_items,
+           SUM(CASE WHEN sti.status = 'COUNTED' THEN 1 ELSE 0 END) AS counted_items,
+           GREATEST(
+               COALESCE(st.`created_at`, '1970-01-01'),
+               COALESCE(st.`submitted_at`, '1970-01-01'),
+               COALESCE(MAX(sti.`counted_at`), '1970-01-01')
+           ) AS last_update
+    FROM `stock_take` st
+    LEFT JOIN `stock_take_item` sti ON sti.`stock_take_id` = st.`id`
+    WHERE st.`status` IN ('DRAFT', 'SUBMITTED') AND st.`type` = 'FULL'
+    GROUP BY st.`id`
+    ORDER BY st.`id` DESC LIMIT 1
+");
+if ($fullChk && $fullChk->num_rows > 0) {
+    $activeFullSession = $fullChk->fetch_assoc();
+    $activeFullSession['total_items'] = intval($activeFullSession['total_items']);
+    $activeFullSession['counted_items'] = intval($activeFullSession['counted_items']);
+}
+
 // Check if viewing a specific session detail
 $viewId = intval($_GET['view'] ?? 0);
 $viewSession = null;
@@ -470,6 +532,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                             <select id="fSubCategory" class="form-select" onchange="loadProducts();">
                                 <option value="">-- All Sub Categories --</option>
                             </select>
+                            <div id="subCatActiveHint" style="display:none;font-size:11px;color:#d97706;margin-top:4px;">
+                                <i class="fas fa-circle" style="font-size:7px;vertical-align:middle;margin-right:3px;"></i>
+                                <span style="font-weight:600;">Active</span> (counted/total) last update = ongoing stock take session
+                            </div>
                         </div>
                     </div>
                     <div class="mb-3">
@@ -526,6 +592,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script>
 // Sub categories data from PHP
 var subCategoriesData = <?php echo json_encode($subCategories); ?>;
+var activeSubCatsData = <?php echo json_encode($activeSubCats); ?>;
+var activeCatsData = <?php echo json_encode($activeCats); ?>;
+var activeFullSession = <?php echo json_encode($activeFullSession); ?>;
 </script>
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
@@ -621,6 +690,7 @@ function openCreateModal() {
     document.getElementById('selectAll').checked = false;
     document.getElementById('smartSelectBar').style.display = 'none';
     document.getElementById('smartSelectN').value = '50';
+    document.getElementById('subCatActiveHint').style.display = 'none';
     loadedProducts = [];
     createModal.show();
 }
@@ -630,20 +700,56 @@ function toggleFilters() {
     document.getElementById('filterFields').style.display = type === 'PARTIAL' ? 'block' : 'none';
 }
 
+function getSubCatActiveInfo(cat, subCat) {
+    // Check FULL session first (applies to all subcategories)
+    if (activeFullSession) {
+        return activeFullSession;
+    }
+    // Check partial sessions matching this subcategory
+    var match = activeSubCatsData.find(function(a) { return a.filter_cat === cat && a.filter_sub_cat === subCat; });
+    return match || null;
+}
+
+function formatActiveLabel(info) {
+    var label = ' \u25CF Active';
+    label += ' (' + info.counted_items + '/' + info.total_items + ')';
+    if (info.last_update && info.last_update !== '1970-01-01') {
+        var d = new Date(info.last_update);
+        if (!isNaN(d.getTime())) {
+            var dd = String(d.getDate()).padStart(2, '0');
+            var mm = String(d.getMonth() + 1).padStart(2, '0');
+            var hh = String(d.getHours()).padStart(2, '0');
+            var min = String(d.getMinutes()).padStart(2, '0');
+            label += ' ' + dd + '/' + mm + ' ' + hh + ':' + min;
+        }
+    }
+    return label;
+}
+
 function onCategoryChange() {
     var cat = document.getElementById('fCategory').value;
     var subSelect = document.getElementById('fSubCategory');
     subSelect.innerHTML = '<option value="">-- All Sub Categories --</option>';
 
+    var hasAnyActive = false;
     if (cat !== '') {
         var filtered = subCategoriesData.filter(function(s) { return s.cat === cat; });
         filtered.forEach(function(s) {
             var opt = document.createElement('option');
             opt.value = s.sub_cat;
-            opt.textContent = s.sub_cat;
+            var info = getSubCatActiveInfo(cat, s.sub_cat);
+            if (info) {
+                hasAnyActive = true;
+                opt.textContent = s.sub_cat + formatActiveLabel(info);
+                opt.style.color = '#d97706';
+                opt.style.fontWeight = '600';
+            } else {
+                opt.textContent = s.sub_cat;
+            }
             subSelect.appendChild(opt);
         });
     }
+    document.getElementById('subCatActiveHint').style.display = hasAnyActive ? 'block' : 'none';
     loadProducts();
 }
 
