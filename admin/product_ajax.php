@@ -707,6 +707,134 @@ if ($action === 'list') {
 
 // ===================== UOM CONVERSION ACTIONS =====================
 
+} elseif ($action === 'bulk_get_ids') {
+    // Return all product IDs matching filters (for "select all" feature)
+    $search = trim($_POST['search'] ?? '');
+    $catFilter = trim($_POST['cat'] ?? '');
+    $statusFilter = trim($_POST['status'] ?? '');
+
+    $where = "1=1";
+    $params = [];
+    $types = "";
+
+    if ($search !== '') {
+        $like = '%' . strtolower($search) . '%';
+        $where .= " AND (LOWER(`barcode`) LIKE ? OR LOWER(`code`) LIKE ? OR LOWER(`name`) LIKE ? OR LOWER(`cat`) LIKE ?)";
+        $params = array_merge($params, [$like, $like, $like, $like]);
+        $types .= "ssss";
+    }
+    if ($catFilter !== '') {
+        $where .= " AND `cat` = ?";
+        $params[] = $catFilter;
+        $types .= "s";
+    }
+    if ($statusFilter === 'active') {
+        $where .= " AND (`checked` = 'Y' OR `checked` = '' OR `checked` IS NULL)";
+    } elseif ($statusFilter === 'inactive') {
+        $where .= " AND `checked` = 'N'";
+    }
+
+    $sql = "SELECT `id` FROM `PRODUCTS` WHERE $where ORDER BY `id` ASC";
+    $stmt = $connect->prepare($sql);
+    if ($types !== '') {
+        $stmt->bind_param($types, ...$params);
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $ids = [];
+    while ($r = $result->fetch_assoc()) {
+        $ids[] = (int)$r['id'];
+    }
+    $stmt->close();
+    echo json_encode(['ids' => $ids]);
+
+} elseif ($action === 'bulk_set_status') {
+    $idsJson = $_POST['ids'] ?? '[]';
+    $ids = json_decode($idsJson, true);
+    $status = trim($_POST['status'] ?? '');
+
+    if (!is_array($ids) || count($ids) === 0) {
+        echo json_encode(['error' => 'No products selected.']);
+        exit;
+    }
+    if ($status !== 'Y' && $status !== 'N') {
+        echo json_encode(['error' => 'Invalid status.']);
+        exit;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $types = 's' . str_repeat('i', count($ids));
+    $params = array_merge([$status], array_map('intval', $ids));
+
+    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `checked` = ? WHERE `id` IN ($placeholders)");
+    $stmt->bind_param($types, ...$params);
+
+    if ($stmt->execute()) {
+        $affected = $stmt->affected_rows;
+        $label = $status === 'Y' ? 'activated' : 'deactivated';
+        echo json_encode(['success' => $affected . ' product(s) ' . $label . '.']);
+    } else {
+        echo json_encode(['error' => 'Failed: ' . $connect->error]);
+    }
+    $stmt->close();
+
+} elseif ($action === 'bulk_edit') {
+    $idsJson = $_POST['ids'] ?? '[]';
+    $updatesJson = $_POST['updates'] ?? '{}';
+    $ids = json_decode($idsJson, true);
+    $updates = json_decode($updatesJson, true);
+
+    if (!is_array($ids) || count($ids) === 0) {
+        echo json_encode(['error' => 'No products selected.']);
+        exit;
+    }
+    if (!is_array($updates) || count($updates) === 0) {
+        echo json_encode(['error' => 'No changes specified.']);
+        exit;
+    }
+
+    // Build dynamic UPDATE query based on provided fields
+    $allowedFields = ['cat', 'sub_cat', 'cat_code', 'sub_code', 'uom', 'rack', 'checked'];
+    $setClauses = [];
+    $setParams = [];
+    $setTypes = "";
+
+    foreach ($allowedFields as $field) {
+        if (array_key_exists($field, $updates)) {
+            $setClauses[] = "`$field` = ?";
+            $setParams[] = $updates[$field];
+            $setTypes .= "s";
+        }
+    }
+
+    // Update rack_updated_at if rack was changed
+    if (array_key_exists('rack', $updates)) {
+        $setClauses[] = "`rack_updated_at` = ?";
+        $setParams[] = date('Y-m-d H:i:s');
+        $setTypes .= "s";
+    }
+
+    if (count($setClauses) === 0) {
+        echo json_encode(['error' => 'No valid fields to update.']);
+        exit;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $sql = "UPDATE `PRODUCTS` SET " . implode(', ', $setClauses) . " WHERE `id` IN ($placeholders)";
+    $allTypes = $setTypes . str_repeat('i', count($ids));
+    $allParams = array_merge($setParams, array_map('intval', $ids));
+
+    $stmt = $connect->prepare($sql);
+    $stmt->bind_param($allTypes, ...$allParams);
+
+    if ($stmt->execute()) {
+        $affected = $stmt->affected_rows;
+        echo json_encode(['success' => $affected . ' product(s) updated.']);
+    } else {
+        echo json_encode(['error' => 'Failed: ' . $connect->error]);
+    }
+    $stmt->close();
+
 } elseif ($action === 'uom_conversion_ensure_table') {
     // Auto-create table if not exists
     $connect->query("CREATE TABLE IF NOT EXISTS `uom_conversion` (
