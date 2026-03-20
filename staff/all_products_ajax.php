@@ -13,6 +13,7 @@ if (!is_dir($cacheDir)) {
     @mkdir($cacheDir, 0755, true);
 }
 $cacheFile = $cacheDir . '/all_products.json';
+$lockFile = $cacheDir . '/all_products.lock';
 $cacheTTL = 30; // seconds
 
 // Allow force-refresh via request parameter
@@ -29,6 +30,44 @@ if (!$forceRefresh && file_exists($cacheFile) && (time() - filemtime($cacheFile)
         readfile($cacheFile);
     }
     exit;
+}
+
+// Stampede protection: only one process rebuilds cache at a time
+$lockFp = @fopen($lockFile, 'c');
+if ($lockFp) {
+    if (!flock($lockFp, LOCK_EX | LOCK_NB)) {
+        // Another process is already rebuilding — serve stale cache if available
+        fclose($lockFp);
+        if (file_exists($cacheFile)) {
+            header('X-Cache: STALE');
+            header('Cache-Control: private, max-age=' . $cacheTTL);
+            if (ob_start('ob_gzhandler')) {
+                readfile($cacheFile);
+                ob_end_flush();
+            } else {
+                readfile($cacheFile);
+            }
+            exit;
+        }
+        // No stale cache exists — must wait for lock
+        $lockFp = fopen($lockFile, 'c');
+        flock($lockFp, LOCK_EX); // blocking wait
+    }
+
+    // Double-check: cache may have been rebuilt while we waited for the lock
+    if (!$forceRefresh && file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTTL) {
+        flock($lockFp, LOCK_UN);
+        fclose($lockFp);
+        header('X-Cache: HIT');
+        header('Cache-Control: private, max-age=' . $cacheTTL);
+        if (ob_start('ob_gzhandler')) {
+            readfile($cacheFile);
+            ob_end_flush();
+        } else {
+            readfile($cacheFile);
+        }
+        exit;
+    }
 }
 
 header('X-Cache: MISS');
@@ -161,10 +200,14 @@ if ($stRes) {
 
 $json = json_encode(['categories' => $allCategories, 'stock_take_barcodes' => $stockTakeBarcodes]);
 
-// Write to cache file atomically
+// Write to cache file atomically, then release lock
 $tmpFile = $cacheFile . '.tmp.' . getmypid();
 if (@file_put_contents($tmpFile, $json) !== false) {
     @rename($tmpFile, $cacheFile);
+}
+if (isset($lockFp) && is_resource($lockFp)) {
+    flock($lockFp, LOCK_UN);
+    fclose($lockFp);
 }
 
 // Output with gzip if supported

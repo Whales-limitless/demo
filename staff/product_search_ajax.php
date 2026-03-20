@@ -50,13 +50,23 @@ $stmt->bind_param("sss", $normalizedLike, $altLike, $altLike2);
 $stmt->execute();
 $result = $stmt->get_result();
 
-// Compute pending order quantities per barcode
+// Pending qty: use short-lived file cache to avoid repeated DB hits from search keystrokes
 $pendingQtyMap = [];
-$pendingRes = $connect->query("SELECT BARCODE, SUM(QTY) AS pending_qty FROM `orderlist` WHERE STATUS = 'PENDING' AND PTYPE = 'PURCHASE' AND QTY > 0 GROUP BY BARCODE");
-if ($pendingRes) {
-    while ($pRow = $pendingRes->fetch_assoc()) {
-        $pendingQtyMap[$pRow['BARCODE']] = (int)$pRow['pending_qty'];
+$pendingCacheDir = sys_get_temp_dir() . '/pw_product_cache';
+if (!is_dir($pendingCacheDir)) { @mkdir($pendingCacheDir, 0755, true); }
+$pendingCacheFile = $pendingCacheDir . '/pending_qty.json';
+$pendingCacheTTL = 10; // seconds — short enough for accuracy, long enough to absorb bursts
+
+if (file_exists($pendingCacheFile) && (time() - filemtime($pendingCacheFile)) < $pendingCacheTTL) {
+    $pendingQtyMap = json_decode(file_get_contents($pendingCacheFile), true) ?: [];
+} else {
+    $pendingRes = $connect->query("SELECT BARCODE, SUM(QTY) AS pending_qty FROM `orderlist` WHERE STATUS = 'PENDING' AND PTYPE = 'PURCHASE' AND QTY > 0 GROUP BY BARCODE");
+    if ($pendingRes) {
+        while ($pRow = $pendingRes->fetch_assoc()) {
+            $pendingQtyMap[$pRow['BARCODE']] = (int)$pRow['pending_qty'];
+        }
     }
+    @file_put_contents($pendingCacheFile, json_encode($pendingQtyMap));
 }
 
 $products = [];
