@@ -2,11 +2,7 @@
 require_once __DIR__ . '/session_security.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
-// If already logged in, redirect to the correct portal
-if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
-    header("Location: /admin/dashboard.php");
-    exit;
-}
+// If already logged in as staff, go to staff home
 if (isset($_SESSION['user_logged_in']) && $_SESSION['user_logged_in'] === true) {
     header("Location: index.php");
     exit;
