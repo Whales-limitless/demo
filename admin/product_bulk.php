@@ -159,6 +159,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                         <th>Barcode</th>
                         <th>Name</th>
                         <th>Category</th>
+                        <th>Sub Category</th>
                         <th>UOM</th>
                         <th>QOH</th>
                         <th>Rack</th>
@@ -166,7 +167,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     </tr>
                 </thead>
                 <tbody id="dataBody">
-                    <tr class="no-results"><td colspan="10" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
+                    <tr class="no-results"><td colspan="11" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading products...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -282,7 +283,7 @@ function fetchProducts(page) {
     var subCat = document.getElementById('filterSubCategory').value;
     var status = document.getElementById('filterStatus').value;
 
-    document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
+    document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="11" class="table-loading"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>';
 
     $.ajax({
         type: 'POST', url: 'product_ajax.php',
@@ -296,7 +297,7 @@ function fetchProducts(page) {
             updateCheckAllState();
         },
         error: function() {
-            document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
+            document.getElementById('dataBody').innerHTML = '<tr class="no-results"><td colspan="11"><i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>Failed to load products</td></tr>';
         }
     });
 }
@@ -307,7 +308,7 @@ function renderTable(data) {
     var offset = (data.page - 1) * data.per_page;
 
     if (products.length === 0) {
-        tbody.innerHTML = '<tr class="no-results"><td colspan="10"><i class="fas fa-boxes-stacked" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products found</td></tr>';
+        tbody.innerHTML = '<tr class="no-results"><td colspan="11"><i class="fas fa-boxes-stacked" style="font-size:24px;margin-bottom:8px;display:block;"></i>No products found</td></tr>';
         document.getElementById('itemCount').textContent = '0 product(s)';
         return;
     }
@@ -329,6 +330,7 @@ function renderTable(data) {
         html += '<td><strong>' + escHtml(p.barcode || '') + '</strong></td>';
         html += '<td>' + escHtml(p.name || '') + '</td>';
         html += '<td>' + escHtml(p.cat || '') + '</td>';
+        html += '<td>' + escHtml(p.sub_cat || '') + '</td>';
         html += '<td>' + escHtml(p.uom || '') + '</td>';
         html += '<td>' + Math.round(parseFloat(p.qoh || 0)) + '</td>';
         html += '<td>' + escHtml(p.rack || '') + '</td>';
