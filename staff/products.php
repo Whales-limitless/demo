@@ -730,9 +730,8 @@ function addToCart(productId) {
     if (cart[i].id === productId) { existing = cart[i]; break; }
   }
 
-  var availQty = product.available_qty;
   if (existing) {
-    existing.qty = Math.min(existing.qty + qty, availQty);
+    existing.qty = Math.min(existing.qty + qty, product.available_qty);
   } else {
     cart.push({
       id: product.id,
@@ -741,8 +740,8 @@ function addToCart(productId) {
       barcode: product.barcode || '',
       img: product.image ? '/img/' + product.image : '',
       rack: product.rack_location || null,
-      qty: Math.min(qty, availQty),
-      maxQty: availQty,
+      qty: Math.min(qty, product.available_qty),
+      maxQty: product.available_qty,
       checked: true
     });
   }

@@ -497,7 +497,7 @@ function renderProductCard(p, index) {
     '<div class="product-info">' +
       '<div class="product-name" onclick="openEditNameModal(' + p.id + ')">' + escHtml(p.name) + '</div>' +
       '<div class="product-tags">' + tags + '</div>' +
-      '<div class="qty-label">Qty: <span>' + p.available_qty + '</span>' + (p.pending_qty > 0 ? ' <span style="font-size:10px;color:var(--primary);font-weight:600;">(' + p.pending_qty + ' pending)</span>' : '') + '</div>' +
+      '<div class="qty-label">Qty: <span>' + p.quantity + '</span></div>' +
       '<div class="product-actions">' +
         '<div class="qty-row">' +
           '<button class="qty-btn" onclick="updateQty(\'minus\',' + p.id + ')">−</button>' +
@@ -733,9 +733,8 @@ function addToCart(productId) {
     if (cart[i].id === productId) { existing = cart[i]; break; }
   }
 
-  var availQty = product.available_qty;
   if (existing) {
-    existing.qty = Math.min(existing.qty + qty, availQty);
+    existing.qty = existing.qty + qty;
   } else {
     cart.push({
       id: product.id,
@@ -744,8 +743,8 @@ function addToCart(productId) {
       barcode: product.barcode || '',
       img: product.image ? '/img/' + product.image : '',
       rack: product.rack_location || null,
-      qty: Math.min(qty, availQty),
-      maxQty: availQty,
+      qty: qty,
+      maxQty: product.quantity,
       checked: true
     });
   }
