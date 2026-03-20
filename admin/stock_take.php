@@ -49,6 +49,41 @@ if ($subCatResult) {
     }
 }
 
+// Fetch subcategories that have active stock take sessions (DRAFT/SUBMITTED)
+$activeSubCats = [];
+$activeSubCatResult = $connect->query("
+    SELECT DISTINCT `filter_cat`, `filter_sub_cat`
+    FROM `stock_take`
+    WHERE `status` IN ('DRAFT', 'SUBMITTED')
+      AND `filter_sub_cat` IS NOT NULL AND `filter_sub_cat` != ''
+");
+if ($activeSubCatResult) {
+    while ($r = $activeSubCatResult->fetch_assoc()) {
+        $activeSubCats[] = $r;
+    }
+}
+
+// Fetch categories that have active stock take sessions (including FULL type)
+$activeCats = [];
+$activeCatResult = $connect->query("
+    SELECT DISTINCT `filter_cat`
+    FROM `stock_take`
+    WHERE `status` IN ('DRAFT', 'SUBMITTED')
+      AND `filter_cat` IS NOT NULL AND `filter_cat` != ''
+");
+if ($activeCatResult) {
+    while ($r = $activeCatResult->fetch_assoc()) {
+        $activeCats[] = $r['filter_cat'];
+    }
+}
+
+// Check if there's any active FULL stock take
+$hasActiveFullSession = false;
+$fullChk = $connect->query("SELECT 1 FROM `stock_take` WHERE `status` IN ('DRAFT', 'SUBMITTED') AND `type` = 'FULL' LIMIT 1");
+if ($fullChk && $fullChk->num_rows > 0) {
+    $hasActiveFullSession = true;
+}
+
 // Check if viewing a specific session detail
 $viewId = intval($_GET['view'] ?? 0);
 $viewSession = null;
@@ -470,6 +505,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                             <select id="fSubCategory" class="form-select" onchange="loadProducts();">
                                 <option value="">-- All Sub Categories --</option>
                             </select>
+                            <div id="subCatActiveHint" style="display:none;font-size:11px;color:#d97706;margin-top:4px;">
+                                <i class="fas fa-circle" style="font-size:7px;vertical-align:middle;margin-right:3px;"></i>
+                                <span style="font-weight:600;">Active Session</span> = has an ongoing stock take (DRAFT/SUBMITTED)
+                            </div>
                         </div>
                     </div>
                     <div class="mb-3">
@@ -526,6 +565,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script>
 // Sub categories data from PHP
 var subCategoriesData = <?php echo json_encode($subCategories); ?>;
+var activeSubCatsData = <?php echo json_encode($activeSubCats); ?>;
+var activeCatsData = <?php echo json_encode($activeCats); ?>;
+var hasActiveFullSession = <?php echo $hasActiveFullSession ? 'true' : 'false'; ?>;
 </script>
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
@@ -621,6 +663,7 @@ function openCreateModal() {
     document.getElementById('selectAll').checked = false;
     document.getElementById('smartSelectBar').style.display = 'none';
     document.getElementById('smartSelectN').value = '50';
+    document.getElementById('subCatActiveHint').style.display = 'none';
     loadedProducts = [];
     createModal.show();
 }
@@ -630,20 +673,33 @@ function toggleFilters() {
     document.getElementById('filterFields').style.display = type === 'PARTIAL' ? 'block' : 'none';
 }
 
+function isSubCatActive(cat, subCat) {
+    if (hasActiveFullSession) return true;
+    return activeSubCatsData.some(function(a) { return a.filter_cat === cat && a.filter_sub_cat === subCat; });
+}
+
 function onCategoryChange() {
     var cat = document.getElementById('fCategory').value;
     var subSelect = document.getElementById('fSubCategory');
     subSelect.innerHTML = '<option value="">-- All Sub Categories --</option>';
 
+    var hasAnyActive = false;
     if (cat !== '') {
         var filtered = subCategoriesData.filter(function(s) { return s.cat === cat; });
         filtered.forEach(function(s) {
             var opt = document.createElement('option');
             opt.value = s.sub_cat;
-            opt.textContent = s.sub_cat;
+            var active = isSubCatActive(cat, s.sub_cat);
+            if (active) hasAnyActive = true;
+            opt.textContent = s.sub_cat + (active ? '  \u25CF Active Session' : '');
+            if (active) {
+                opt.style.color = '#d97706';
+                opt.style.fontWeight = '600';
+            }
             subSelect.appendChild(opt);
         });
     }
+    document.getElementById('subCatActiveHint').style.display = hasAnyActive ? 'block' : 'none';
     loadProducts();
 }
 
