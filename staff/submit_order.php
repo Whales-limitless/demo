@@ -128,11 +128,10 @@ foreach ($items as $item) {
 }
 
 if ($insertedCount > 0) {
-    // Bust the product cache so available_qty reflects the new order immediately
-    $cacheFile = sys_get_temp_dir() . '/pw_product_cache/all_products.json';
-    if (file_exists($cacheFile)) {
-        @unlink($cacheFile);
-    }
+    // Bust product caches so available_qty reflects the new order immediately
+    $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+    @unlink($cacheDir . '/all_products.json');
+    @unlink($cacheDir . '/pending_qty.json');
 }
 
 if ($insertedCount > 0 && empty($errors)) {
