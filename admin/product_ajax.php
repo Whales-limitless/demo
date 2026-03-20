@@ -748,35 +748,71 @@ if ($action === 'list') {
     $stmt->close();
     echo json_encode(['ids' => $ids]);
 
-} elseif ($action === 'bulk_set_status') {
+} elseif ($action === 'bulk_delete') {
     $idsJson = $_POST['ids'] ?? '[]';
     $ids = json_decode($idsJson, true);
-    $status = trim($_POST['status'] ?? '');
 
     if (!is_array($ids) || count($ids) === 0) {
         echo json_encode(['error' => 'No products selected.']);
         exit;
     }
-    if ($status !== 'Y' && $status !== 'N') {
-        echo json_encode(['error' => 'Invalid status.']);
-        exit;
+
+    $uploadDir = __DIR__ . '/../img/';
+    $intIds = array_map('intval', $ids);
+
+    // Fetch images for selected products before deleting
+    $placeholders = implode(',', array_fill(0, count($intIds), '?'));
+    $types = str_repeat('i', count($intIds));
+
+    $imgStmt = $connect->prepare("SELECT `id`, `img1`, `barcode` FROM `PRODUCTS` WHERE `id` IN ($placeholders)");
+    $imgStmt->bind_param($types, ...$intIds);
+    $imgStmt->execute();
+    $imgResult = $imgStmt->get_result();
+    $images = [];
+    $barcodes = [];
+    while ($r = $imgResult->fetch_assoc()) {
+        if (!empty($r['img1'])) {
+            $images[] = $r['img1'];
+        }
+        if (!empty($r['barcode'])) {
+            $barcodes[] = $r['barcode'];
+        }
     }
+    $imgStmt->close();
 
-    $placeholders = implode(',', array_fill(0, count($ids), '?'));
-    $types = 's' . str_repeat('i', count($ids));
-    $params = array_merge([$status], array_map('intval', $ids));
+    // Delete products from database
+    $delStmt = $connect->prepare("DELETE FROM `PRODUCTS` WHERE `id` IN ($placeholders)");
+    $delStmt->bind_param($types, ...$intIds);
 
-    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `checked` = ? WHERE `id` IN ($placeholders)");
-    $stmt->bind_param($types, ...$params);
+    if ($delStmt->execute()) {
+        $affected = $delStmt->affected_rows;
+        $delStmt->close();
 
-    if ($stmt->execute()) {
-        $affected = $stmt->affected_rows;
-        $label = $status === 'Y' ? 'activated' : 'deactivated';
-        echo json_encode(['success' => $affected . ' product(s) ' . $label . '.']);
+        // Delete image files
+        $imgDeleted = 0;
+        foreach ($images as $img) {
+            $imgPath = $uploadDir . $img;
+            if (file_exists($imgPath)) {
+                @unlink($imgPath);
+                $imgDeleted++;
+            }
+        }
+
+        // Clean up UOM conversions for deleted products
+        if (!empty($barcodes)) {
+            $bcPlaceholders = implode(',', array_fill(0, count($barcodes), '?'));
+            $bcTypes = str_repeat('s', count($barcodes));
+            $convStmt = $connect->prepare("DELETE FROM `uom_conversion` WHERE `barcode` IN ($bcPlaceholders)");
+            $convStmt->bind_param($bcTypes, ...$barcodes);
+            $convStmt->execute();
+            $convStmt->close();
+        }
+
+        echo json_encode(['success' => $affected . ' product(s) permanently deleted.' . ($imgDeleted > 0 ? ' ' . $imgDeleted . ' image(s) removed.' : '')]);
     } else {
         echo json_encode(['error' => 'Failed: ' . $connect->error]);
+        $delStmt->close();
     }
-    $stmt->close();
 
 } elseif ($action === 'bulk_edit') {
     $idsJson = $_POST['ids'] ?? '[]';

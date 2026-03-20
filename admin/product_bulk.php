@@ -183,8 +183,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
     <div class="bar-actions">
         <button class="btn-bulk-edit" onclick="openBulkEditModal();"><i class="fas fa-pen"></i> Bulk Edit</button>
-        <button class="btn-bulk-activate" onclick="bulkSetStatus('Y');"><i class="fas fa-check"></i> Activate</button>
-        <button class="btn-bulk-deactivate" onclick="bulkSetStatus('N');"><i class="fas fa-ban"></i> Deactivate</button>
+        <button class="btn-bulk-deactivate" onclick="bulkDelete();"><i class="fas fa-trash"></i> Delete</button>
         <button class="btn-bulk-cancel" onclick="clearSelection();"><i class="fas fa-times"></i> Clear</button>
     </div>
 </div>
@@ -495,29 +494,33 @@ function updateBulkBar() {
 
 // ===================== BULK ACTIONS =====================
 
-function bulkSetStatus(status) {
+function bulkDelete() {
     var ids = getSelectedIdsArray();
     if (ids.length === 0) return;
 
-    var label = status === 'Y' ? 'activate' : 'deactivate';
     Swal.fire({
-        title: 'Confirm Bulk ' + (status === 'Y' ? 'Activate' : 'Deactivate'),
-        text: label.charAt(0).toUpperCase() + label.slice(1) + ' ' + ids.length + ' product(s)?',
+        title: 'Permanently Delete ' + ids.length + ' Product(s)?',
+        html: '<div style="color:#ef4444;font-weight:600;margin-bottom:8px;"><i class="fas fa-exclamation-triangle"></i> This action cannot be undone!</div>' +
+              'All selected products and their images will be permanently deleted.',
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: status === 'Y' ? '#16a34a' : '#ef4444',
-        confirmButtonText: 'Yes, ' + label
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, Delete Permanently',
+        input: 'text',
+        inputLabel: 'Type DELETE to confirm',
+        inputValidator: function(v) { if (v !== 'DELETE') return 'Please type DELETE to confirm.'; }
     }).then(function(result) {
         if (result.isConfirmed) {
             $.ajax({
                 type: 'POST', url: 'product_ajax.php',
-                data: { action: 'bulk_set_status', ids: JSON.stringify(ids), status: status },
+                data: { action: 'bulk_delete', ids: JSON.stringify(ids) },
                 dataType: 'json',
                 success: function(data) {
                     if (data.success) {
                         Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() {
                             clearSelection();
                             fetchProducts(currentPage);
+                            loadCategoryFilter();
                         });
                     } else {
                         Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
