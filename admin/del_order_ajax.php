@@ -20,6 +20,9 @@ if (strpos($contentType, 'application/json') !== false) {
 
 $action = $_POST['action'] ?? '';
 
+// Ensure CREATED_AT column exists
+$connect->query("ALTER TABLE `del_orderlist` ADD COLUMN `CREATED_AT` DATETIME DEFAULT CURRENT_TIMESTAMP");
+
 if ($action === 'list') {
     $startDate = $_POST['start_date'] ?? date('Y-m-d', strtotime('-30 days'));
     $endDate = $_POST['end_date'] ?? date('Y-m-d');
@@ -36,7 +39,7 @@ if ($action === 'list') {
         $types .= "s";
     }
 
-    $sql = "SELECT o.*, c.ADDRESS AS CUST_ADDRESS FROM `del_orderlist` o LEFT JOIN `del_customer` c ON o.CUSTOMERCODE = c.CODE $where ORDER BY o.DELDATE DESC, o.ID DESC";
+    $sql = "SELECT o.*, c.ADDRESS AS CUST_ADDRESS, c.HP AS CUST_PHONE FROM `del_orderlist` o LEFT JOIN `del_customer` c ON o.CUSTOMERCODE = c.CODE $where ORDER BY o.DELDATE DESC, o.ID DESC";
     $stmt = $connect->prepare($sql);
     $stmt->bind_param($types, ...$params);
     $stmt->execute();

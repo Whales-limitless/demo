@@ -162,6 +162,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <div><dt>Address</dt><dd><?php echo htmlspecialchars($viewOrder['CUST_ADDRESS'] ?? ''); ?></dd></div>
         <div><dt>Phone</dt><dd><?php echo htmlspecialchars($viewOrder['CUST_PHONE'] ?? ''); ?></dd></div>
         <div><dt>Location</dt><dd><?php echo htmlspecialchars($viewOrder['LOCATION'] ?? ''); ?></dd></div>
+        <div><dt>Purchase Date</dt><dd><?php echo !empty($viewOrder['CREATED_AT']) ? htmlspecialchars(date('Y-m-d', strtotime($viewOrder['CREATED_AT']))) : '-'; ?></dd></div>
         <?php if ($viewOrder['REMARK']): ?><div style="grid-column:1/-1"><dt>Remark</dt><dd><?php echo htmlspecialchars($viewOrder['REMARK']); ?></dd></div><?php endif; ?>
     </div>
     <div class="do-items">
