@@ -89,6 +89,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .inline-edit-select { padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; outline: none; background: #fff; max-width: 140px; width: 100%; }
 .inline-edit-select:focus { border-color: var(--primary); }
 
+/* Image preview modal */
+.image-preview-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center; cursor: pointer; }
+.image-preview-overlay.active { display: flex; }
+.image-preview-overlay img { max-width: 90vw; max-height: 90vh; border-radius: 12px; box-shadow: 0 8px 40px rgba(0,0,0,0.4); object-fit: contain; }
+.product-thumb[data-src] { cursor: pointer; transition: opacity 0.15s; }
+.product-thumb[data-src]:hover { opacity: 0.75; }
+
 /* Loading */
 .table-loading { text-align: center; padding: 40px; color: var(--text-muted); }
 .table-loading i { font-size: 24px; margin-bottom: 8px; display: block; }
@@ -246,6 +253,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
+<!-- Image Preview Overlay -->
+<div class="image-preview-overlay" id="imagePreviewOverlay" onclick="closeImagePreview();">
+    <img id="imagePreviewImg" src="" alt="Product Image">
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -267,6 +279,24 @@ document.addEventListener('DOMContentLoaded', function() {
     loadCategoryFilter();
     loadDropdowns();
     fetchProducts(1);
+});
+
+// ===================== IMAGE PREVIEW =====================
+
+function openImagePreview(img) {
+    var src = img.getAttribute('data-src');
+    if (!src) return;
+    document.getElementById('imagePreviewImg').src = src;
+    document.getElementById('imagePreviewOverlay').classList.add('active');
+}
+
+function closeImagePreview() {
+    document.getElementById('imagePreviewOverlay').classList.remove('active');
+    document.getElementById('imagePreviewImg').src = '';
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeImagePreview();
 });
 
 // ===================== FETCH & RENDER =====================
@@ -323,7 +353,7 @@ function renderTable(data) {
         html += '<td><input type="checkbox" class="bulk-check row-check" data-id="' + p.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRow(this);"></td>';
         html += '<td>' + (offset + i + 1) + '</td>';
         if (p.image) {
-            html += '<td><img src="../img/' + escHtml(p.image) + '" class="product-thumb" loading="lazy"></td>';
+            html += '<td><img src="../img/' + escHtml(p.image) + '" class="product-thumb" loading="lazy" data-src="../img/' + escHtml(p.image) + '" onclick="openImagePreview(this);"></td>';
         } else {
             html += '<td><div class="product-thumb-placeholder"><i class="fas fa-image"></i></div></td>';
         }
