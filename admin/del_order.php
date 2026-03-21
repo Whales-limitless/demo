@@ -222,9 +222,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="table-card">
     <div style="overflow-x:auto;">
         <table class="data-table">
-            <thead><tr><th style="width:40px">No</th><th>Del. Date</th><th>Order No</th><th>Driver</th><th>Customer</th><th>Address</th><th>Status</th><th style="width:1%">Action</th></tr></thead>
+            <thead><tr><th style="width:40px">No</th><th>Del. Date</th><th>Purchase Date</th><th>Order No</th><th>Driver</th><th>Customer</th><th>Address</th><th>Status</th><th style="width:1%">Action</th></tr></thead>
             <tbody id="dataBody">
-                <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+                <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
             </tbody>
         </table>
     </div>
@@ -429,11 +429,12 @@ function loadOrders() {
             if (data.error) return;
             var orders = data.orders || [];
             var tbody = document.getElementById('dataBody');
-            if (orders.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-file-invoice" style="font-size:24px;display:block;margin-bottom:8px;"></i>No orders found</td></tr>'; return; }
+            if (orders.length === 0) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-file-invoice" style="font-size:24px;display:block;margin-bottom:8px;"></i>No orders found</td></tr>'; return; }
             var statusMap = { '': 'Order', 'A': 'Assigned', 'D': 'Done', 'C': 'Completed' };
             var badgeMap = { '': 'badge-order', 'A': 'badge-assigned', 'D': 'badge-done', 'C': 'badge-completed' };
             tbody.innerHTML = orders.map(function(o, i) {
-                return '<tr><td>' + (i+1) + '</td><td>' + escHtml(o.DELDATE||'') + '</td><td><strong>' + escHtml(o.ORDNO||'') + '</strong></td><td>' + escHtml(o.DRIVER||'-') + '</td><td>' + escHtml(o.CUSTOMER||'') + '</td><td>' + escHtml(o.CUST_ADDRESS||'') + '</td><td><span class="badge-status ' + (badgeMap[o.STATUS]||'') + '">' + (statusMap[o.STATUS]||o.STATUS) + '</span></td><td style="white-space:nowrap"><button class="btn-action btn-edit" onclick="openEditModal(' + o.ID + ')"><i class="fas fa-pen"></i></button> <button class="btn-action btn-view" onclick="openViewModal(' + o.ID + ')"><i class="fas fa-eye"></i></button> <button class="btn-action btn-delete" onclick="deleteOrder(' + o.ID + ',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+                var purchaseDate = o.CREATED_AT ? o.CREATED_AT.substring(0, 10) : '-';
+                return '<tr><td>' + (i+1) + '</td><td>' + escHtml(o.DELDATE||'') + '</td><td>' + escHtml(purchaseDate) + '</td><td><strong>' + escHtml(o.ORDNO||'') + '</strong></td><td>' + escHtml(o.DRIVER||'-') + '</td><td>' + escHtml(o.CUSTOMER||'') + '</td><td>' + escHtml(o.CUST_ADDRESS||'') + '</td><td><span class="badge-status ' + (badgeMap[o.STATUS]||'') + '">' + (statusMap[o.STATUS]||o.STATUS) + '</span></td><td style="white-space:nowrap"><button class="btn-action btn-edit" onclick="openEditModal(' + o.ID + ')"><i class="fas fa-pen"></i></button> <button class="btn-action btn-view" onclick="openViewModal(' + o.ID + ')"><i class="fas fa-eye"></i></button> <button class="btn-action btn-delete" onclick="deleteOrder(' + o.ID + ',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas fa-trash"></i></button></td></tr>';
             }).join('');
         }
     });
