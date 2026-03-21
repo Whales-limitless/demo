@@ -292,6 +292,26 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         </div>
     </div>
 </div>
+<!-- View Order Modal -->
+<div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-eye"></i> <span id="viewTitle">Delivery Order</span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="viewModalBody" style="padding:0;">
+                <div style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="viewEditBtn"><i class="fas fa-pen"></i> Edit</button>
+                <button type="button" class="btn btn-info text-white" onclick="printViewModal();"><i class="fas fa-print"></i> Print</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php endif; ?>
 
 </div>
@@ -303,6 +323,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script>
 <?php if (!$viewOrder): ?>
 var modal = null;
+var viewModalEl = null;
 var orderItems = [];
 var locationData = <?php
     $locMap = [];
@@ -313,6 +334,7 @@ var locationData = <?php
 
 document.addEventListener('DOMContentLoaded', function() {
     modal = new bootstrap.Modal(document.getElementById('orderModal'));
+    viewModalEl = new bootstrap.Modal(document.getElementById('viewModal'));
     $('#fCustomer').select2({
         theme: 'bootstrap-5',
         placeholder: '-- Select Customer --',
@@ -411,7 +433,7 @@ function loadOrders() {
             var statusMap = { '': 'Order', 'A': 'Assigned', 'D': 'Done', 'C': 'Completed' };
             var badgeMap = { '': 'badge-order', 'A': 'badge-assigned', 'D': 'badge-done', 'C': 'badge-completed' };
             tbody.innerHTML = orders.map(function(o, i) {
-                return '<tr><td>' + (i+1) + '</td><td>' + escHtml(o.DELDATE||'') + '</td><td><strong>' + escHtml(o.ORDNO||'') + '</strong></td><td>' + escHtml(o.DRIVER||'-') + '</td><td>' + escHtml(o.CUSTOMER||'') + '</td><td>' + escHtml(o.CUST_ADDRESS||'') + '</td><td><span class="badge-status ' + (badgeMap[o.STATUS]||'') + '">' + (statusMap[o.STATUS]||o.STATUS) + '</span></td><td style="white-space:nowrap"><button class="btn-action btn-edit" onclick="openEditModal(' + o.ID + ')"><i class="fas fa-pen"></i></button> <button class="btn-action btn-view" onclick="window.open(\'del_order.php?view=' + o.ID + '\')"><i class="fas fa-eye"></i></button> <button class="btn-action btn-delete" onclick="deleteOrder(' + o.ID + ',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+                return '<tr><td>' + (i+1) + '</td><td>' + escHtml(o.DELDATE||'') + '</td><td><strong>' + escHtml(o.ORDNO||'') + '</strong></td><td>' + escHtml(o.DRIVER||'-') + '</td><td>' + escHtml(o.CUSTOMER||'') + '</td><td>' + escHtml(o.CUST_ADDRESS||'') + '</td><td><span class="badge-status ' + (badgeMap[o.STATUS]||'') + '">' + (statusMap[o.STATUS]||o.STATUS) + '</span></td><td style="white-space:nowrap"><button class="btn-action btn-edit" onclick="openEditModal(' + o.ID + ')"><i class="fas fa-pen"></i></button> <button class="btn-action btn-view" onclick="openViewModal(' + o.ID + ')"><i class="fas fa-eye"></i></button> <button class="btn-action btn-delete" onclick="deleteOrder(' + o.ID + ',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas fa-trash"></i></button></td></tr>';
             }).join('');
         }
     });
@@ -452,6 +474,70 @@ function deleteOrder(id, ordno) {
             }});
         }
     });
+}
+
+function openViewModal(id) {
+    var body = document.getElementById('viewModalBody');
+    body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+    viewModalEl.show();
+    $.ajax({
+        type: 'POST', url: 'del_order_ajax.php', dataType: 'json',
+        data: { action: 'get', id: id },
+        success: function(data) {
+            if (data.error) { body.innerHTML = '<div style="padding:20px;color:#dc2626;">' + escHtml(data.error) + '</div>'; return; }
+            var o = data.order;
+            var items = data.items || [];
+            var statusMap = { '': 'Order', 'A': 'Assigned', 'D': 'Done', 'C': 'Completed' };
+            var purchaseDate = o.CREATED_AT ? o.CREATED_AT.substring(0, 10) : '-';
+            var html = '<div style="padding:24px;">';
+            html += '<div style="text-align:center;margin-bottom:20px;"><h4 style="font-family:Outfit,sans-serif;font-weight:700;margin:0;">DELIVERY ORDER</h4><p style="color:var(--text-muted);font-size:13px;margin:4px 0 0;">Order No: <strong>' + escHtml(o.ORDNO||'') + '</strong></p></div>';
+            html += '<div class="do-info">';
+            html += '<div><dt>Delivery Date</dt><dd>' + escHtml(o.DELDATE||'') + '</dd></div>';
+            html += '<div><dt>Status</dt><dd>' + (statusMap[o.STATUS]||o.STATUS) + '</dd></div>';
+            html += '<div><dt>Customer</dt><dd>' + escHtml(o.CUSTOMER||'') + '</dd></div>';
+            html += '<div><dt>Driver</dt><dd>' + escHtml(o.DRIVER||'-') + '</dd></div>';
+            html += '<div><dt>Address</dt><dd>' + escHtml(o.CUST_ADDRESS||'') + '</dd></div>';
+            html += '<div><dt>Phone</dt><dd>' + escHtml(o.CUST_PHONE||'') + '</dd></div>';
+            html += '<div><dt>Location</dt><dd>' + escHtml(o.LOCATION||'') + '</dd></div>';
+            html += '<div><dt>Purchase Date</dt><dd>' + escHtml(purchaseDate) + '</dd></div>';
+            if (o.REMARK) { html += '<div style="grid-column:1/-1"><dt>Remark</dt><dd>' + escHtml(o.REMARK) + '</dd></div>'; }
+            html += '</div>';
+            html += '<h6 style="font-weight:700;margin-bottom:8px;">Order Items</h6>';
+            html += '<div class="do-items"><table><thead><tr><th>No</th><th>Description</th><th>Qty</th><th>UOM</th><th>Installation</th></tr></thead><tbody>';
+            if (items.length === 0) {
+                html += '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No items</td></tr>';
+            } else {
+                items.forEach(function(item, idx) {
+                    var installLabel = (item.INSTALL === 'Y') ? '<span style="color:#f59e0b;font-weight:600;"><i class="fas fa-tools"></i> Yes</span>' : '-';
+                    html += '<tr><td>' + (idx+1) + '</td><td>' + escHtml(item.PDESC||'') + '</td><td>' + escHtml(item.QTY||'') + '</td><td>' + escHtml(item.UOM||'') + '</td><td>' + installLabel + '</td></tr>';
+                });
+            }
+            html += '</tbody></table></div>';
+            if (data.hasSignature) {
+                var safeOrdno = (o.ORDNO||'').replace(/[\/\\:*?"<>|]/g, '_');
+                html += '<div style="margin-top:16px;"><h6 style="font-weight:700;margin-bottom:8px;">Customer Signature</h6>';
+                html += '<img src="../staff/uploads/signatures/' + encodeURIComponent(safeOrdno) + '.png" alt="Signature" style="max-width:300px;border:1px solid #e5e7eb;border-radius:8px;"></div>';
+            }
+            html += '</div>';
+            body.innerHTML = html;
+            // Wire up edit button
+            document.getElementById('viewEditBtn').onclick = function() { viewModalEl.hide(); openEditModal(id); };
+        }
+    });
+}
+
+function printViewModal() {
+    var content = document.getElementById('viewModalBody').innerHTML;
+    var w = window.open('', '_blank', 'width=800,height=600');
+    w.document.write('<html><head><title>Delivery Order</title>');
+    w.document.write('<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">');
+    w.document.write('<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">');
+    w.document.write('<style>body{font-family:"DM Sans",sans-serif;padding:20px;color:#1a1a1a;} .do-info{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;font-size:13px;} .do-info dt{font-weight:700;color:#6b7280;} .do-items table{width:100%;border-collapse:collapse;font-size:13px;} .do-items th,.do-items td{border:1px solid #e5e7eb;padding:8px 12px;text-align:left;} .do-items th{background:#f9fafb;font-weight:600;}</style>');
+    w.document.write('</head><body>');
+    w.document.write(content);
+    w.document.write('</body></html>');
+    w.document.close();
+    w.onload = function() { w.print(); };
 }
 
 renderItems();
