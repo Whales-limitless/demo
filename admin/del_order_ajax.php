@@ -137,7 +137,13 @@ if ($action === 'list') {
         $items = [];
         while ($row = $ir->fetch_assoc()) { $items[] = $row; }
         $istmt->close();
-        echo json_encode(['order' => $order, 'items' => $items]);
+        // Check signature
+        $sstmt = $connect->prepare("SELECT ID FROM `del_sign` WHERE `ORDNO` = ? LIMIT 1");
+        $sstmt->bind_param("s", $order['ORDNO']);
+        $sstmt->execute();
+        $hasSign = $sstmt->get_result()->num_rows > 0;
+        $sstmt->close();
+        echo json_encode(['order' => $order, 'items' => $items, 'hasSignature' => $hasSign]);
     } else {
         $stmt->close();
         echo json_encode(['error' => 'Order not found.']);
