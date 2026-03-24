@@ -223,7 +223,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                                 <th style="width:40px">#</th>
                                 <th>Product</th>
                                 <th>Barcode</th>
-                                <th style="width:60px">UOM</th>
+                                <th style="width:90px">UOM</th>
                                 <th style="width:140px">Qty</th>
                                 <th style="width:140px">QOH Impact</th>
                                 <th style="width:40px"></th>
