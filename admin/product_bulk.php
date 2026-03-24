@@ -92,7 +92,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 /* Image preview modal */
 .image-preview-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center; cursor: pointer; overflow: auto; padding: 24px; }
 .image-preview-overlay.active { display: flex; }
-.image-preview-overlay img { max-width: none; max-height: none; border-radius: 12px; box-shadow: 0 8px 40px rgba(0,0,0,0.4); }
+.image-preview-overlay img { max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: 12px; box-shadow: 0 8px 40px rgba(0,0,0,0.4); }
 .product-thumb[data-src] { cursor: pointer; transition: opacity 0.15s; }
 .product-thumb[data-src]:hover { opacity: 0.75; }
 
