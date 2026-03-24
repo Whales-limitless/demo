@@ -222,7 +222,7 @@ $currentPage = 'staff_po';
                                 <th style="width:40px">#</th>
                                 <th>Product</th>
                                 <th>Barcode</th>
-                                <th style="width:60px">UOM</th>
+                                <th style="width:90px">UOM</th>
                                 <th style="width:140px">Qty</th>
                                 <th style="width:140px">QOH Impact</th>
                                 <th style="width:40px"></th>
@@ -828,6 +828,7 @@ function viewPO(id) {
             }
             html += '</div>';
 
+            html += '<div style="overflow-x:auto;">';
             html += '<table class="line-items-table">';
             html += '<thead><tr><th>#</th><th>Product</th><th>Barcode</th><th>UOM</th><th>Ordered</th><th>Received</th></tr></thead>';
             html += '<tbody>';
@@ -843,6 +844,7 @@ function viewPO(id) {
             });
             html += '</tbody>';
             html += '</table>';
+            html += '</div>';
 
             document.getElementById('viewTitle').innerHTML = '<i class="fas fa-file-invoice"></i> ' + escHtml(po.po_number);
             document.getElementById('viewBody').innerHTML = html;
