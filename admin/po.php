@@ -92,7 +92,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .psm-load-more:hover { background: #e5e7eb; border-color: var(--primary); color: var(--primary); }
 
 /* Line items table */
-.line-items-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+.line-items-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; table-layout: fixed; }
 .line-items-table th { background: #f9fafb; padding: 8px 10px; font-weight: 600; font-size: 12px; text-align: left; border-bottom: 2px solid #e5e7eb; }
 .line-items-table td { padding: 6px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
 .line-items-table input { width: 100%; padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-family: 'DM Sans', sans-serif; }
@@ -100,7 +100,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-remove-line { background: #fee2e2; color: #dc2626; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 12px; }
 .btn-remove-line:hover { background: #fca5a5; }
 .li-uom-wrap { display: flex; gap: 4px; align-items: center; }
-.li-uom-select { padding: 5px 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; font-family: 'DM Sans', sans-serif; outline: none; min-width: 80px; }
+.li-uom-select { padding: 5px 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; font-family: 'DM Sans', sans-serif; outline: none; width: 100%; }
 .li-uom-select:focus { border-color: var(--primary); }
 .li-conv-indicator { font-size: 11px; line-height: 1.3; margin-top: 3px; padding: 2px 6px; border-radius: 4px; }
 .li-conv-indicator.converted { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
@@ -222,7 +222,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                                 <th style="width:40px">#</th>
                                 <th>Product</th>
                                 <th>Barcode</th>
-                                <th style="width:80px">UOM</th>
+                                <th style="width:60px">UOM</th>
                                 <th style="width:140px">Qty</th>
                                 <th style="width:140px">QOH Impact</th>
                                 <th style="width:40px"></th>
