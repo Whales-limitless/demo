@@ -838,6 +838,7 @@ function viewPO(id) {
             }
             html += '</div>';
 
+            html += '<div style="overflow-x:auto;">';
             html += '<table class="line-items-table">';
             html += '<thead><tr><th>#</th><th>Product</th><th>Barcode</th><th>UOM</th><th>Ordered</th><th>Received</th></tr></thead>';
             html += '<tbody>';
@@ -853,6 +854,7 @@ function viewPO(id) {
             });
             html += '</tbody>';
             html += '</table>';
+            html += '</div>';
 
             document.getElementById('viewTitle').innerHTML = '<i class="fas fa-file-invoice"></i> ' + escHtml(po.po_number);
             document.getElementById('viewBody').innerHTML = html;
