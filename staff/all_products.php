@@ -51,8 +51,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .product-search input { border: none; outline: none; padding: 10px 14px; font-family: 'DM Sans', sans-serif; font-size: 14px; width: 100%; color: var(--text); background: transparent; }
 .search-btn { background: var(--primary); border: none; padding: 0; width: 42px; height: 42px; cursor: pointer; color: #fff; display: grid; place-items: center; flex-shrink: 0; border-radius: 0 10px 10px 0; transition: background var(--transition); }
 .search-btn:hover { background: var(--primary-dark); }
-.barcode-search-btn { background: #1d4ed8; border-radius: 0 10px 10px 0; }
-.barcode-search-btn:hover { background: #1e3a8a; }
+.barcode-search-btn { background: #1f2937; border-radius: 0 10px 10px 0; }
+.barcode-search-btn:hover { background: #111827; }
 .search-btn + .barcode-search-btn { border-radius: 0; }
 .product-search .search-btn:not(.barcode-search-btn) { border-radius: 0; }
 .product-search .barcode-search-btn:last-child { border-radius: 0 10px 10px 0; }
@@ -180,7 +180,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .detail-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; align-items: center; justify-content: center; padding: 16px; }
 .detail-modal-overlay.active { display: flex; }
 .detail-modal { background: var(--surface); border-radius: var(--radius); width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); animation: fadeUp 0.25s ease; }
-.detail-modal-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; border-radius: var(--radius) var(--radius) 0 0; background: var(--bg); }
+.detail-modal-img { width: 100%; max-height: 60vh; object-fit: contain; display: block; border-radius: var(--radius) var(--radius) 0 0; background: #f3f4f6; }
 .detail-modal-noimg { width: 100%; aspect-ratio: 1; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 14px; font-weight: 600; border-radius: var(--radius) var(--radius) 0 0; }
 .detail-modal-body { padding: 20px; }
 .detail-modal-name { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
