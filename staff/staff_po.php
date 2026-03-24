@@ -221,8 +221,8 @@ $currentPage = 'staff_po';
                                 <th style="width:40px">#</th>
                                 <th>Product</th>
                                 <th>Barcode</th>
-                                <th style="width:120px">UOM</th>
-                                <th style="width:100px">Qty</th>
+                                <th style="width:80px">UOM</th>
+                                <th style="width:140px">Qty</th>
                                 <th style="width:140px">QOH Impact</th>
                                 <th style="width:40px"></th>
                             </tr>
@@ -258,7 +258,7 @@ $currentPage = 'staff_po';
 
 <!-- Product Search Modal (Bootstrap modal) -->
 <div class="modal fade" id="productSearchModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-search" style="color:var(--primary);margin-right:6px;"></i>Search Product</h5>
