@@ -97,8 +97,11 @@ if ('serviceWorker' in navigator) {
   <?php if ($navUserType === 'A' || $navUserType === 'S'): ?>
   <div class="nav-search" id="navSearch">
     <input type="text" placeholder="Search product name…" id="searchInput" autocomplete="off">
-    <button aria-label="Search">
+    <button aria-label="Search" id="navSearchBtn" title="Search by name">
       <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
+    <button aria-label="Search by barcode" id="navBarcodeBtn" class="barcode-btn" title="Search by barcode">
+      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="2" y1="4" x2="2" y2="20"/><line x1="6" y1="4" x2="6" y2="20"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="13" y1="4" x2="13" y2="20"/><line x1="16" y1="4" x2="16" y2="20"/><line x1="18" y1="4" x2="18" y2="20"/><line x1="22" y1="4" x2="22" y2="20"/></svg>
     </button>
   </div>
   <a href="cart.php" class="cart-btn" aria-label="Cart">
@@ -356,12 +359,25 @@ if ('serviceWorker' in navigator) {
     });
 
     // Search button click
-    var searchBtn = navSearch.querySelector('button');
+    var searchBtn = document.getElementById('navSearchBtn');
     if (searchBtn) {
       searchBtn.addEventListener('click', function(e) {
         e.preventDefault();
         dropdown.classList.remove('active');
         goToSearch(searchInput.value);
+      });
+    }
+
+    // Barcode search button click
+    var barcodeBtn = document.getElementById('navBarcodeBtn');
+    if (barcodeBtn) {
+      barcodeBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        dropdown.classList.remove('active');
+        var q = searchInput.value;
+        if (q && q.length >= 1) {
+          window.location.href = 'all_products.php?q=' + encodeURIComponent(q) + '&mode=barcode';
+        }
       });
     }
 

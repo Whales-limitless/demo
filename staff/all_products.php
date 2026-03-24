@@ -51,6 +51,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .product-search input { border: none; outline: none; padding: 10px 14px; font-family: 'DM Sans', sans-serif; font-size: 14px; width: 100%; color: var(--text); background: transparent; }
 .search-btn { background: var(--primary); border: none; padding: 0; width: 42px; height: 42px; cursor: pointer; color: #fff; display: grid; place-items: center; flex-shrink: 0; border-radius: 0 10px 10px 0; transition: background var(--transition); }
 .search-btn:hover { background: var(--primary-dark); }
+.barcode-search-btn { background: #1d4ed8; border-radius: 0 10px 10px 0; }
+.barcode-search-btn:hover { background: #1e3a8a; }
+.search-btn + .barcode-search-btn { border-radius: 0; }
+.product-search .search-btn:not(.barcode-search-btn) { border-radius: 0; }
+.product-search .barcode-search-btn:last-child { border-radius: 0 10px 10px 0; }
 
 .search-results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding: 12px 16px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
 .search-results-header h2 { font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700; }
@@ -203,8 +208,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="product-search">
       <svg class="search-icon" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" placeholder="Search all products…" id="productSearchInput">
-      <button class="search-btn" id="searchBtn" title="Search">
+      <button class="search-btn" id="searchBtn" title="Search by name">
         <svg style="width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+      <button class="search-btn barcode-search-btn" id="barcodeSearchBtn" title="Search by barcode">
+        <svg style="width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;"><line x1="2" y1="2" x2="2" y2="18"/><line x1="5" y1="2" x2="5" y2="18"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="12" y1="2" x2="12" y2="18"/><line x1="15" y1="2" x2="15" y2="18"/><line x1="17" y1="2" x2="17" y2="18"/></svg>
       </button>
     </div>
   </div>
@@ -459,6 +467,75 @@ function scoreProduct(p, q) {
   return score;
 }
 
+// Barcode-priority scoring: barcode matches ranked highest, then name as fallback
+function scoreBarcodeProduct(p, q) {
+  var ql = normalizeQuotes(q.toLowerCase());
+  var barcode = normalizeQuotes((p.barcode || '').toLowerCase());
+  var sku = normalizeQuotes((p.sku || '').toLowerCase());
+  var name = normalizeQuotes((p.name || '').toLowerCase());
+  var qlAlt = ql.replace(/"/g, "''");
+  var qlAlt2 = ql.replace(/''/g, '"');
+
+  var score = 0;
+
+  // Exact barcode match (highest priority)
+  if (barcode === ql || barcode === qlAlt || barcode === qlAlt2) score += 2000;
+  // Barcode starts with
+  if (barcode.indexOf(ql) === 0 || barcode.indexOf(qlAlt) === 0 || barcode.indexOf(qlAlt2) === 0) score += 1000;
+  // Barcode contains
+  if (barcode.indexOf(ql) !== -1 || barcode.indexOf(qlAlt) !== -1 || barcode.indexOf(qlAlt2) !== -1) score += 500;
+
+  // SKU exact match
+  if (sku === ql || sku === qlAlt || sku === qlAlt2) score += 400;
+  // SKU contains
+  if (sku.indexOf(ql) !== -1 || sku.indexOf(qlAlt) !== -1 || sku.indexOf(qlAlt2) !== -1) score += 200;
+
+  // Name match as fallback (lower priority)
+  if (name === ql || name === qlAlt || name === qlAlt2) score += 80;
+  if (name.indexOf(ql) !== -1 || name.indexOf(qlAlt) !== -1 || name.indexOf(qlAlt2) !== -1) score += 30;
+
+  return score;
+}
+
+function doBarcodeSearch(query) {
+  var q = query;
+  if (q.length === 0) {
+    clearSearch();
+    return;
+  }
+
+  isSearchMode = true;
+
+  var scored = [];
+  allProductsFlat.forEach(function(p) {
+    var s = scoreBarcodeProduct(p, q);
+    if (s > 0) scored.push({ product: p, score: s });
+  });
+
+  scored.sort(function(a, b) { return b.score - a.score; });
+
+  searchResults = scored;
+  searchRenderedCount = 0;
+
+  var sections = document.getElementById('productSections');
+  var matchCount = scored.length;
+
+  var headerHtml = '<div class="search-results-header">' +
+    '<h2>Barcode Search: "' + escHtml(q) + '" (' + matchCount + ' found)</h2>' +
+    '<button class="clear-search" onclick="clearSearch()">Clear Search</button>' +
+  '</div>';
+
+  if (matchCount === 0) {
+    sections.innerHTML = headerHtml + '<div style="text-align:center;padding:40px 0;color:var(--text-muted);font-size:14px;">No products found.</div>';
+    document.getElementById('loadSentinel').style.display = 'none';
+  } else {
+    sections.innerHTML = headerHtml + '<div class="product-grid" id="searchGrid"></div>';
+    loadNextSearchBatch();
+  }
+
+  document.getElementById('productTotal').textContent = matchCount + ' results';
+}
+
 function doRelevanceSearch(query) {
   var q = query;
   if (q.length === 0) {
@@ -679,11 +756,16 @@ function applyProductData(data) {
   initProductData(data.categories || []);
 
   var initialQuery = getUrlParam('q');
+  var initialMode = getUrlParam('mode');
   if (initialQuery) {
     document.getElementById('productSearchInput').value = initialQuery;
     var navInput = document.getElementById('searchInput');
     if (navInput) navInput.value = initialQuery;
-    doRelevanceSearch(initialQuery);
+    if (initialMode === 'barcode') {
+      doBarcodeSearch(initialQuery);
+    } else {
+      doRelevanceSearch(initialQuery);
+    }
   } else {
     loadNextBatch();
   }
@@ -759,6 +841,13 @@ document.getElementById('searchBtn').addEventListener('click', function() {
   if (!dataLoaded) return;
   var q = document.getElementById('productSearchInput').value;
   if (q.length > 0) doRelevanceSearch(q);
+});
+
+// Barcode search button click
+document.getElementById('barcodeSearchBtn').addEventListener('click', function() {
+  if (!dataLoaded) return;
+  var q = document.getElementById('productSearchInput').value;
+  if (q.length > 0) doBarcodeSearch(q);
 });
 
 // Enter key in search input
