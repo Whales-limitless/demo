@@ -52,8 +52,8 @@
 .nav-search button svg { width: 18px; height: 18px; }
 .nav-search button:hover { background: #7a0a1b; }
 
-.nav-search .barcode-btn { background: #1d4ed8; }
-.nav-search .barcode-btn:hover { background: #1e3a8a; }
+.nav-search .barcode-btn { background: #1f2937; }
+.nav-search .barcode-btn:hover { background: #111827; }
 
 .menu-btn {
   background: none;
