@@ -765,6 +765,9 @@ function selectProductFromCard(el) {
     var name = el.getAttribute('data-name');
     var uom = el.getAttribute('data-uom');
     addLineItem(barcode, name, uom, 1);
+
+    var Toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1500, timerProgressBar: true });
+    Toast.fire({ icon: 'success', title: 'Added: ' + name });
 }
 
 // ==================== SAVE PO ====================

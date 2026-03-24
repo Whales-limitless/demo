@@ -635,6 +635,9 @@ function selectProductFromCard(el) {
     var uom = el.getAttribute('data-uom');
     var rack = el.getAttribute('data-rack');
     addGRNLine(null, barcode, name, null, 1, rack, uom);
+
+    var Toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1500, timerProgressBar: true });
+    Toast.fire({ icon: 'success', title: 'Added: ' + name });
 }
 
 // ==================== SUBMIT RECEIVE ====================
