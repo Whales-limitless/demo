@@ -396,7 +396,7 @@ function patchProductData(freshData) {
 
     if (qtyChanged) {
       var qtyEl = card.querySelector('.qty-label');
-      if (qtyEl) qtyEl.innerHTML = 'Qty: <span>' + p.quantity + '</span>';
+      if (qtyEl) qtyEl.innerHTML = 'Qty: <span>' + p.available_qty + '</span>' + (p.pending_qty > 0 ? ' <span style="font-size:10px;color:var(--primary);font-weight:600;">(' + p.pending_qty + ' pending)</span>' : '');
     }
     if (nameChanged) {
       var nameEl = card.querySelector('.product-name');
@@ -653,7 +653,7 @@ function renderProductCard(p, index) {
     '<div class="product-info">' +
       '<div class="product-name" onclick="openEditNameModal(' + p.id + ')">' + escHtml(p.name) + '</div>' +
       '<div class="product-tags">' + tags + '</div>' +
-      '<div class="qty-label">Qty: <span>' + p.quantity + '</span></div>' +
+      '<div class="qty-label">Qty: <span>' + p.available_qty + '</span>' + (p.pending_qty > 0 ? ' <span style="font-size:10px;color:var(--primary);font-weight:600;">(' + p.pending_qty + ' pending)</span>' : '') + '</div>' +
       '<div class="product-actions">' +
         '<div class="qty-row">' +
           '<button class="qty-btn" onclick="updateQty(\'minus\',' + p.id + ')">−</button>' +
