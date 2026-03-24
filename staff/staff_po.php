@@ -720,7 +720,7 @@ function loadProducts(append) {
                 var qohClass = (p.qoh || 0) > 0 ? 'in' : 'out';
                 var imgHtml = p.image ? '<img class="psm-card-img" src="../img/' + escHtml(p.image) + '" alt="" loading="lazy">' :
                     '<div class="psm-card-noimg"><i class="fas fa-box"></i></div>';
-                html += '<div class="psm-card" onclick="selectProductFromModal(\'' + escHtml(p.barcode) + '\', \'' + escHtml(p.name).replace(/'/g, "\\'") + '\', \'' + escHtml(p.uom || '') + '\');">';
+                html += '<div class="psm-card" data-barcode="' + escHtml(p.barcode) + '" data-name="' + escHtml(p.name) + '" data-uom="' + escHtml(p.uom || '') + '" onclick="selectProductFromCard(this);">';
                 html += imgHtml;
                 html += '<div class="psm-card-name">' + escHtml(p.name) + '</div>';
                 html += '<div class="psm-card-meta">' + escHtml(p.barcode) + '</div>';
@@ -752,7 +752,10 @@ function loadProducts(append) {
     });
 }
 
-function selectProductFromModal(barcode, name, uom) {
+function selectProductFromCard(el) {
+    var barcode = el.getAttribute('data-barcode');
+    var name = el.getAttribute('data-name');
+    var uom = el.getAttribute('data-uom');
     addLineItem(barcode, name, uom, 1);
 }
 
