@@ -504,6 +504,132 @@ if ($action === 'stock_movement') {
     $stmt->close();
     echo json_encode(['rows' => $rows]);
 
+// ── Stock Take Report ──
+} elseif ($action === 'stock_take_report') {
+    $category = trim($_POST['category'] ?? '');
+    $subCategory = trim($_POST['sub_category'] ?? '');
+    $statusFilter = trim($_POST['status_filter'] ?? '');
+    $search = trim($_POST['search'] ?? '');
+
+    $collate = "COLLATE utf8mb4_unicode_ci";
+
+    // Get the latest SUBMITTED or APPROVED stock take per product
+    $sql = "SELECT
+                p.barcode,
+                p.name AS product_name,
+                CONCAT_WS(' > ', NULLIF(p.cat, ''), NULLIF(p.sub_cat, '')) AS category,
+                COALESCE(p.qoh, 0) AS current_qoh,
+                latest_st.last_stock_take,
+                latest_st.counted_qty,
+                latest_st.variance,
+                latest_st.session_code,
+                latest_st.counted_by,
+                CASE
+                    WHEN latest_st.last_stock_take IS NULL THEN NULL
+                    ELSE DATEDIFF(CURDATE(), latest_st.last_stock_take)
+                END AS days_ago
+            FROM `PRODUCTS` p
+            LEFT JOIN (
+                SELECT
+                    sti.barcode,
+                    sti.counted_qty,
+                    sti.variance,
+                    sti.counted_by,
+                    COALESCE(sti.counted_at, st.created_at) AS last_stock_take,
+                    st.session_code,
+                    ROW_NUMBER() OVER (PARTITION BY sti.barcode ORDER BY COALESCE(sti.counted_at, st.created_at) DESC) AS rn
+                FROM `stock_take_item` sti
+                INNER JOIN `stock_take` st ON st.id = sti.stock_take_id
+                WHERE st.status IN ('SUBMITTED', 'APPROVED')
+                  AND sti.status = 'COUNTED'
+            ) latest_st ON latest_st.barcode $collate = p.barcode $collate AND latest_st.rn = 1
+            WHERE p.checked = 'Y'";
+
+    $params = [];
+    $types = '';
+
+    if ($category !== '') {
+        $sql .= " AND p.cat = ?";
+        $params[] = $category;
+        $types .= 's';
+    }
+    if ($subCategory !== '') {
+        $sql .= " AND p.sub_cat = ?";
+        $params[] = $subCategory;
+        $types .= 's';
+    }
+    if ($search !== '') {
+        $sql .= " AND (p.barcode LIKE ? OR p.name LIKE ?)";
+        $searchParam = '%' . $search . '%';
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $types .= 'ss';
+    }
+    if ($statusFilter === 'never') {
+        $sql .= " AND latest_st.last_stock_take IS NULL";
+    } elseif ($statusFilter === 'taken') {
+        $sql .= " AND latest_st.last_stock_take IS NOT NULL";
+    } elseif ($statusFilter === 'overdue') {
+        $sql .= " AND (latest_st.last_stock_take IS NULL OR DATEDIFF(CURDATE(), latest_st.last_stock_take) > 30)";
+    }
+
+    $sql .= " ORDER BY latest_st.last_stock_take IS NULL DESC, latest_st.last_stock_take ASC, p.name ASC";
+
+    $rows = [];
+    $totalCount = 0;
+    $neverCount = 0;
+    $takenCount = 0;
+    $overdueCount = 0;
+
+    if (!empty($types)) {
+        $stmt = $connect->prepare($sql);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+    } else {
+        $result = $connect->query($sql);
+    }
+
+    if ($result) {
+        while ($r = $result->fetch_assoc()) {
+            $rows[] = $r;
+            $totalCount++;
+            if ($r['last_stock_take'] === null) {
+                $neverCount++;
+            } else {
+                $takenCount++;
+                if (intval($r['days_ago']) > 30) {
+                    $overdueCount++;
+                }
+            }
+        }
+    }
+    if (isset($stmt)) { $stmt->close(); }
+
+    echo json_encode([
+        'rows' => $rows,
+        'summary' => [
+            'total' => $totalCount,
+            'never' => $neverCount,
+            'taken' => $takenCount,
+            'overdue' => $overdueCount
+        ]
+    ]);
+
+// ── Stock Take Sub-Categories Helper ──
+} elseif ($action === 'stock_take_subcategories') {
+    $category = trim($_POST['category'] ?? '');
+    $subCats = [];
+    if ($category !== '') {
+        $stmt = $connect->prepare("SELECT DISTINCT `sub_cat` FROM `PRODUCTS` WHERE `checked` = 'Y' AND `cat` = ? AND `sub_cat` != '' ORDER BY `sub_cat` ASC");
+        $stmt->bind_param('s', $category);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($r = $result->fetch_assoc()) { $subCats[] = $r['sub_cat']; }
+        $stmt->close();
+    }
+    echo json_encode(['sub_categories' => $subCats]);
+
 } else {
     echo json_encode(['error' => 'Invalid action.']);
 }
