@@ -201,6 +201,7 @@ function renderTable(rows, summary) {
     html += '<th class="text-end">Counted Qty</th>';
     html += '<th class="text-end">Variance</th>';
     html += '<th>Session</th>';
+    html += '<th>Session Status</th>';
     html += '<th>Counted By</th>';
     html += '<th class="text-center">Days Ago</th>';
     html += '<th class="text-center">Status</th>';
@@ -231,6 +232,12 @@ function renderTable(rows, summary) {
         html += '<td class="text-end">' + (r.counted_qty !== null ? parseFloat(r.counted_qty).toFixed(2) : '-') + '</td>';
         html += '<td class="text-end ' + varianceClass + '">' + (r.variance !== null ? (variance > 0 ? '+' : '') + variance.toFixed(2) : '-') + '</td>';
         html += '<td><span style="font-size:11px;">' + escHtml(r.session_code || '-') + '</span></td>';
+        var sessStatus = r.session_status || '';
+        var sessBadge = '-';
+        if (sessStatus === 'APPROVED') sessBadge = '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">APPROVED</span>';
+        else if (sessStatus === 'SUBMITTED') sessBadge = '<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">SUBMITTED</span>';
+        else if (sessStatus === 'DRAFT') sessBadge = '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">DRAFT</span>';
+        html += '<td class="text-center">' + sessBadge + '</td>';
         html += '<td>' + escHtml(r.counted_by || '-') + '</td>';
         html += '<td class="text-center">' + daysAgo + '</td>';
         html += '<td class="text-center">' + statusBadge + '</td>';

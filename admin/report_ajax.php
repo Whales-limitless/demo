@@ -523,6 +523,7 @@ if ($action === 'stock_movement') {
                 latest_st.counted_qty,
                 latest_st.variance,
                 latest_st.session_code,
+                latest_st.session_status,
                 latest_st.counted_by,
                 CASE
                     WHEN latest_st.last_stock_take IS NULL THEN NULL
@@ -537,11 +538,12 @@ if ($action === 'stock_movement') {
                     sti.counted_by,
                     COALESCE(sti.counted_at, st.created_at) AS last_stock_take,
                     st.session_code,
+                    st.status AS session_status,
                     ROW_NUMBER() OVER (PARTITION BY sti.barcode ORDER BY COALESCE(sti.counted_at, st.created_at) DESC) AS rn
                 FROM `stock_take_item` sti
                 INNER JOIN `stock_take` st ON st.id = sti.stock_take_id
-                WHERE st.status IN ('SUBMITTED', 'APPROVED')
-                  AND sti.status = 'COUNTED'
+                WHERE st.status IN ('DRAFT', 'SUBMITTED', 'APPROVED')
+                  AND (sti.status = 'COUNTED' OR sti.counted_at IS NOT NULL)
             ) latest_st ON latest_st.barcode $collate = p.barcode $collate AND latest_st.rn = 1
             WHERE p.checked = 'Y'";
 
