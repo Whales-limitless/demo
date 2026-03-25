@@ -28,6 +28,7 @@ $sidebarSections = [
         ['page' => 'del_report',    'href' => 'del_report.php',    'icon' => 'fas fa-chart-bar',         'label' => 'Delivery Reports'],
     ],
     'REPORTS' => [
+        ['page' => 'report_stock_take',     'href' => 'report_stock_take.php',     'icon' => 'fas fa-clipboard-list', 'label' => 'Stock Take Report'],
         ['page' => 'report_stock_movement', 'href' => 'report_stock_movement.php', 'icon' => 'fas fa-exchange-alt',   'label' => 'Stock Movement'],
         ['page' => 'report_sales_date',     'href' => 'report_sales_date.php',     'icon' => 'fas fa-calendar-alt',   'label' => 'Sales by Date'],
         ['page' => 'report_sales_staff',    'href' => 'report_sales_staff.php',    'icon' => 'fas fa-user-tie',       'label' => 'Sales by Staff'],
