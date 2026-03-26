@@ -267,6 +267,40 @@ if ($action === 'list') {
         echo json_encode(['error' => 'Order not found.']);
     }
 
+} elseif ($action === 'images') {
+    $id = intval($_POST['id'] ?? 0);
+    if ($id <= 0) { echo json_encode(['error' => 'Invalid ID.']); exit; }
+
+    $stmt = $connect->prepare("SELECT IMG1, IMG2, IMG3, ORDNO FROM `del_orderlist` WHERE `ID` = ? LIMIT 1");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $ordno = $row['ORDNO'];
+
+        // Ensure INSTALL_IMG column exists
+        $connect->query("ALTER TABLE `del_orderlistdesc` ADD COLUMN `INSTALL_IMG` VARCHAR(200) NOT NULL DEFAULT '' AFTER `INSTALL`");
+
+        // Fetch installation photos
+        $instStmt = $connect->prepare("SELECT `PDESC`, `INSTALL_IMG` FROM `del_orderlistdesc` WHERE `ORDERNO` = ? AND `INSTALL` = 'Y' AND `INSTALL_IMG` != '' ORDER BY `PDESC` ASC");
+        $instStmt->bind_param("s", $ordno);
+        $instStmt->execute();
+        $instResult = $instStmt->get_result();
+        $installPhotos = [];
+        while ($ir = $instResult->fetch_assoc()) {
+            $installPhotos[] = ['PDESC' => $ir['PDESC'], 'INSTALL_IMG' => $ir['INSTALL_IMG']];
+        }
+        $instStmt->close();
+
+        $row['install_photos'] = $installPhotos;
+        unset($row['ORDNO']);
+        echo json_encode($row);
+    } else {
+        echo json_encode(['error' => 'Order not found.']);
+    }
+    $stmt->close();
+
 } else {
     echo json_encode(['error' => 'Invalid action.']);
 }

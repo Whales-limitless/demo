@@ -95,6 +95,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .badge-assigned { background: #e0e7ff; color: #4338ca; }
 .badge-done { background: #dcfce7; color: #16a34a; }
 .badge-completed { background: #f0fdf4; color: #166534; }
+
+/* Image modal */
+.img-modal-body img { max-width: 100%; border-radius: 8px; margin-bottom: 10px; }
+.install-photos-section { margin-top: 16px; padding-top: 16px; border-top: 2px dashed #f59e0b; }
+.install-photos-title { font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; color: #92400e; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.install-photos-title i { color: #f59e0b; }
+.install-photo-item { margin-bottom: 14px; }
+.install-photo-item .install-product-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; padding: 4px 10px; background: #fef3c7; border-radius: 6px; display: inline-block; }
+.install-photo-item img { max-width: 100%; border-radius: 8px; }
+.btn-img { background: #8b5cf6; } .btn-img:hover { background: #7c3aed; }
+
 .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
 .modal-header { border-bottom: 1px solid #e5e7eb; } .modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
 .modal-footer { border-top: 1px solid #e5e7eb; }
@@ -220,11 +231,18 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 </div>
 
 <div class="table-card">
+    <div class="table-toolbar">
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="Search order no, driver, customer, address..." oninput="filterTable()">
+        </div>
+        <span class="item-count" id="itemCount"></span>
+    </div>
     <div style="overflow-x:auto;">
         <table class="data-table">
-            <thead><tr><th style="width:40px">No</th><th>Del. Date</th><th>Purchase Date</th><th>Order No</th><th>Driver</th><th>Customer</th><th>Address</th><th>Status</th><th style="width:1%">Action</th></tr></thead>
+            <thead><tr><th style="width:40px">No</th><th>Del. Date</th><th>Purchase Date</th><th>Order No</th><th>Driver</th><th>Customer</th><th>Address</th><th>Photos</th><th>Status</th><th style="width:1%">Action</th></tr></thead>
             <tbody id="dataBody">
-                <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
             </tbody>
         </table>
     </div>
@@ -312,6 +330,19 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
+<!-- Image Modal -->
+<div class="modal fade" id="imgModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-images"></i> Delivery & Installation Photos</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body img-modal-body" id="imgModalBody"></div>
+        </div>
+    </div>
+</div>
+
 <?php endif; ?>
 
 </div>
@@ -324,7 +355,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <?php if (!$viewOrder): ?>
 var modal = null;
 var viewModalEl = null;
+var imgModalEl = null;
 var orderItems = [];
+var allOrders = [];
 var locationData = <?php
     $locMap = [];
     $lr = $connect->query("SELECT * FROM `del_location` ORDER BY `NAME` ASC");
@@ -335,6 +368,7 @@ var locationData = <?php
 document.addEventListener('DOMContentLoaded', function() {
     modal = new bootstrap.Modal(document.getElementById('orderModal'));
     viewModalEl = new bootstrap.Modal(document.getElementById('viewModal'));
+    imgModalEl = new bootstrap.Modal(document.getElementById('imgModal'));
     $('#fCustomer').select2({
         theme: 'bootstrap-5',
         placeholder: '-- Select Customer --',
@@ -427,15 +461,67 @@ function loadOrders() {
         data: { action: 'list', start_date: document.getElementById('filterStart').value, end_date: document.getElementById('filterEnd').value, status: document.getElementById('filterStatus').value },
         success: function(data) {
             if (data.error) return;
-            var orders = data.orders || [];
-            var tbody = document.getElementById('dataBody');
-            if (orders.length === 0) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-file-invoice" style="font-size:24px;display:block;margin-bottom:8px;"></i>No orders found</td></tr>'; return; }
-            var statusMap = { '': 'Order', 'A': 'Assigned', 'D': 'Done', 'C': 'Completed' };
-            var badgeMap = { '': 'badge-order', 'A': 'badge-assigned', 'D': 'badge-done', 'C': 'badge-completed' };
-            tbody.innerHTML = orders.map(function(o, i) {
-                var purchaseDate = o.CREATED_AT ? o.CREATED_AT.substring(0, 10) : '-';
-                return '<tr><td>' + (i+1) + '</td><td>' + escHtml(o.DELDATE||'') + '</td><td>' + escHtml(purchaseDate) + '</td><td><strong>' + escHtml(o.ORDNO||'') + '</strong></td><td>' + escHtml(o.DRIVER||'-') + '</td><td>' + escHtml(o.CUSTOMER||'') + '</td><td>' + escHtml(o.CUST_ADDRESS||'') + '</td><td><span class="badge-status ' + (badgeMap[o.STATUS]||'') + '">' + (statusMap[o.STATUS]||o.STATUS) + '</span></td><td style="white-space:nowrap"><button class="btn-action btn-edit" onclick="openEditModal(' + o.ID + ')"><i class="fas fa-pen"></i></button> <button class="btn-action btn-view" onclick="openViewModal(' + o.ID + ')"><i class="fas fa-eye"></i></button> <button class="btn-action btn-delete" onclick="deleteOrder(' + o.ID + ',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas fa-trash"></i></button></td></tr>';
-            }).join('');
+            allOrders = data.orders || [];
+            document.getElementById('searchInput').value = '';
+            renderOrders(allOrders);
+        }
+    });
+}
+
+function filterTable() {
+    var q = document.getElementById('searchInput').value.trim().toLowerCase();
+    if (q === '') { renderOrders(allOrders); return; }
+    var filtered = allOrders.filter(function(o) {
+        return (o.ORDNO||'').toLowerCase().indexOf(q) !== -1 ||
+               (o.DRIVER||'').toLowerCase().indexOf(q) !== -1 ||
+               (o.CUSTOMER||'').toLowerCase().indexOf(q) !== -1 ||
+               (o.CUST_ADDRESS||'').toLowerCase().indexOf(q) !== -1 ||
+               (o.DELDATE||'').indexOf(q) !== -1;
+    });
+    renderOrders(filtered);
+}
+
+function renderOrders(orders) {
+    var tbody = document.getElementById('dataBody');
+    if (orders.length === 0) { tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-file-invoice" style="font-size:24px;display:block;margin-bottom:8px;"></i>No orders found</td></tr>'; document.getElementById('itemCount').textContent = '0 orders'; return; }
+    var statusMap = { '': 'Order', 'A': 'Assigned', 'D': 'Done', 'C': 'Completed' };
+    var badgeMap = { '': 'badge-order', 'A': 'badge-assigned', 'D': 'badge-done', 'C': 'badge-completed' };
+    tbody.innerHTML = orders.map(function(o, i) {
+        var purchaseDate = o.CREATED_AT ? o.CREATED_AT.substring(0, 10) : '-';
+        var hasImg = o.IMG1 || o.IMG2 || o.IMG3;
+        var photoBtn = hasImg ? '<button class="btn-action btn-img" onclick="viewImages(' + o.ID + ')" title="View Photos"><i class="fas fa-camera"></i></button>' : '<span style="color:#d1d5db;font-size:12px;">-</span>';
+        return '<tr><td>' + (i+1) + '</td><td>' + escHtml(o.DELDATE||'') + '</td><td>' + escHtml(purchaseDate) + '</td><td><strong>' + escHtml(o.ORDNO||'') + '</strong></td><td>' + escHtml(o.DRIVER||'-') + '</td><td>' + escHtml(o.CUSTOMER||'') + '</td><td>' + escHtml(o.CUST_ADDRESS||'') + '</td><td style="text-align:center">' + photoBtn + '</td><td><span class="badge-status ' + (badgeMap[o.STATUS]||'') + '">' + (statusMap[o.STATUS]||o.STATUS) + '</span></td><td style="white-space:nowrap"><button class="btn-action btn-edit" onclick="openEditModal(' + o.ID + ')"><i class="fas fa-pen"></i></button> <button class="btn-action btn-view" onclick="openViewModal(' + o.ID + ')"><i class="fas fa-eye"></i></button> <button class="btn-action btn-delete" onclick="deleteOrder(' + o.ID + ',\'' + escHtml(o.ORDNO||'') + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+    }).join('');
+    document.getElementById('itemCount').textContent = orders.length + ' order' + (orders.length !== 1 ? 's' : '');
+}
+
+function viewImages(id) {
+    $.ajax({
+        type: 'POST', url: 'del_order_ajax.php', data: { action: 'images', id: id }, dataType: 'json',
+        success: function(data) {
+            if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
+            var html = '';
+            if (data.IMG1) html += '<img src="../staff/uploads/' + data.IMG1 + '" alt="Delivery Photo 1">';
+            if (data.IMG2) html += '<img src="../staff/uploads/' + data.IMG2 + '" alt="Delivery Photo 2">';
+            if (data.IMG3) html += '<img src="../staff/uploads/' + data.IMG3 + '" alt="Delivery Photo 3">';
+            if (!html) html = '<p class="text-muted text-center">No delivery photos uploaded.</p>';
+
+            // Installation photos
+            var instPhotos = data.install_photos || [];
+            if (instPhotos.length > 0) {
+                html += '<div class="install-photos-section">';
+                html += '<div class="install-photos-title"><i class="fas fa-tools"></i> Installation Photos</div>';
+                for (var i = 0; i < instPhotos.length; i++) {
+                    html += '<div class="install-photo-item">';
+                    html += '<div class="install-product-name">' + escHtml(instPhotos[i].PDESC) + '</div>';
+                    html += '<img src="../staff/uploads/' + instPhotos[i].INSTALL_IMG + '" alt="Installation - ' + escHtml(instPhotos[i].PDESC) + '">';
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
+
+            document.getElementById('imgModalBody').innerHTML = html;
+            imgModalEl.show();
         }
     });
 }
