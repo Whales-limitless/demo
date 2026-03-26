@@ -556,7 +556,7 @@ function addLineItem(barcode, desc, uom, qty) {
     function render() {
         var html = '<tr id="line_' + idx + '" data-base-uom="' + escHtml(uom || '') + '">';
         html += '<td>' + idx + '</td>';
-        html += '<td><div class="li-desc" style="word-break:break-word;font-size:0.95em;padding:4px 0;min-width:120px;">' + escHtml(desc) + '</div><input type="hidden" class="li-desc-val" value="' + escHtml(desc) + '"><input type="hidden" class="li-barcode" value="' + escHtml(barcode) + '"></td>';
+        html += '<td><div class="li-desc" style="word-break:break-word;font-size:0.95em;padding:4px 0;min-width:120px;cursor:pointer;border-bottom:1px dashed #999;" onclick="editLineDesc(this)" title="Click to edit product name">' + escHtml(desc) + '</div><input type="hidden" class="li-desc-val" value="' + escHtml(desc) + '"><input type="hidden" class="li-barcode" value="' + escHtml(barcode) + '"></td>';
         html += '<td><small class="text-muted">' + escHtml(barcode) + '</small></td>';
         html += '<td>' + buildUomSelect(idx, uom || '') + '</td>';
         html += '<td><input type="number" class="li-qty" value="' + (parseFloat(qty) || 1) + '" min="0" step="any" onchange="onLineQtyChange(' + idx + ');" oninput="onLineQtyChange(' + idx + ');"></td>';
@@ -571,6 +571,35 @@ function addLineItem(barcode, desc, uom, qty) {
     } else {
         render();
     }
+}
+
+function editLineDesc(divEl) {
+    var currentText = divEl.textContent.trim();
+    var td = divEl.parentElement;
+    var hiddenInput = td.querySelector('.li-desc-val');
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentText;
+    input.className = 'form-control form-control-sm';
+    input.style.cssText = 'font-size:0.95em;min-width:120px;';
+    divEl.style.display = 'none';
+    td.insertBefore(input, divEl.nextSibling);
+    input.focus();
+    input.select();
+
+    function finish() {
+        var newVal = input.value.trim();
+        if (newVal === '') newVal = currentText;
+        divEl.textContent = newVal;
+        hiddenInput.value = newVal;
+        divEl.style.display = '';
+        if (input.parentElement) input.remove();
+    }
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') { input.value = currentText; input.blur(); }
+    });
 }
 
 function removeLine(idx) {
