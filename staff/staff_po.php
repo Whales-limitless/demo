@@ -125,7 +125,7 @@ $currentPage = 'staff_po';
     .po-search-box { max-width: 100%; }
     .btn-action { padding: 4px 8px; font-size: 11px; }
 }
-.edit-name-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1060; justify-content: center; align-items: center; padding: 16px; }
+.edit-name-modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center; padding: 16px; }
 .edit-name-modal-overlay.active { display: flex; }
 .edit-name-modal { background: var(--surface); border-radius: var(--radius); padding: 24px; max-width: 400px; width: 100%; box-shadow: var(--shadow-lg); animation: fadeUp 0.25s ease; }
 .edit-name-modal h3 { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 16px; }
@@ -248,6 +248,18 @@ $currentPage = 'staff_po';
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-success w-50" onclick="savePO();"><i class="fas fa-check"></i> Save PO</button>
+            </div>
+            <!-- Edit Product Name overlay inside PO modal -->
+            <div class="edit-name-modal-overlay" id="poEditNameModalOverlay" onclick="if(event.target===this)closePoEditNameModal();">
+              <div class="edit-name-modal">
+                <h3>Edit Product Name</h3>
+                <label>Product Name</label>
+                <input type="text" id="poEditNameInput" placeholder="Enter product name..." onkeydown="if(event.key==='Enter'){event.preventDefault();savePoEditName();}">
+                <div class="edit-name-modal-actions">
+                  <button class="btn-cancel" onclick="closePoEditNameModal()">Cancel</button>
+                  <button class="btn-save" onclick="savePoEditName()">Save</button>
+                </div>
+              </div>
             </div>
         </div>
     </div>
@@ -1157,18 +1169,5 @@ function saveNewProduct() {
     });
 }
 </script>
-
-<div class="edit-name-modal-overlay" id="poEditNameModalOverlay" onclick="if(event.target===this)closePoEditNameModal();">
-  <div class="edit-name-modal">
-    <h3>Edit Product Name</h3>
-    <label>Product Name</label>
-    <input type="text" id="poEditNameInput" placeholder="Enter product name..." onkeydown="if(event.key==='Enter'){event.preventDefault();savePoEditName();}">
-    <div class="edit-name-modal-actions">
-      <button class="btn-cancel" onclick="closePoEditNameModal()">Cancel</button>
-      <button class="btn-save" onclick="savePoEditName()">Save</button>
-    </div>
-  </div>
-</div>
-
 </body>
 </html>
