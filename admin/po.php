@@ -126,6 +126,19 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     .search-box { max-width: 100%; }
     .btn-action { padding: 4px 8px; font-size: 11px; }
 }
+.edit-name-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; justify-content: center; align-items: center; padding: 16px; }
+.edit-name-modal-overlay.active { display: flex; }
+.edit-name-modal { background: var(--surface); border-radius: var(--radius); padding: 24px; max-width: 400px; width: 100%; box-shadow: var(--shadow-lg); animation: fadeUp 0.25s ease; }
+.edit-name-modal h3 { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+.edit-name-modal label { font-size: 13px; font-weight: 600; color: var(--text); display: block; margin-bottom: 6px; }
+.edit-name-modal input { width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; transition: border-color var(--transition); margin-bottom: 12px; box-sizing: border-box; }
+.edit-name-modal input:focus { border-color: var(--primary); }
+.edit-name-modal-actions { display: flex; gap: 8px; margin-top: 8px; }
+.edit-name-modal-actions button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; transition: all var(--transition); }
+.edit-name-modal-actions .btn-save { background: var(--primary); color: #fff; }
+.edit-name-modal-actions .btn-save:hover { background: var(--primary-dark); }
+.edit-name-modal-actions .btn-cancel { background: var(--bg); color: var(--text); }
+.edit-name-modal-actions .btn-cancel:hover { background: #e5e7eb; }
 </style>
 </head>
 <body>
@@ -573,33 +586,30 @@ function addLineItem(barcode, desc, uom, qty) {
     }
 }
 
-function editLineDesc(divEl) {
-    var currentText = divEl.textContent.trim();
-    var td = divEl.parentElement;
-    var hiddenInput = td.querySelector('.li-desc-val');
-    var input = document.createElement('input');
-    input.type = 'text';
-    input.value = currentText;
-    input.className = 'form-control form-control-sm';
-    input.style.cssText = 'font-size:0.95em;min-width:120px;';
-    divEl.style.display = 'none';
-    td.insertBefore(input, divEl.nextSibling);
-    input.focus();
-    input.select();
+var editNameTargetDiv = null;
 
-    function finish() {
-        var newVal = input.value.trim();
-        if (newVal === '') newVal = currentText;
-        divEl.textContent = newVal;
-        hiddenInput.value = newVal;
-        divEl.style.display = '';
-        if (input.parentElement) input.remove();
-    }
-    input.addEventListener('blur', finish);
-    input.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-        if (e.key === 'Escape') { input.value = currentText; input.blur(); }
-    });
+function editLineDesc(divEl) {
+    editNameTargetDiv = divEl;
+    document.getElementById('poEditNameInput').value = divEl.textContent.trim();
+    document.getElementById('poEditNameModalOverlay').classList.add('active');
+    document.getElementById('poEditNameInput').focus();
+    document.getElementById('poEditNameInput').select();
+}
+
+function closePoEditNameModal() {
+    document.getElementById('poEditNameModalOverlay').classList.remove('active');
+    editNameTargetDiv = null;
+}
+
+function savePoEditName() {
+    if (!editNameTargetDiv) return;
+    var val = document.getElementById('poEditNameInput').value.trim();
+    if (!val) { alert('Product name cannot be empty'); return; }
+    var td = editNameTargetDiv.parentElement;
+    var hiddenInput = td.querySelector('.li-desc-val');
+    editNameTargetDiv.textContent = val;
+    hiddenInput.value = val;
+    closePoEditNameModal();
 }
 
 function removeLine(idx) {
@@ -1239,5 +1249,18 @@ function saveNewProduct() {
     });
 }
 </script>
+
+<div class="edit-name-modal-overlay" id="poEditNameModalOverlay" onclick="if(event.target===this)closePoEditNameModal();">
+  <div class="edit-name-modal">
+    <h3>Edit Product Name</h3>
+    <label>Product Name</label>
+    <input type="text" id="poEditNameInput" placeholder="Enter product name..." onkeydown="if(event.key==='Enter'){event.preventDefault();savePoEditName();}">
+    <div class="edit-name-modal-actions">
+      <button class="btn-cancel" onclick="closePoEditNameModal()">Cancel</button>
+      <button class="btn-save" onclick="savePoEditName()">Save</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
