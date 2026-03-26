@@ -126,7 +126,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     .search-box { max-width: 100%; }
     .btn-action { padding: 4px 8px; font-size: 11px; }
 }
-.edit-name-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; justify-content: center; align-items: center; padding: 16px; }
+.edit-name-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1060; justify-content: center; align-items: center; padding: 16px; }
 .edit-name-modal-overlay.active { display: flex; }
 .edit-name-modal { background: var(--surface); border-radius: var(--radius); padding: 24px; max-width: 400px; width: 100%; box-shadow: var(--shadow-lg); animation: fadeUp 0.25s ease; }
 .edit-name-modal h3 { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 16px; }
