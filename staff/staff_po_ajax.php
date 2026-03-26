@@ -579,6 +579,23 @@ if ($action === 'search_products') {
     }
     $stmt->close();
 
+} else if ($action === 'update_product_name') {
+    $barcode = trim($_POST['barcode'] ?? '');
+    $name = trim($_POST['name'] ?? '');
+    if ($barcode === '') {
+        echo json_encode(['error' => 'Barcode is required']);
+        exit;
+    }
+    if ($name === '') {
+        echo json_encode(['error' => 'Product name cannot be empty']);
+        exit;
+    }
+    $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `name` = ? WHERE `barcode` = ?");
+    $stmt->bind_param("ss", $name, $barcode);
+    $stmt->execute();
+    $stmt->close();
+    echo json_encode(['success' => true, 'name' => $name]);
+
 } else {
     echo json_encode(['error' => 'Invalid action.']);
 }

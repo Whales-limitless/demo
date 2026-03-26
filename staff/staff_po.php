@@ -605,9 +605,34 @@ function savePoEditName() {
     if (!val) { alert('Product name cannot be empty'); return; }
     var td = editNameTargetDiv.parentElement;
     var hiddenInput = td.querySelector('.li-desc-val');
-    editNameTargetDiv.textContent = val;
-    hiddenInput.value = val;
-    closePoEditNameModal();
+    var barcode = td.querySelector('.li-barcode').value;
+    var btn = document.querySelector('#poEditNameModalOverlay .btn-save');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'staff_po_ajax.php', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            btn.disabled = false;
+            btn.textContent = 'Save';
+            if (xhr.status === 200) {
+                try {
+                    var resp = JSON.parse(xhr.responseText);
+                    if (resp.success) {
+                        editNameTargetDiv.textContent = resp.name;
+                        hiddenInput.value = resp.name;
+                        closePoEditNameModal();
+                    } else {
+                        alert('Failed: ' + (resp.error || 'Unknown error'));
+                    }
+                } catch(e) { alert('Failed to update product name'); }
+            } else {
+                alert('Failed to update product name');
+            }
+        }
+    };
+    xhr.send('action=update_product_name&barcode=' + encodeURIComponent(barcode) + '&name=' + encodeURIComponent(val));
 }
 
 function removeLine(idx) {
