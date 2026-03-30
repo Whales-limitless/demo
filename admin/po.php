@@ -278,6 +278,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-info text-white" id="viewPrintBtn" onclick="printCurrentPO();" style="margin-right:auto;"><i class="fas fa-print"></i> Print</button>
+                <button type="button" class="btn btn-danger text-white" onclick="downloadCurrentPDF();"><i class="fas fa-file-pdf"></i> Download PDF</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -385,6 +386,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 var poModal = null, viewModal = null, productSearchModal = null, newProductModal = null;
 var currentStatus = '';
@@ -1044,6 +1046,104 @@ function printPO(id) {
             printWin.document.close();
             printWin.focus();
             printWin.print();
+        }
+    });
+}
+
+// ==================== DOWNLOAD PDF ====================
+function downloadCurrentPDF() {
+    if (currentViewPOId) downloadPDF(currentViewPOId);
+}
+
+function downloadPDF(id) {
+    $.ajax({
+        type: 'POST', url: 'po_ajax.php', data: { action: 'get', id: id }, dataType: 'json',
+        success: function(data) {
+            if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
+            var po = data.po;
+            var items = data.items || [];
+
+            var container = document.createElement('div');
+            container.style.width = '210mm';
+            container.style.padding = '20mm';
+            container.style.fontFamily = 'Arial, Helvetica, sans-serif';
+            container.style.fontSize = '12px';
+            container.style.color = '#1a1a1a';
+
+            var html = '';
+            html += '<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1a1a1a;padding-bottom:12px;">';
+            html += '<div style="font-size:16px;font-weight:bold;margin-bottom:2px;">Parkway Departmental Store</div>';
+            html += '<h1 style="font-size:22px;margin:0 0 4px;">PURCHASE ORDER</h1>';
+            html += '<div style="font-size:16px;font-weight:bold;">' + escHtml(po.po_number) + '</div>';
+            html += '</div>';
+
+            var statusLower = (po.status || '').toLowerCase();
+            var statusColors = { draft: '#92400e', approved: '#1e40af', received: '#166534', partially_received: '#166534', cancelled: '#991b1b', closed: '#6b21a8' };
+            var statusBgs = { draft: '#fef3c7', approved: '#dbeafe', received: '#dcfce7', partially_received: '#dcfce7', cancelled: '#fee2e2', closed: '#f3e8ff' };
+
+            html += '<div style="display:flex;flex-wrap:wrap;margin-bottom:20px;">';
+            html += '<div style="width:50%;">';
+            html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Status:</span><span style="display:inline-block;padding:2px 10px;border-radius:4px;font-weight:bold;font-size:11px;text-transform:uppercase;background:' + (statusBgs[statusLower]||'#e5e7eb') + ';color:' + (statusColors[statusLower]||'#374151') + ';">' + escHtml(po.status) + '</span></div>';
+            html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Supplier:</span>' + escHtml(po.supplier_name || '-') + '</div>';
+            html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Order Date:</span>' + escHtml(po.order_date || '-') + '</div>';
+            html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Expected Date:</span>' + escHtml(po.expected_date || '-') + '</div>';
+            html += '</div>';
+            html += '<div style="width:50%;">';
+            html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Created By:</span>' + escHtml(po.created_by || '-') + '</div>';
+            if (po.approved_by) {
+                html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Approved By:</span>' + escHtml(po.approved_by) + '</div>';
+                html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Approved Date:</span>' + escHtml(po.approved_date || '-') + '</div>';
+            }
+            if (po.remark) {
+                html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Remark:</span>' + escHtml(po.remark) + '</div>';
+            }
+            html += '</div>';
+            html += '</div>';
+
+            html += '<table style="width:100%;border-collapse:collapse;margin-top:16px;">';
+            html += '<thead><tr>';
+            html += '<th style="background:#1a1a1a;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;">#</th>';
+            html += '<th style="background:#1a1a1a;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;">Product</th>';
+            html += '<th style="background:#1a1a1a;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;">Barcode</th>';
+            html += '<th style="background:#1a1a1a;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;">UOM</th>';
+            html += '<th style="background:#1a1a1a;color:#fff;padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase;">Ordered</th>';
+            html += '<th style="background:#1a1a1a;color:#fff;padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase;">Received</th>';
+            html += '</tr></thead>';
+            html += '<tbody>';
+            var totalOrdered = 0;
+            items.forEach(function(item, i) {
+                var ordered = parseFloat(item.qty_ordered || 0);
+                var received = parseFloat(item.qty_received || 0);
+                totalOrdered += ordered;
+                var bgColor = (i % 2 === 1) ? '#f9fafb' : '#fff';
+                html += '<tr style="background:' + bgColor + ';">';
+                html += '<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">' + (i + 1) + '</td>';
+                html += '<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">' + escHtml(item.product_desc) + '</td>';
+                html += '<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">' + escHtml(item.barcode) + '</td>';
+                html += '<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">' + escHtml(item.uom || '-') + '</td>';
+                html += '<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:right;">' + ordered.toFixed(2) + '</td>';
+                html += '<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:right;">' + received.toFixed(2) + '</td>';
+                html += '</tr>';
+            });
+            html += '<tr><td colspan="4" style="padding:7px 10px;font-weight:bold;border-top:2px solid #1a1a1a;text-align:right;">Total</td><td style="padding:7px 10px;font-weight:bold;border-top:2px solid #1a1a1a;text-align:right;">' + totalOrdered.toFixed(2) + '</td><td style="padding:7px 10px;border-top:2px solid #1a1a1a;"></td></tr>';
+            html += '</tbody></table>';
+
+            html += '<div style="margin-top:40px;display:flex;justify-content:space-between;">';
+            html += '<div style="width:200px;text-align:center;"><div style="border-top:1px solid #1a1a1a;margin-top:60px;padding-top:6px;font-size:11px;">Prepared By</div></div>';
+            html += '<div style="width:200px;text-align:center;"><div style="border-top:1px solid #1a1a1a;margin-top:60px;padding-top:6px;font-size:11px;">Approved By</div></div>';
+            html += '</div>';
+
+            container.innerHTML = html;
+
+            var opt = {
+                margin: 0,
+                filename: (po.po_number || 'PO') + '.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(container).save();
         }
     });
 }
