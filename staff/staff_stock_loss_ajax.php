@@ -211,6 +211,89 @@ if ($action === 'record_multiple') {
 
     echo json_encode(['success' => $deleted . ' record(s) deleted successfully.']);
 
+} elseif ($action === 'export_excel') {
+    require_once __DIR__ . '/SimpleXlsxWriter.php';
+
+    $type = $_POST['type'] ?? '';
+    $sessionId = trim($_POST['session_id'] ?? '');
+    $month = intval($_POST['month'] ?? 0);
+    $year = intval($_POST['year'] ?? 0);
+
+    $items = [];
+    $title = 'Stock Loss';
+
+    if ($type === 'session' && $sessionId !== '') {
+        $like = $sessionId . '%';
+        $stmt = $connect->prepare("SELECT `SDATE`, `STIME`, `PDESC`, `QTYADJ`, `LOSS_REASON`, `REMARK`, `USER`, `image_path` FROM `stockadj` WHERE `SALNUM` LIKE ? AND `LOSS_REASON` IS NOT NULL AND `LOSS_REASON` != 'ADJUSTMENT' ORDER BY `ID` ASC");
+        $stmt->bind_param("s", $like);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($r = $result->fetch_assoc()) $items[] = $r;
+        $stmt->close();
+        $title = 'StockLoss_' . $sessionId;
+    } elseif ($type === 'monthly' && $month >= 1 && $year >= 2000) {
+        $startDate = sprintf('%04d-%02d-01', $year, $month);
+        $endDate = date('Y-m-t', strtotime($startDate));
+        $stmt = $connect->prepare("SELECT `SDATE`, `STIME`, `PDESC`, `QTYADJ`, `LOSS_REASON`, `REMARK`, `USER`, `image_path` FROM `stockadj` WHERE `LOSS_REASON` IS NOT NULL AND `LOSS_REASON` != 'ADJUSTMENT' AND `SDATE` >= ? AND `SDATE` <= ? ORDER BY `SDATE` ASC, `ID` ASC");
+        $stmt->bind_param("ss", $startDate, $endDate);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($r = $result->fetch_assoc()) $items[] = $r;
+        $stmt->close();
+        $months = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+        $title = 'StockLoss_' . $months[$month] . '_' . $year;
+    }
+
+    if (empty($items)) {
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'No data to export.']);
+        exit;
+    }
+
+    $xlsx = new SimpleXlsxWriter();
+    $xlsx->setTitle('Stock Loss');
+    $xlsx->setColWidths([5, 12, 14, 35, 8, 14, 25, 15]);
+
+    $xlsx->addRow(['No', 'Date', 'Image', 'Description', 'Qty', 'Reason', 'Remark', 'Recorded By'], [2,2,2,2,2,2,2,2]);
+
+    $imgDir = __DIR__ . '/';
+    $totalQty = 0;
+    foreach ($items as $i => $item) {
+        $qty = abs(floatval($item['QTYADJ'] ?? 0));
+        $totalQty += $qty;
+        $xlsx->addRow([
+            $i + 1,
+            $item['SDATE'] ?? '',
+            '',
+            $item['PDESC'] ?? '',
+            $qty,
+            $item['LOSS_REASON'] ?? '',
+            $item['REMARK'] ?? '',
+            $item['USER'] ?? ''
+        ], [3,3,3,3,3,3,3,3]);
+
+        if (!empty($item['image_path'])) {
+            $imgPath = $imgDir . $item['image_path'];
+            $xlsx->addImage($i + 1, 2, $imgPath, 70, 60);
+        }
+    }
+
+    $xlsx->addRow(['', '', '', 'Total:', $totalQty, '', '', ''], [0,0,0,1,1,0,0,0]);
+
+    $tmpFile = $xlsx->generate();
+    if (!$tmpFile) {
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Failed to generate file.']);
+        exit;
+    }
+
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . $title . '.xlsx"');
+    header('Content-Length: ' . filesize($tmpFile));
+    readfile($tmpFile);
+    unlink($tmpFile);
+    exit;
+
 } elseif ($action === 'images_base64') {
     $paths = json_decode($_POST['paths'] ?? '[]', true);
     if (!is_array($paths)) { echo json_encode([]); exit; }

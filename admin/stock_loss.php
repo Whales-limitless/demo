@@ -777,19 +777,23 @@ function exportSessionPDF() {
     });
 }
 
-// ==================== EXPORT EXCEL ====================
+// ==================== EXPORT EXCEL (server-side xlsx) ====================
 function exportSessionExcel() {
-    if (!currentSessionItems || currentSessionItems.length === 0) return;
-    convertItemImages(currentSessionItems).then(function() {
-        var html = buildExportHtml(true);
-        if (!html) return;
-        downloadExcel(html, 'StockLoss_' + (currentSessionId || 'export') + '.xls');
-    });
+    if (!currentSessionId) return;
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'stock_loss_ajax.php';
+    form.target = '_blank';
+    form.innerHTML = '<input type="hidden" name="action" value="export_excel"><input type="hidden" name="type" value="session"><input type="hidden" name="session_id" value="' + escHtml(currentSessionId) + '">';
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
 }
 
 function downloadExcel(html, fname) {
+    // kept for compatibility but no longer used for main export
     var excelHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">';
-    excelHtml += '<head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Stock Loss</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>';
+    excelHtml += '<head><meta charset="utf-8"></head>';
     excelHtml += '<body>' + html + '</body></html>';
     var blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel' });
     var url = URL.createObjectURL(blob);
@@ -961,13 +965,15 @@ function exportMonthlyPDF() {
 }
 
 function exportMonthlyExcel() {
-    if (!monthlyData || !monthlyData.items || monthlyData.items.length === 0) return;
-    convertItemImages(monthlyData.items).then(function() {
-        var html = buildMonthlyExportHtml(true);
-        if (!html) return;
-        var fname = 'StockLoss_' + monthNames[monthlyData.month - 1] + '_' + monthlyData.year + '.xls';
-        downloadExcel(html, fname);
-    });
+    if (!monthlyData || !monthlyData.month || !monthlyData.year) return;
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'stock_loss_ajax.php';
+    form.target = '_blank';
+    form.innerHTML = '<input type="hidden" name="action" value="export_excel"><input type="hidden" name="type" value="monthly"><input type="hidden" name="month" value="' + monthlyData.month + '"><input type="hidden" name="year" value="' + monthlyData.year + '">';
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
 }
 </script>
 </body>
