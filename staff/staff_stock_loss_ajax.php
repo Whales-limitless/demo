@@ -269,28 +269,123 @@ if ($action === 'search' || $action === 'search_products') {
         echo json_encode(['error' => $e->getMessage()]);
     }
 
-} elseif ($action === 'recent') {
-    // Get recent stock losses recorded by this staff
-    $losses = [];
-    $stmt = $connect->prepare("SELECT `SDATE`, `BARCODE`, `PDESC`, `QTYADJ`, `LOSS_REASON`, `REMARK`, `USER` FROM `stockadj` WHERE `LOSS_REASON` IS NOT NULL AND `LOSS_REASON` != 'ADJUSTMENT' AND `USER` = ? ORDER BY `ID` DESC LIMIT 50");
-    $stmt->bind_param("s", $staffOutlet);
+} elseif ($action === 'recent' || $action === 'list_sessions') {
+    // Group stock loss records by session
+    $result = $connect->query("
+        SELECT SUBSTRING_INDEX(`SALNUM`, '_', 1) AS session_id,
+               MIN(`SDATE`) AS session_date,
+               MIN(`STIME`) AS session_time,
+               COUNT(*) AS item_count,
+               SUM(ABS(`QTYADJ`)) AS total_qty,
+               GROUP_CONCAT(DISTINCT `LOSS_REASON` ORDER BY `LOSS_REASON` SEPARATOR ',') AS reasons,
+               MIN(`USER`) AS recorded_by
+        FROM `stockadj`
+        WHERE `LOSS_REASON` IS NOT NULL AND `LOSS_REASON` != 'ADJUSTMENT'
+        GROUP BY SUBSTRING_INDEX(`SALNUM`, '_', 1)
+        ORDER BY MAX(`ID`) DESC
+        LIMIT 100
+    ");
+    $sessions = [];
+    if ($result) {
+        while ($r = $result->fetch_assoc()) {
+            $r['item_count'] = (int)$r['item_count'];
+            $r['total_qty'] = (float)$r['total_qty'];
+            $sessions[] = $r;
+        }
+    }
+    echo json_encode(['sessions' => $sessions]);
+
+} elseif ($action === 'session_detail') {
+    $sessionId = trim($_POST['session_id'] ?? '');
+    if ($sessionId === '') {
+        echo json_encode(['error' => 'Session ID required.']);
+        exit;
+    }
+    $like = $sessionId . '%';
+    $stmt = $connect->prepare("
+        SELECT s.`ID`, s.`SDATE`, s.`STIME`, s.`BARCODE`, s.`PDESC`, s.`QTYADJ`, s.`LOSS_REASON`, s.`REMARK`, s.`USER`, s.`image_path`,
+               p.`img1` AS product_image
+        FROM `stockadj` s
+        LEFT JOIN `PRODUCTS` p ON s.`BARCODE` = p.`barcode`
+        WHERE s.`SALNUM` LIKE ?
+          AND s.`LOSS_REASON` IS NOT NULL AND s.`LOSS_REASON` != 'ADJUSTMENT'
+        ORDER BY s.`ID` ASC
+    ");
+    $stmt->bind_param("s", $like);
     $stmt->execute();
     $result = $stmt->get_result();
+    $items = [];
     while ($r = $result->fetch_assoc()) {
-        $losses[] = $r;
+        $r['QTYADJ'] = (float)$r['QTYADJ'];
+        $items[] = $r;
+    }
+    $stmt->close();
+    echo json_encode(['items' => $items]);
+
+} elseif ($action === 'delete_session') {
+    $sessionId = trim($_POST['session_id'] ?? '');
+    if ($sessionId === '') {
+        echo json_encode(['error' => 'Session ID required.']);
+        exit;
+    }
+
+    $like = $sessionId . '%';
+
+    // Get all items in this session to revert QOH
+    $stmt = $connect->prepare("
+        SELECT `BARCODE`, `QTYADJ`, `image_path`
+        FROM `stockadj`
+        WHERE `SALNUM` LIKE ?
+          AND `LOSS_REASON` IS NOT NULL AND `LOSS_REASON` != 'ADJUSTMENT'
+    ");
+    $stmt->bind_param("s", $like);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $items = [];
+    while ($r = $result->fetch_assoc()) {
+        $items[] = $r;
     }
     $stmt->close();
 
-    // If no results for outlet, get all recent
-    if (empty($losses)) {
-        $result = $connect->query("SELECT `SDATE`, `BARCODE`, `PDESC`, `QTYADJ`, `LOSS_REASON`, `REMARK`, `USER` FROM `stockadj` WHERE `LOSS_REASON` IS NOT NULL AND `LOSS_REASON` != 'ADJUSTMENT' ORDER BY `ID` DESC LIMIT 50");
-        if ($result) {
-            while ($r = $result->fetch_assoc()) {
-                $losses[] = $r;
+    if (empty($items)) {
+        echo json_encode(['error' => 'Session not found.']);
+        exit;
+    }
+
+    $connect->begin_transaction();
+
+    try {
+        // Revert QOH for each item
+        foreach ($items as $item) {
+            $revertQty = abs((float)$item['QTYADJ']);
+            $qohStmt = $connect->prepare("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) + ? WHERE `barcode` = ?");
+            $qohStmt->bind_param("ds", $revertQty, $item['BARCODE']);
+            $qohStmt->execute();
+            $qohStmt->close();
+
+            // Delete image file if exists
+            if (!empty($item['image_path'])) {
+                $filePath = __DIR__ . '/' . $item['image_path'];
+                if (file_exists($filePath)) {
+                    @unlink($filePath);
+                }
             }
         }
+
+        // Delete all stockadj records for this session
+        $delStmt = $connect->prepare("DELETE FROM `stockadj` WHERE `SALNUM` LIKE ? AND `LOSS_REASON` IS NOT NULL AND `LOSS_REASON` != 'ADJUSTMENT'");
+        $delStmt->bind_param("s", $like);
+        $delStmt->execute();
+        $deleted = $delStmt->affected_rows;
+        $delStmt->close();
+
+        $connect->commit();
+        echo json_encode(['success' => $deleted . ' item(s) deleted and QOH reverted successfully.']);
+
+    } catch (Exception $e) {
+        $connect->rollback();
+        echo json_encode(['error' => $e->getMessage()]);
     }
-    echo json_encode($losses);
 
 } else {
     echo json_encode(['error' => 'Invalid action.']);
