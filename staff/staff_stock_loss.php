@@ -249,6 +249,12 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
         .no-records { text-align: center; color: var(--text-muted); font-size: 14px; padding: 30px 16px; }
         .loading-spinner { text-align: center; padding: 24px; color: var(--text-muted); font-size: 14px; }
+        .btn-export { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; font-family: 'DM Sans', sans-serif; }
+        .btn-export-pdf { background: #fee2e2; color: #dc2626; }
+        .btn-export-pdf:hover { background: #fca5a5; }
+        .btn-export-excel { background: #d1fae5; color: #059669; }
+        .btn-export-excel:hover { background: #a7f3d0; }
+        .modal-footer { border-top: 1px solid #e5e7eb; }
 
         /* Hidden file input */
         .hidden-input { display: none; }
@@ -318,9 +324,15 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             <div class="modal-body" id="sessionDetailBody">
                 <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-danger" id="btnDeleteSession" onclick="deleteCurrentSession();"><i class="fas fa-trash"></i> Delete Session</button>
+            <div class="modal-footer" style="justify-content:space-between;">
+                <div style="display:flex;gap:6px;">
+                    <button type="button" class="btn-export btn-export-pdf" onclick="exportSessionPDF();"><i class="fas fa-file-pdf"></i> PDF</button>
+                    <button type="button" class="btn-export btn-export-excel" onclick="exportSessionExcel();"><i class="fas fa-file-excel"></i> Excel</button>
+                </div>
+                <div style="display:flex;gap:6px;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-danger" id="btnDeleteSession" onclick="deleteCurrentSession();"><i class="fas fa-trash"></i> Delete</button>
+                </div>
             </div>
         </div>
     </div>
@@ -332,6 +344,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
     let lossItems = [];
     let itemIdCounter = 0;
@@ -342,6 +355,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
     var sessionDetailModal = null;
     var currentSessionId = null;
+    var currentSessionItems = [];
     document.addEventListener('DOMContentLoaded', function() {
         sessionDetailModal = new bootstrap.Modal(document.getElementById('sessionDetailModal'));
     });
@@ -692,6 +706,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             type: 'POST', url: 'staff_stock_loss_ajax.php', data: { action: 'session_detail', session_id: sessionId }, dataType: 'json',
             success: function(data) {
                 var items = data.items || [];
+                currentSessionItems = items;
                 if (items.length === 0) {
                     document.getElementById('sessionDetailBody').innerHTML = '<div class="loading-spinner">No items found.</div>';
                     return;
@@ -792,6 +807,87 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         renderList();
         loadRecent();
     });
+
+    // ===================== EXPORT PDF =====================
+    function buildExportHtml() {
+        if (!currentSessionItems || currentSessionItems.length === 0) return null;
+        var items = currentSessionItems;
+        var totalQty = 0;
+
+        var html = '<div style="font-family:Arial,sans-serif;padding:20px;max-width:800px;margin:0 auto;">';
+        html += '<h2 style="color:#C8102E;margin:0 0 4px;">Stock Loss Report</h2>';
+        html += '<p style="color:#6b7280;font-size:13px;margin:0 0 16px;">Session: ' + escapeHtml(currentSessionId) + ' &middot; ' + escapeHtml(items[0].SDATE || '') + ' ' + escapeHtml(items[0].STIME || '') + ' &middot; Recorded by: ' + escapeHtml(items[0].USER || '') + '</p>';
+        html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+        html += '<thead><tr style="background:#1a1a1a;color:#fff;">';
+        html += '<th style="padding:8px 10px;text-align:left;">No</th>';
+        html += '<th style="padding:8px 10px;text-align:left;">Image</th>';
+        html += '<th style="padding:8px 10px;text-align:left;">Description</th>';
+        html += '<th style="padding:8px 10px;text-align:center;">Qty</th>';
+        html += '<th style="padding:8px 10px;text-align:left;">Reason</th>';
+        html += '<th style="padding:8px 10px;text-align:left;">Remark</th>';
+        html += '</tr></thead><tbody>';
+
+        items.forEach(function(item, i) {
+            var qty = Math.abs(item.QTYADJ || 0);
+            totalQty += qty;
+            var imgTag = item.image_path
+                ? '<img src="' + escapeHtml(item.image_path) + '" style="width:60px;height:60px;object-fit:cover;border-radius:6px;">'
+                : '<div style="width:60px;height:60px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#d1d5db;font-size:10px;">No image</div>';
+
+            html += '<tr style="border-bottom:1px solid #e5e7eb;">';
+            html += '<td style="padding:8px 10px;">' + (i + 1) + '</td>';
+            html += '<td style="padding:8px 10px;">' + imgTag + '</td>';
+            html += '<td style="padding:8px 10px;font-weight:600;">' + escapeHtml(item.PDESC || '') + '</td>';
+            html += '<td style="padding:8px 10px;text-align:center;font-weight:700;">' + qty + '</td>';
+            html += '<td style="padding:8px 10px;">' + escapeHtml(item.LOSS_REASON || '') + '</td>';
+            html += '<td style="padding:8px 10px;">' + escapeHtml(item.REMARK || '') + '</td>';
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        html += '<div style="text-align:right;font-size:13px;font-weight:700;margin-top:12px;color:#C8102E;">' + items.length + ' item(s) &middot; Total Qty: ' + totalQty + '</div>';
+        html += '</div>';
+        return html;
+    }
+
+    function exportSessionPDF() {
+        var html = buildExportHtml();
+        if (!html) return;
+
+        var container = document.createElement('div');
+        container.innerHTML = html;
+        document.body.appendChild(container);
+
+        html2pdf().set({
+            margin: 10,
+            filename: 'StockLoss_' + (currentSessionId || 'export') + '.pdf',
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { scale: 2, useCORS: true, allowTaint: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(container).save().then(function() {
+            document.body.removeChild(container);
+        });
+    }
+
+    // ===================== EXPORT EXCEL =====================
+    function exportSessionExcel() {
+        var html = buildExportHtml();
+        if (!html) return;
+
+        var excelHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">';
+        excelHtml += '<head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Stock Loss</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>';
+        excelHtml += '<body>' + html + '</body></html>';
+
+        var blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'StockLoss_' + (currentSessionId || 'export') + '.xls';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 </script>
 
 </body>
