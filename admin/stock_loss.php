@@ -56,32 +56,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
 .modal-footer { border-top: 1px solid #e5e7eb; }
 
-/* Product search modal grid (same as PO) */
-.psm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-.psm-card { display: flex; flex-direction: column; align-items: center; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer; transition: all 0.15s; text-align: center; }
-.psm-card:hover { border-color: var(--primary); background: #fef2f2; box-shadow: 0 2px 8px rgba(200,16,46,0.1); }
-.psm-card.already-added { opacity: 0.5; }
-.psm-card-img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: #f3f4f6; margin-bottom: 8px; }
-.psm-card-noimg { width: 64px; height: 64px; border-radius: 8px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
-.psm-card-noimg i { font-size: 20px; color: #d1d5db; }
-.psm-card-name { font-weight: 600; font-size: 12px; line-height: 1.3; margin-bottom: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
-.psm-card-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
-.psm-card-qoh { font-size: 11px; font-weight: 700; }
-.psm-card-qoh.in { color: #16a34a; }
-.psm-card-qoh.out { color: #dc2626; }
-.psm-card-rack { font-size: 10px; color: var(--text-muted); }
-.psm-empty { text-align:center; padding:30px 20px; color:var(--text-muted); font-size:13px; }
-#psmResultsContainer { max-height: 450px; overflow-y: auto; }
-.psm-search-bar { display: flex; gap: 8px; flex-wrap: wrap; }
-.psm-search-bar input { flex: 1; min-width: 0; flex-basis: 100%; }
-@media (min-width: 576px) { .psm-search-bar input { flex-basis: auto; } }
-.psm-search-btn { background: var(--primary); color: #fff; border: none; padding: 8px 20px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.psm-search-btn:hover { background: var(--primary-dark); }
-.psm-result-count { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
-.psm-load-more { display: block; width: 100%; padding: 10px; margin-top: 12px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; text-align: center; transition: all 0.15s; }
-.psm-load-more:hover { background: #e5e7eb; border-color: var(--primary); color: var(--primary); }
-
-/* Record loss section - multi product */
+/* Record loss section - multi item */
 .record-section { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-md); padding: 20px; margin-bottom: 20px; }
 .record-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
 .record-section-title { font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700; }
@@ -148,7 +123,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             <span class="record-section-title">Record Stock Loss</span>
             <div style="display:flex;gap:8px;align-items:center;">
                 <span id="lossItemCount" style="font-size:13px;color:var(--text-muted);display:none;">0 items</span>
-                <button class="btn-add" onclick="openProductSearchModal();"><i class="fas fa-search"></i> Search Product</button>
+                <button class="btn-add" onclick="addItem();"><i class="fas fa-plus"></i> Add Item</button>
             </div>
         </div>
         <div id="lossListContainer">
@@ -202,29 +177,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
-<!-- Hidden file inputs for image upload -->
+<!-- Hidden file input for image upload -->
 <input type="file" id="fileInput" class="hidden-input" accept="image/*">
-
-<!-- Product Search Modal (same as PO) -->
-<div class="modal fade" id="productSearchModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-search" style="color:var(--primary);margin-right:6px;"></i>Search Product</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="psm-search-bar mb-3">
-                    <input type="text" class="form-control" id="psmSearchInput" placeholder="Enter product name or barcode..." autocomplete="off">
-                    <button type="button" class="psm-search-btn" onclick="doProductSearch();"><i class="fas fa-search"></i> Search</button>
-                </div>
-                <div id="psmResultsContainer">
-                    <div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Enter a search term and click Search</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Session Detail Modal -->
 <div class="modal fade" id="sessionDetailModal" tabindex="-1" aria-hidden="true">
@@ -249,7 +203,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-var productSearchModal = null;
 var lossItems = [];
 var itemIdCounter = 0;
 var activeImageItemId = null;
@@ -257,10 +210,8 @@ var fileInput = document.getElementById('fileInput');
 
 var sessionDetailModal = null;
 var currentSessionId = null;
-var allSessions = [];
 
 document.addEventListener('DOMContentLoaded', function() {
-    productSearchModal = new bootstrap.Modal(document.getElementById('productSearchModal'));
     sessionDetailModal = new bootstrap.Modal(document.getElementById('sessionDetailModal'));
     loadSessions();
 });
@@ -367,12 +318,9 @@ function viewSession(sessionId) {
                 var qty = Math.abs(item.QTYADJ || 0);
                 totalQty += qty;
 
-                // Determine image: loss image > product image > placeholder
                 var imgHtml;
                 if (item.image_path) {
                     imgHtml = '<img class="detail-item-img" src="../staff/' + escHtml(item.image_path) + '" alt="" loading="lazy">';
-                } else if (item.product_image) {
-                    imgHtml = '<img class="detail-item-img" src="../img/' + escHtml(item.product_image) + '" alt="" loading="lazy">';
                 } else {
                     imgHtml = '<div class="detail-item-noimg"><i class="fas fa-box"></i></div>';
                 }
@@ -381,7 +329,6 @@ function viewSession(sessionId) {
                 html += imgHtml;
                 html += '<div class="detail-item-info">';
                 html += '<div class="detail-item-name">' + escHtml(item.PDESC || '') + '</div>';
-                html += '<div class="detail-item-meta">Barcode: ' + escHtml(item.BARCODE || '') + '</div>';
                 html += '<div class="detail-item-fields">';
                 html += '<span><strong>Qty:</strong> ' + qty + '</span>';
                 html += '<span class="badge-reason badge-' + escHtml(item.LOSS_REASON || 'OTHER') + '">' + escHtml(item.LOSS_REASON || '') + '</span>';
@@ -415,7 +362,7 @@ function confirmDeleteSession(sessionId, itemCount, totalQty) {
     } else {
         msg += 'all items in this session';
     }
-    msg += ' and <strong>revert the QOH</strong> (add quantities back to stock).';
+    msg += '.';
 
     Swal.fire({
         title: 'Delete Stock Loss Session?',
@@ -424,7 +371,7 @@ function confirmDeleteSession(sessionId, itemCount, totalQty) {
         showCancelButton: true,
         confirmButtonColor: '#dc2626',
         cancelButtonColor: '#6b7280',
-        confirmButtonText: 'Yes, Delete & Revert QOH',
+        confirmButtonText: 'Yes, Delete',
         cancelButtonText: 'Cancel'
     }).then(function(result) {
         if (result.isConfirmed) {
@@ -446,131 +393,23 @@ function confirmDeleteSession(sessionId, itemCount, totalQty) {
     });
 }
 
-// ==================== PRODUCT SEARCH MODAL ====================
-var psmSearchXhr = null;
-var psmCurrentQuery = '';
-var psmCurrentOffset = 0;
-var psmTotal = 0;
-
-function openProductSearchModal() {
-    document.getElementById('psmSearchInput').value = '';
-    document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Enter a search term and click Search</div>';
-    productSearchModal.show();
-    setTimeout(function() { document.getElementById('psmSearchInput').focus(); }, 300);
-}
-
-document.getElementById('psmSearchInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); doProductSearch(); }
-});
-
-function doProductSearch() {
-    var q = document.getElementById('psmSearchInput').value;
-    if (q.length === 0) {
-        document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Please enter a search term</div>';
-        return;
-    }
-    psmCurrentQuery = q;
-    psmCurrentOffset = 0;
-    psmTotal = 0;
-    loadProducts(false);
-}
-
-function loadMoreProducts() {
-    loadProducts(true);
-}
-
-function loadProducts(append) {
-    if (psmSearchXhr) { psmSearchXhr.abort(); }
-    var container = document.getElementById('psmResultsContainer');
-    if (!append) {
-        container.innerHTML = '<div class="psm-empty"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
-    } else {
-        var btn = document.getElementById('psmLoadMoreBtn');
-        if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-    }
-
-    psmSearchXhr = $.ajax({
-        type: 'POST', url: 'stock_loss_ajax.php', data: { action: 'search_products', q: psmCurrentQuery, offset: psmCurrentOffset }, dataType: 'json',
-        success: function(data) {
-            psmSearchXhr = null;
-            var products = data.products || [];
-            psmTotal = data.total || 0;
-
-            if (!append && products.length === 0) {
-                container.innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>No products found for "' + escHtml(psmCurrentQuery) + '"</div>';
-                return;
-            }
-
-            var html = '';
-            products.forEach(function(p) {
-                var qohClass = (p.qoh || 0) > 0 ? 'in' : 'out';
-                var alreadyAdded = lossItems.some(function(item) { return item.barcode === p.barcode; });
-                var addedClass = alreadyAdded ? ' already-added' : '';
-                var imgHtml = p.image ? '<img class="psm-card-img" src="../img/' + escHtml(p.image) + '" alt="" loading="lazy">' :
-                    '<div class="psm-card-noimg"><i class="fas fa-box"></i></div>';
-                html += '<div class="psm-card' + addedClass + '" data-barcode="' + escHtml(p.barcode) + '" data-name="' + escHtml(p.name) + '" data-qoh="' + (p.qoh || 0) + '" onclick="selectProductFromCard(this);">';
-                html += imgHtml;
-                html += '<div class="psm-card-name">' + escHtml(p.name) + '</div>';
-                html += '<div class="psm-card-meta">' + escHtml(p.barcode) + '</div>';
-                if (p.rack) { html += '<div class="psm-card-rack"><i class="fas fa-map-marker-alt"></i> ' + escHtml(p.rack) + '</div>'; }
-                html += '<div class="psm-card-qoh ' + qohClass + '">QOH: ' + (p.qoh || 0) + '</div>';
-                html += '</div>';
-            });
-
-            psmCurrentOffset += products.length;
-            var loaded = psmCurrentOffset;
-            var hasMore = loaded < psmTotal;
-
-            if (append) {
-                var grid = container.querySelector('.psm-grid');
-                if (grid) grid.insertAdjacentHTML('beforeend', html);
-                var oldBtn = document.getElementById('psmLoadMoreBtn');
-                if (oldBtn) oldBtn.remove();
-                var countEl = container.querySelector('.psm-result-count');
-                if (countEl) countEl.textContent = 'Showing ' + loaded + ' of ' + psmTotal + ' products';
-            } else {
-                container.innerHTML = '<div class="psm-result-count">Showing ' + loaded + ' of ' + psmTotal + ' products</div><div class="psm-grid">' + html + '</div>';
-            }
-
-            if (hasMore) {
-                container.insertAdjacentHTML('beforeend', '<button class="psm-load-more" id="psmLoadMoreBtn" onclick="loadMoreProducts();">Load More (' + (psmTotal - loaded) + ' remaining)</button>');
-            }
-        },
-        error: function() { psmSearchXhr = null; }
-    });
-}
-
-function selectProductFromCard(el) {
-    var barcode = el.getAttribute('data-barcode');
-    var name = el.getAttribute('data-name');
-    var qoh = parseInt(el.getAttribute('data-qoh')) || 0;
-
-    if (lossItems.some(function(item) { return item.barcode === barcode; })) {
-        Swal.fire({ icon: 'info', title: 'Already Added', text: 'This product is already in the list.', confirmButtonColor: '#C8102E', timer: 1500, showConfirmButton: false });
-        return;
-    }
-
-    addProduct(barcode, name, qoh);
-    productSearchModal.hide();
-
-    var Toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1500, timerProgressBar: true });
-    Toast.fire({ icon: 'success', title: 'Added: ' + name });
-}
-
-// ==================== MULTI-PRODUCT LIST ====================
-function addProduct(barcode, name, qoh) {
+// ==================== MULTI-ITEM LIST ====================
+function addItem() {
     itemIdCounter++;
     lossItems.push({
         id: itemIdCounter,
-        barcode: barcode,
-        name: name,
-        qoh: qoh,
+        description: '',
         qty: 1,
         reason: '',
         remark: '',
         imageData: null
     });
     renderList();
+    // Focus the new description input
+    setTimeout(function() {
+        var input = document.getElementById('desc_' + itemIdCounter);
+        if (input) input.focus();
+    }, 50);
 }
 
 function removeItem(itemId) {
@@ -594,7 +433,7 @@ function renderList() {
     var submitArea = document.getElementById('submitArea');
 
     if (lossItems.length === 0) {
-        container.innerHTML = '<div class="empty-list" id="emptyState"><i class="fas fa-exclamation-triangle" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i><div>Search and add products above to record stock loss</div></div>';
+        container.innerHTML = '<div class="empty-list" id="emptyState"><i class="fas fa-exclamation-triangle" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i><div>Click "Add Item" above to record stock loss</div></div>';
         countEl.style.display = 'none';
         submitArea.style.display = 'none';
         return;
@@ -615,20 +454,20 @@ function renderList() {
             : '<button class="img-btn" onclick="uploadImage(' + item.id + ')"><i class="fas fa-upload"></i> Upload</button>';
 
         html += '<div class="loss-item" data-item-id="' + item.id + '">';
-        html += '  <div class="loss-item-header">';
-        html += '    <div class="loss-item-info">';
-        html += '      <div class="loss-item-name">' + escHtml(item.name) + '</div>';
-        html += '      <div class="loss-item-meta">' + escHtml(item.barcode) + ' &middot; QOH: ' + item.qoh + '</div>';
+        html += '  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">';
+        html += '    <div class="loss-field" style="flex:1;margin:0;">';
+        html += '      <label>Product Description <span style="color:var(--primary)">*</span></label>';
+        html += '      <input type="text" id="desc_' + item.id + '" value="' + escAttr(item.description) + '" onchange="updateItem(' + item.id + ', \'description\', this.value)" placeholder="Enter product description...">';
         html += '    </div>';
-        html += '    <button class="loss-item-remove" onclick="removeItem(' + item.id + ')" title="Remove"><i class="fas fa-times"></i></button>';
+        html += '    <button class="loss-item-remove" onclick="removeItem(' + item.id + ')" title="Remove" style="margin-top:18px;"><i class="fas fa-times"></i></button>';
         html += '  </div>';
         html += '  <div class="loss-item-fields">';
         html += '    <div class="loss-field">';
-        html += '      <label>Quantity</label>';
+        html += '      <label>Quantity <span style="color:var(--primary)">*</span></label>';
         html += '      <input type="number" min="1" value="' + item.qty + '" onchange="updateItem(' + item.id + ', \'qty\', this.value)" placeholder="1">';
         html += '    </div>';
         html += '    <div class="loss-field">';
-        html += '      <label>Reason</label>';
+        html += '      <label>Reason <span style="color:var(--primary)">*</span></label>';
         html += '      <select onchange="updateItem(' + item.id + ', \'reason\', this.value)">';
         html += '        <option value=""' + (item.reason === '' ? ' selected' : '') + '>-- Select --</option>';
         html += '        <option value="SPOILAGE"' + (item.reason === 'SPOILAGE' ? ' selected' : '') + '>Spoilage</option>';
@@ -703,12 +542,16 @@ function submitAllLosses() {
 
     for (var i = 0; i < lossItems.length; i++) {
         var item = lossItems[i];
+        if (!item.description || !item.description.trim()) {
+            Swal.fire({ icon: 'warning', title: 'Missing Description', text: 'Please enter a product description for item #' + (i + 1) + '.', confirmButtonColor: '#C8102E' });
+            return;
+        }
         if (!item.qty || item.qty < 1) {
-            Swal.fire({ icon: 'warning', title: 'Invalid Quantity', text: 'Please enter a valid quantity for "' + item.name + '".', confirmButtonColor: '#C8102E' });
+            Swal.fire({ icon: 'warning', title: 'Invalid Quantity', text: 'Please enter a valid quantity for "' + item.description + '".', confirmButtonColor: '#C8102E' });
             return;
         }
         if (!item.reason) {
-            Swal.fire({ icon: 'warning', title: 'Missing Reason', text: 'Please select a reason for "' + item.name + '".', confirmButtonColor: '#C8102E' });
+            Swal.fire({ icon: 'warning', title: 'Missing Reason', text: 'Please select a reason for "' + item.description + '".', confirmButtonColor: '#C8102E' });
             return;
         }
     }
@@ -718,7 +561,7 @@ function submitAllLosses() {
 
     Swal.fire({
         title: 'Confirm Stock Loss',
-        html: '<strong>' + totalItems + ' product(s)</strong> with a total of <strong>' + totalQty + ' unit(s)</strong> will be deducted from inventory.',
+        html: '<strong>' + totalItems + ' item(s)</strong> with a total of <strong>' + totalQty + ' unit(s)</strong> will be recorded.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#C8102E',
@@ -742,7 +585,7 @@ function doSubmit() {
 
     var itemsData = lossItems.map(function(item) {
         return {
-            barcode: item.barcode,
+            description: item.description,
             qty: item.qty,
             reason: item.reason,
             remark: item.remark
