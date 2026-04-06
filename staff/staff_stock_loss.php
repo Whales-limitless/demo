@@ -845,8 +845,54 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         loadRecent();
     });
 
+    // ===================== IMAGE TO BASE64 HELPER =====================
+    function imgToBase64(url) {
+        return new Promise(function(resolve) {
+            var img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = function() {
+                var canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/jpeg', 0.8));
+            };
+            img.onerror = function() { resolve(''); };
+            img.src = url;
+        });
+    }
+
+    function convertItemImages(items, imgPrefix) {
+        var promises = items.map(function(item) {
+            if (item.image_path) {
+                return imgToBase64(imgPrefix + item.image_path).then(function(b64) {
+                    item._base64 = b64;
+                });
+            } else {
+                item._base64 = '';
+                return Promise.resolve();
+            }
+        });
+        return Promise.all(promises);
+    }
+
+    function downloadExcel(html, fname) {
+        var excelHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">';
+        excelHtml += '<head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Stock Loss</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>';
+        excelHtml += '<body>' + html + '</body></html>';
+        var blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
     // ===================== EXPORT PDF =====================
-    function buildExportHtml() {
+    function buildExportHtml(useBase64) {
         if (!currentSessionItems || currentSessionItems.length === 0) return null;
         var items = currentSessionItems;
         var totalQty = 0;
@@ -867,9 +913,14 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         items.forEach(function(item, i) {
             var qty = Math.abs(item.QTYADJ || 0);
             totalQty += qty;
-            var imgTag = item.image_path
-                ? '<img src="' + escapeHtml(item.image_path) + '" style="width:60px;height:60px;object-fit:cover;border-radius:6px;">'
-                : '<div style="width:60px;height:60px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#d1d5db;font-size:10px;">No image</div>';
+            var imgTag;
+            if (useBase64 && item._base64) {
+                imgTag = '<img src="' + item._base64 + '" style="width:60px;height:60px;object-fit:cover;border-radius:6px;">';
+            } else if (item.image_path) {
+                imgTag = '<img src="' + escapeHtml(item.image_path) + '" style="width:60px;height:60px;object-fit:cover;border-radius:6px;">';
+            } else {
+                imgTag = '<div style="width:60px;height:60px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#d1d5db;font-size:10px;">No image</div>';
+            }
 
             html += '<tr style="border-bottom:1px solid #e5e7eb;">';
             html += '<td style="padding:8px 10px;">' + (i + 1) + '</td>';
@@ -888,7 +939,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     }
 
     function exportSessionPDF() {
-        var html = buildExportHtml();
+        var html = buildExportHtml(false);
         if (!html) return;
 
         var container = document.createElement('div');
@@ -908,22 +959,12 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
     // ===================== EXPORT EXCEL =====================
     function exportSessionExcel() {
-        var html = buildExportHtml();
-        if (!html) return;
-
-        var excelHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">';
-        excelHtml += '<head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Stock Loss</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>';
-        excelHtml += '<body>' + html + '</body></html>';
-
-        var blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'StockLoss_' + (currentSessionId || 'export') + '.xls';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        if (!currentSessionItems || currentSessionItems.length === 0) return;
+        convertItemImages(currentSessionItems, '').then(function() {
+            var html = buildExportHtml(true);
+            if (!html) return;
+            downloadExcel(html, 'StockLoss_' + (currentSessionId || 'export') + '.xls');
+        });
     }
 
     // ===================== MONTHLY REPORT =====================
@@ -1000,7 +1041,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         });
     }
 
-    function buildMonthlyExportHtml() {
+    function buildMonthlyExportHtml(useBase64) {
         if (!monthlyData || !monthlyData.items || monthlyData.items.length === 0) return null;
         var items = monthlyData.items;
         var month = monthlyData.month;
@@ -1035,9 +1076,14 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         items.forEach(function(item, i) {
             var qty = Math.abs(item.QTYADJ || 0);
             totalQty += qty;
-            var imgTag = item.image_path
-                ? '<img src="' + escapeHtml(item.image_path) + '" style="width:50px;height:50px;object-fit:cover;border-radius:4px;">'
-                : '<div style="width:50px;height:50px;background:#f3f4f6;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#d1d5db;font-size:9px;">No img</div>';
+            var imgTag;
+            if (useBase64 && item._base64) {
+                imgTag = '<img src="' + item._base64 + '" style="width:50px;height:50px;object-fit:cover;border-radius:4px;">';
+            } else if (item.image_path) {
+                imgTag = '<img src="' + escapeHtml(item.image_path) + '" style="width:50px;height:50px;object-fit:cover;border-radius:4px;">';
+            } else {
+                imgTag = '<div style="width:50px;height:50px;background:#f3f4f6;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#d1d5db;font-size:9px;">No img</div>';
+            }
 
             html += '<tr style="border-bottom:1px solid #e5e7eb;">';
             html += '<td style="padding:6px 8px;">' + (i + 1) + '</td>';
@@ -1058,7 +1104,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     }
 
     function exportMonthlyPDF() {
-        var html = buildMonthlyExportHtml();
+        var html = buildMonthlyExportHtml(false);
         if (!html) return;
 
         var container = document.createElement('div');
@@ -1078,23 +1124,13 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     }
 
     function exportMonthlyExcel() {
-        var html = buildMonthlyExportHtml();
-        if (!html) return;
-
-        var fname = 'StockLoss_' + monthNames[monthlyData.month - 1] + '_' + monthlyData.year + '.xls';
-        var excelHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">';
-        excelHtml += '<head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Stock Loss</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>';
-        excelHtml += '<body>' + html + '</body></html>';
-
-        var blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = fname;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        if (!monthlyData || !monthlyData.items || monthlyData.items.length === 0) return;
+        convertItemImages(monthlyData.items, '').then(function() {
+            var html = buildMonthlyExportHtml(true);
+            if (!html) return;
+            var fname = 'StockLoss_' + monthNames[monthlyData.month - 1] + '_' + monthlyData.year + '.xls';
+            downloadExcel(html, fname);
+        });
     }
 </script>
 
