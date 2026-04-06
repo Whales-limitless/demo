@@ -70,51 +70,17 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             max-width: 700px; margin: 0 auto; padding: 16px 16px 100px;
         }
 
-        /* Search Section */
-        .search-card {
+        /* Add Item Section */
+        .add-item-card {
             background: var(--surface); border-radius: 14px;
             box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
             padding: 16px; margin-bottom: 16px;
         }
-
-        .search-btn-trigger {
-            width: 100%; padding: 12px 14px; display: flex; align-items: center; gap: 10px;
-            font-family: 'DM Sans', sans-serif; font-size: 15px; color: #9ca3af;
-            background: var(--bg); border: 1.5px solid #e5e7eb; border-radius: 12px;
-            cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .search-btn-trigger:hover { border-color: var(--primary); }
-        .search-btn-trigger i { font-size: 16px; }
-
-        /* Product search modal grid (same as PO) */
-        .psm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-        @media (min-width: 576px) { .psm-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); } }
-        .psm-card { display: flex; flex-direction: column; align-items: center; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer; transition: all 0.15s; text-align: center; }
-        .psm-card:hover { border-color: var(--primary); background: #fef2f2; box-shadow: 0 2px 8px rgba(200,16,46,0.1); }
-        .psm-card.already-added { opacity: 0.5; }
-        .psm-card-img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: #f3f4f6; margin-bottom: 8px; }
-        .psm-card-noimg { width: 64px; height: 64px; border-radius: 8px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
-        .psm-card-noimg i { font-size: 20px; color: #d1d5db; }
-        .psm-card-name { font-weight: 600; font-size: 12px; line-height: 1.3; margin-bottom: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
-        .psm-card-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
-        .psm-card-qoh { font-size: 11px; font-weight: 700; }
-        .psm-card-qoh.in { color: #16a34a; }
-        .psm-card-qoh.out { color: #dc2626; }
-        .psm-card-rack { font-size: 10px; color: var(--text-muted); }
-        .psm-empty { text-align:center; padding:30px 20px; color:var(--text-muted); font-size:13px; }
-        #psmResultsContainer { max-height: 450px; overflow-y: auto; }
-        .psm-search-bar { display: flex; gap: 8px; flex-wrap: wrap; }
-        .psm-search-bar input { flex: 1; min-width: 0; flex-basis: 100%; }
-        @media (min-width: 576px) { .psm-search-bar input { flex-basis: auto; } }
-        .psm-search-btn { background: var(--primary); color: #fff; border: none; padding: 8px 20px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-        .psm-search-btn:hover { background: var(--primary-dark); }
-        .psm-result-count { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
-        .psm-load-more { display: block; width: 100%; padding: 10px; margin-top: 12px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; text-align: center; transition: all 0.15s; }
-        .psm-load-more:hover { background: #e5e7eb; border-color: var(--primary); color: var(--primary); }
-        .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
+        .modal-content { border-radius: 12px; border: none; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
         .modal-header { border-bottom: 1px solid #e5e7eb; }
         .modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
-        .btn-add { background: var(--primary); color: #fff; border: none; padding: 9px 20px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .modal-footer { border-top: 1px solid #e5e7eb; }
+        .btn-add { background: var(--primary); color: #fff; border: none; padding: 9px 20px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; width: 100%; justify-content: center; }
         .btn-add:hover { background: var(--primary-dark); }
 
         /* Product List */
@@ -308,11 +274,9 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 </header>
 
 <div class="main-content">
-    <!-- Search & Add Product -->
-    <div class="search-card">
-        <button type="button" class="search-btn-trigger" onclick="openProductSearchModal();">
-            <i class="fas fa-search"></i> Search product name to add...
-        </button>
+    <!-- Add Item -->
+    <div class="add-item-card">
+        <button type="button" class="btn-add" onclick="addItem();"><i class="fas fa-plus"></i> Add Item</button>
     </div>
 
     <!-- Product Loss List -->
@@ -324,7 +288,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         <div id="lossListContainer">
             <div class="empty-list" id="emptyState">
                 <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                <div>Search and add products above to record stock loss</div>
+                <div>Click "Add Item" above to record stock loss</div>
             </div>
         </div>
     </div>
@@ -362,27 +326,6 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     </div>
 </div>
 
-<!-- Product Search Modal (same as PO) -->
-<div class="modal fade" id="productSearchModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-search" style="color:var(--primary);margin-right:6px;"></i>Search Product</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="psm-search-bar mb-3">
-                    <input type="text" class="form-control" id="psmSearchInput" placeholder="Enter product name or barcode..." autocomplete="off">
-                    <button type="button" class="psm-search-btn" onclick="doProductSearch();"><i class="fas fa-search"></i> Search</button>
-                </div>
-                <div id="psmResultsContainer">
-                    <div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Enter a search term and click Search</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Hidden camera/file inputs -->
 <input type="file" id="cameraInput" class="hidden-input" accept="image/*" capture="environment">
 <input type="file" id="fileInput" class="hidden-input" accept="image/*">
@@ -390,149 +333,36 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    let lossItems = []; // Array of { id, barcode, name, qoh, qty, reason, remark, imageData }
+    let lossItems = [];
     let itemIdCounter = 0;
     let activeImageItemId = null;
 
     const cameraInput = document.getElementById('cameraInput');
     const fileInput = document.getElementById('fileInput');
 
-    var productSearchModal = null;
     var sessionDetailModal = null;
     var currentSessionId = null;
     document.addEventListener('DOMContentLoaded', function() {
-        productSearchModal = new bootstrap.Modal(document.getElementById('productSearchModal'));
         sessionDetailModal = new bootstrap.Modal(document.getElementById('sessionDetailModal'));
     });
 
-    // ===================== PRODUCT SEARCH MODAL (same as PO) =====================
-    var psmSearchXhr = null;
-    var psmCurrentQuery = '';
-    var psmCurrentOffset = 0;
-    var psmTotal = 0;
+    // ===================== ADD / REMOVE ITEMS =====================
 
-    function openProductSearchModal() {
-        document.getElementById('psmSearchInput').value = '';
-        document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Enter a search term and click Search</div>';
-        productSearchModal.show();
-        setTimeout(function() { document.getElementById('psmSearchInput').focus(); }, 300);
-    }
-
-    document.getElementById('psmSearchInput').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') { e.preventDefault(); doProductSearch(); }
-    });
-
-    function doProductSearch() {
-        var q = document.getElementById('psmSearchInput').value;
-        if (q.length === 0) {
-            document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Please enter a search term</div>';
-            return;
-        }
-        psmCurrentQuery = q;
-        psmCurrentOffset = 0;
-        psmTotal = 0;
-        loadProducts(false);
-    }
-
-    function loadMoreProducts() {
-        loadProducts(true);
-    }
-
-    function loadProducts(append) {
-        if (psmSearchXhr) { psmSearchXhr.abort(); }
-        var container = document.getElementById('psmResultsContainer');
-        if (!append) {
-            container.innerHTML = '<div class="psm-empty"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
-        } else {
-            var btn = document.getElementById('psmLoadMoreBtn');
-            if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-        }
-
-        psmSearchXhr = $.ajax({
-            type: 'POST', url: 'staff_stock_loss_ajax.php', data: { action: 'search_products', q: psmCurrentQuery, offset: psmCurrentOffset }, dataType: 'json',
-            success: function(data) {
-                psmSearchXhr = null;
-                var products = data.products || [];
-                psmTotal = data.total || 0;
-
-                if (!append && products.length === 0) {
-                    container.innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>No products found for "' + escapeHtml(psmCurrentQuery) + '"</div>';
-                    return;
-                }
-
-                var html = '';
-                products.forEach(function(p) {
-                    var qohClass = (p.qoh || 0) > 0 ? 'in' : 'out';
-                    var alreadyAdded = lossItems.some(function(item) { return item.barcode === p.barcode; });
-                    var addedClass = alreadyAdded ? ' already-added' : '';
-                    var imgHtml = p.image ? '<img class="psm-card-img" src="../img/' + escapeHtml(p.image) + '" alt="" loading="lazy">' :
-                        '<div class="psm-card-noimg"><i class="fas fa-box"></i></div>';
-                    html += '<div class="psm-card' + addedClass + '" data-barcode="' + escapeHtml(p.barcode) + '" data-name="' + escapeHtml(p.name) + '" data-qoh="' + (p.qoh || 0) + '" onclick="selectProductFromCard(this);">';
-                    html += imgHtml;
-                    html += '<div class="psm-card-name">' + escapeHtml(p.name) + '</div>';
-                    html += '<div class="psm-card-meta">' + escapeHtml(p.barcode) + '</div>';
-                    if (p.rack) { html += '<div class="psm-card-rack"><i class="fas fa-map-marker-alt"></i> ' + escapeHtml(p.rack) + '</div>'; }
-                    html += '<div class="psm-card-qoh ' + qohClass + '">QOH: ' + (p.qoh || 0) + '</div>';
-                    html += '</div>';
-                });
-
-                psmCurrentOffset += products.length;
-                var loaded = psmCurrentOffset;
-                var hasMore = loaded < psmTotal;
-
-                if (append) {
-                    var grid = container.querySelector('.psm-grid');
-                    if (grid) grid.insertAdjacentHTML('beforeend', html);
-                    var oldBtn = document.getElementById('psmLoadMoreBtn');
-                    if (oldBtn) oldBtn.remove();
-                    var countEl = container.querySelector('.psm-result-count');
-                    if (countEl) countEl.textContent = 'Showing ' + loaded + ' of ' + psmTotal + ' products';
-                } else {
-                    container.innerHTML = '<div class="psm-result-count">Showing ' + loaded + ' of ' + psmTotal + ' products</div><div class="psm-grid">' + html + '</div>';
-                }
-
-                if (hasMore) {
-                    container.insertAdjacentHTML('beforeend', '<button class="psm-load-more" id="psmLoadMoreBtn" onclick="loadMoreProducts();">Load More (' + (psmTotal - loaded) + ' remaining)</button>');
-                }
-            },
-            error: function() { psmSearchXhr = null; }
-        });
-    }
-
-    function selectProductFromCard(el) {
-        var barcode = el.getAttribute('data-barcode');
-        var name = el.getAttribute('data-name');
-        var qoh = parseInt(el.getAttribute('data-qoh')) || 0;
-
-        // Check if already added
-        if (lossItems.some(function(item) { return item.barcode === barcode; })) {
-            Swal.fire({ icon: 'info', title: 'Already Added', text: 'This product is already in the list.', confirmButtonColor: '#C8102E', timer: 1500, showConfirmButton: false });
-            return;
-        }
-
-        addProduct(barcode, name, qoh);
-        productSearchModal.hide();
-
-        var Toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1500, timerProgressBar: true });
-        Toast.fire({ icon: 'success', title: 'Added: ' + name });
-    }
-
-    // ===================== ADD / REMOVE PRODUCTS =====================
-
-    function addProduct(barcode, name, qoh) {
+    function addItem() {
         itemIdCounter++;
-        const item = {
+        lossItems.push({
             id: itemIdCounter,
-            barcode: barcode,
-            name: name,
-            qoh: qoh,
+            description: '',
             qty: 1,
             reason: '',
             remark: '',
             imageData: null
-        };
-        lossItems.push(item);
+        });
         renderList();
+        setTimeout(function() {
+            var input = document.getElementById('desc_' + itemIdCounter);
+            if (input) input.focus();
+        }, 50);
     }
 
     function removeItem(itemId) {
@@ -574,29 +404,29 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                   '<button class="img-btn" onclick="uploadImage(' + item.id + ')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload</button>';
 
             html += '<div class="loss-item" data-item-id="' + item.id + '">';
-            html += '  <div class="loss-item-header">';
-            html += '    <div class="loss-item-info">';
-            html += '      <div class="loss-item-name">' + escapeHtml(item.name) + '</div>';
-            html += '      <div class="loss-item-meta">' + escapeHtml(item.barcode) + ' &middot; QOH: ' + item.qoh + '</div>';
+            html += '  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">';
+            html += '    <div class="loss-field" style="flex:1;margin:0;">';
+            html += '      <label>Product Description *</label>';
+            html += '      <input type="text" id="desc_' + item.id + '" value="' + escapeAttr(item.description) + '" onchange="updateItem(' + item.id + ', \'description\', this.value)" placeholder="Enter product description...">';
             html += '    </div>';
-            html += '    <button class="loss-item-remove" onclick="removeItem(' + item.id + ')" title="Remove">';
+            html += '    <button class="loss-item-remove" onclick="removeItem(' + item.id + ')" title="Remove" style="margin-top:18px;">';
             html += '      <svg style="width:18px;height:18px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
             html += '    </button>';
             html += '  </div>';
             html += '  <div class="loss-item-fields">';
             html += '    <div class="loss-field">';
-            html += '      <label>Quantity</label>';
+            html += '      <label>Quantity *</label>';
             html += '      <input type="number" min="1" value="' + item.qty + '" onchange="updateItem(' + item.id + ', \'qty\', this.value)" placeholder="1">';
             html += '    </div>';
             html += '    <div class="loss-field">';
-            html += '      <label>Reason</label>';
+            html += '      <label>Reason *</label>';
             html += '      <select onchange="updateItem(' + item.id + ', \'reason\', this.value)">';
             html += '        <option value=""' + (item.reason === '' ? ' selected' : '') + '>-- Select --</option>';
-            html += '        <option value="Spoilage"' + (item.reason === 'Spoilage' ? ' selected' : '') + '>Spoilage</option>';
-            html += '        <option value="Damage"' + (item.reason === 'Damage' ? ' selected' : '') + '>Damage</option>';
-            html += '        <option value="Theft"' + (item.reason === 'Theft' ? ' selected' : '') + '>Theft</option>';
-            html += '        <option value="Expired"' + (item.reason === 'Expired' ? ' selected' : '') + '>Expired</option>';
-            html += '        <option value="Other"' + (item.reason === 'Other' ? ' selected' : '') + '>Other</option>';
+            html += '        <option value="SPOILAGE"' + (item.reason === 'SPOILAGE' ? ' selected' : '') + '>Spoilage</option>';
+            html += '        <option value="DAMAGE"' + (item.reason === 'DAMAGE' ? ' selected' : '') + '>Damage</option>';
+            html += '        <option value="THEFT"' + (item.reason === 'THEFT' ? ' selected' : '') + '>Theft</option>';
+            html += '        <option value="EXPIRED"' + (item.reason === 'EXPIRED' ? ' selected' : '') + '>Expired</option>';
+            html += '        <option value="OTHER"' + (item.reason === 'OTHER' ? ' selected' : '') + '>Other</option>';
             html += '      </select>';
             html += '    </div>';
             html += '    <div class="loss-field full-width">';
@@ -618,7 +448,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         const div = document.createElement('div');
         div.className = 'empty-list';
         div.id = 'emptyState';
-        div.innerHTML = '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><div>Search and add products above to record stock loss</div>';
+        div.innerHTML = '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><div>Click "Add Item" above to record stock loss</div>';
         return div;
     }
 
@@ -695,12 +525,16 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         // Validate all items
         for (let i = 0; i < lossItems.length; i++) {
             const item = lossItems[i];
+            if (!item.description || !item.description.trim()) {
+                Swal.fire({ icon: 'warning', title: 'Missing Description', text: 'Please enter a product description for item #' + (i + 1) + '.', confirmButtonColor: '#C8102E' });
+                return;
+            }
             if (!item.qty || item.qty < 1) {
-                Swal.fire({ icon: 'warning', title: 'Invalid Quantity', text: 'Please enter a valid quantity for "' + item.name + '".', confirmButtonColor: '#C8102E' });
+                Swal.fire({ icon: 'warning', title: 'Invalid Quantity', text: 'Please enter a valid quantity for "' + item.description + '".', confirmButtonColor: '#C8102E' });
                 return;
             }
             if (!item.reason) {
-                Swal.fire({ icon: 'warning', title: 'Missing Reason', text: 'Please select a reason for "' + item.name + '".', confirmButtonColor: '#C8102E' });
+                Swal.fire({ icon: 'warning', title: 'Missing Reason', text: 'Please select a reason for "' + item.description + '".', confirmButtonColor: '#C8102E' });
                 return;
             }
         }
@@ -710,7 +544,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
         Swal.fire({
             title: 'Confirm Stock Loss',
-            html: '<strong>' + totalItems + ' product(s)</strong> with a total of <strong>' + totalQty + ' unit(s)</strong> will be deducted from inventory.',
+            html: '<strong>' + totalItems + ' item(s)</strong> with a total of <strong>' + totalQty + ' unit(s)</strong> will be recorded.',
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#C8102E',
@@ -735,7 +569,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
         const itemsData = lossItems.map(function(item) {
             return {
-                barcode: item.barcode,
+                description: item.description,
                 qty: item.qty,
                 reason: item.reason.toUpperCase(),
                 remark: item.remark
@@ -873,8 +707,6 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                     var imgHtml;
                     if (item.image_path) {
                         imgHtml = '<img class="detail-item-img" src="' + escapeHtml(item.image_path) + '" alt="" loading="lazy">';
-                    } else if (item.product_image) {
-                        imgHtml = '<img class="detail-item-img" src="../img/' + escapeHtml(item.product_image) + '" alt="" loading="lazy">';
                     } else {
                         imgHtml = '<div class="detail-item-noimg"><i class="fas fa-box"></i></div>';
                     }
@@ -883,7 +715,6 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
                     html += imgHtml;
                     html += '<div class="detail-item-info">';
                     html += '<div class="detail-item-name">' + escapeHtml(item.PDESC || '') + '</div>';
-                    html += '<div class="detail-item-meta">Barcode: ' + escapeHtml(item.BARCODE || '') + '</div>';
                     html += '<div class="detail-item-fields">';
                     html += '<span><strong>Qty:</strong> ' + qty + '</span>';
                     html += '<span class="reason-badge ' + getReasonBadgeClass(item.LOSS_REASON || '') + '">' + escapeHtml(item.LOSS_REASON || '') + '</span>';
@@ -916,7 +747,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         } else {
             msg += 'all items in this session';
         }
-        msg += ' and <strong>revert the QOH</strong> (add quantities back to stock).';
+        msg += '.';
 
         Swal.fire({
             title: 'Delete Stock Loss Session?',
@@ -925,7 +756,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             showCancelButton: true,
             confirmButtonColor: '#dc2626',
             cancelButtonColor: '#6b7280',
-            confirmButtonText: 'Yes, Delete & Revert QOH',
+            confirmButtonText: 'Yes, Delete',
             cancelButtonText: 'Cancel'
         }).then(function(result) {
             if (result.isConfirmed) {
