@@ -15,6 +15,8 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="components.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root {
@@ -75,43 +77,45 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             padding: 16px; margin-bottom: 16px;
         }
 
-        .search-wrap { position: relative; }
-        .search-wrap .search-icon {
-            position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-            color: #9ca3af; pointer-events: none; width: 18px; height: 18px;
-        }
-        .search-wrap input {
-            width: 100%; padding: 12px 14px 12px 42px;
-            font-family: 'DM Sans', sans-serif; font-size: 15px; color: var(--text);
+        .search-btn-trigger {
+            width: 100%; padding: 12px 14px; display: flex; align-items: center; gap: 10px;
+            font-family: 'DM Sans', sans-serif; font-size: 15px; color: #9ca3af;
             background: var(--bg); border: 1.5px solid #e5e7eb; border-radius: 12px;
-            outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+            cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .search-wrap input:focus {
-            border-color: var(--primary); box-shadow: 0 0 0 3px rgba(200,16,46,0.1);
-        }
-        .search-wrap input::placeholder { color: #9ca3af; }
+        .search-btn-trigger:hover { border-color: var(--primary); }
+        .search-btn-trigger i { font-size: 16px; }
 
-        .search-dropdown {
-            display: none; position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px;
-            background: var(--surface); border: 1.5px solid #e5e7eb; border-radius: 12px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.12); z-index: 50; max-height: 280px;
-            overflow-y: auto; -webkit-overflow-scrolling: touch;
-        }
-        .search-dropdown.active { display: block; }
-
-        .dd-item {
-            display: flex; align-items: center; justify-content: space-between; gap: 10px;
-            padding: 10px 14px; cursor: pointer; transition: background 0.15s;
-            border-bottom: 1px solid #f3f4f6;
-        }
-        .dd-item:last-child { border-bottom: none; }
-        .dd-item:hover, .dd-item:focus { background: #f9fafb; }
-        .dd-item-info { flex: 1; min-width: 0; }
-        .dd-item-name { font-size: 14px; font-weight: 600; color: var(--text); }
-        .dd-item-name mark { background: #fef3c7; color: var(--text); border-radius: 2px; }
-        .dd-item-barcode { font-size: 11px; color: var(--text-muted); font-weight: 500; }
-        .dd-item-qoh { font-size: 11px; font-weight: 700; color: var(--primary); white-space: nowrap; }
-        .dd-msg { text-align: center; padding: 16px; color: var(--text-muted); font-size: 13px; }
+        /* Product search modal grid (same as PO) */
+        .psm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+        @media (min-width: 576px) { .psm-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); } }
+        .psm-card { display: flex; flex-direction: column; align-items: center; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer; transition: all 0.15s; text-align: center; }
+        .psm-card:hover { border-color: var(--primary); background: #fef2f2; box-shadow: 0 2px 8px rgba(200,16,46,0.1); }
+        .psm-card.already-added { opacity: 0.5; }
+        .psm-card-img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: #f3f4f6; margin-bottom: 8px; }
+        .psm-card-noimg { width: 64px; height: 64px; border-radius: 8px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+        .psm-card-noimg i { font-size: 20px; color: #d1d5db; }
+        .psm-card-name { font-weight: 600; font-size: 12px; line-height: 1.3; margin-bottom: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+        .psm-card-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+        .psm-card-qoh { font-size: 11px; font-weight: 700; }
+        .psm-card-qoh.in { color: #16a34a; }
+        .psm-card-qoh.out { color: #dc2626; }
+        .psm-card-rack { font-size: 10px; color: var(--text-muted); }
+        .psm-empty { text-align:center; padding:30px 20px; color:var(--text-muted); font-size:13px; }
+        #psmResultsContainer { max-height: 450px; overflow-y: auto; }
+        .psm-search-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+        .psm-search-bar input { flex: 1; min-width: 0; flex-basis: 100%; }
+        @media (min-width: 576px) { .psm-search-bar input { flex-basis: auto; } }
+        .psm-search-btn { background: var(--primary); color: #fff; border: none; padding: 8px 20px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+        .psm-search-btn:hover { background: var(--primary-dark); }
+        .psm-result-count { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+        .psm-load-more { display: block; width: 100%; padding: 10px; margin-top: 12px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; text-align: center; transition: all 0.15s; }
+        .psm-load-more:hover { background: #e5e7eb; border-color: var(--primary); color: var(--primary); }
+        .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
+        .modal-header { border-bottom: 1px solid #e5e7eb; }
+        .modal-header .modal-title { font-family: 'Outfit', sans-serif; font-weight: 700; }
+        .btn-add { background: var(--primary); color: #fff; border: none; padding: 9px 20px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-add:hover { background: var(--primary-dark); }
 
         /* Product List */
         .list-header {
@@ -290,11 +294,9 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 <div class="main-content">
     <!-- Search & Add Product -->
     <div class="search-card">
-        <div class="search-wrap">
-            <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="productSearch" placeholder="Search product name to add..." autocomplete="off">
-            <div class="search-dropdown" id="searchDropdown"></div>
-        </div>
+        <button type="button" class="search-btn-trigger" onclick="openProductSearchModal();">
+            <i class="fas fa-search"></i> Search product name to add...
+        </button>
     </div>
 
     <!-- Product Loss List -->
@@ -325,87 +327,161 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
 <?php include 'mobile-bottombar.php'; ?>
 
+<!-- Product Search Modal (same as PO) -->
+<div class="modal fade" id="productSearchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-search" style="color:var(--primary);margin-right:6px;"></i>Search Product</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="psm-search-bar mb-3">
+                    <input type="text" class="form-control" id="psmSearchInput" placeholder="Enter product name or barcode..." autocomplete="off">
+                    <button type="button" class="psm-search-btn" onclick="doProductSearch();"><i class="fas fa-search"></i> Search</button>
+                </div>
+                <div id="psmResultsContainer">
+                    <div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Enter a search term and click Search</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Hidden camera/file inputs -->
 <input type="file" id="cameraInput" class="hidden-input" accept="image/*" capture="environment">
 <input type="file" id="fileInput" class="hidden-input" accept="image/*">
 
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let lossItems = []; // Array of { id, barcode, name, qoh, qty, reason, remark, imageData }
     let itemIdCounter = 0;
-    let searchTimer = null;
     let activeImageItemId = null;
 
-    const searchInput = document.getElementById('productSearch');
-    const dropdown = document.getElementById('searchDropdown');
     const cameraInput = document.getElementById('cameraInput');
     const fileInput = document.getElementById('fileInput');
 
-    // ===================== PRODUCT SEARCH (name only) =====================
+    var productSearchModal = null;
+    document.addEventListener('DOMContentLoaded', function() {
+        productSearchModal = new bootstrap.Modal(document.getElementById('productSearchModal'));
+    });
 
-    function highlightMatch(text, query) {
-        if (!query) return escapeHtml(text);
-        var escaped = escapeHtml(text);
-        var re = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
-        return escaped.replace(re, '<mark>$1</mark>');
+    // ===================== PRODUCT SEARCH MODAL (same as PO) =====================
+    var psmSearchXhr = null;
+    var psmCurrentQuery = '';
+    var psmCurrentOffset = 0;
+    var psmTotal = 0;
+
+    function openProductSearchModal() {
+        document.getElementById('psmSearchInput').value = '';
+        document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Enter a search term and click Search</div>';
+        productSearchModal.show();
+        setTimeout(function() { document.getElementById('psmSearchInput').focus(); }, 300);
     }
 
-    searchInput.addEventListener('input', function() {
-        clearTimeout(searchTimer);
-        const q = this.value.trim();
+    document.getElementById('psmSearchInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); doProductSearch(); }
+    });
+
+    function doProductSearch() {
+        var q = document.getElementById('psmSearchInput').value;
         if (q.length === 0) {
-            dropdown.classList.remove('active');
+            document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Please enter a search term</div>';
             return;
         }
-        dropdown.innerHTML = '<div class="dd-msg">Searching...</div>';
-        dropdown.classList.add('active');
+        psmCurrentQuery = q;
+        psmCurrentOffset = 0;
+        psmTotal = 0;
+        loadProducts(false);
+    }
 
-        searchTimer = setTimeout(function() {
-            fetch('staff_stock_loss_ajax.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'action=search&q=' + encodeURIComponent(q)
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (!data || data.length === 0) {
-                    dropdown.innerHTML = '<div class="dd-msg">No products found</div>';
+    function loadMoreProducts() {
+        loadProducts(true);
+    }
+
+    function loadProducts(append) {
+        if (psmSearchXhr) { psmSearchXhr.abort(); }
+        var container = document.getElementById('psmResultsContainer');
+        if (!append) {
+            container.innerHTML = '<div class="psm-empty"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+        } else {
+            var btn = document.getElementById('psmLoadMoreBtn');
+            if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        }
+
+        psmSearchXhr = $.ajax({
+            type: 'POST', url: 'staff_stock_loss_ajax.php', data: { action: 'search_products', q: psmCurrentQuery, offset: psmCurrentOffset }, dataType: 'json',
+            success: function(data) {
+                psmSearchXhr = null;
+                var products = data.products || [];
+                psmTotal = data.total || 0;
+
+                if (!append && products.length === 0) {
+                    container.innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>No products found for "' + escapeHtml(psmCurrentQuery) + '"</div>';
                     return;
                 }
-                let html = '';
-                data.forEach(function(p) {
-                    const alreadyAdded = lossItems.some(item => item.barcode === p.barcode);
-                    const dimClass = alreadyAdded ? ' style="opacity:0.5;"' : '';
-                    html += '<div class="dd-item"' + dimClass + ' onclick="addProduct(\'' + escapeHtml(p.barcode).replace(/'/g, "&#39;") + '\', \'' + escapeHtml(p.name).replace(/'/g, "&#39;") + '\', ' + parseInt(p.qoh) + ')">';
-                    html += '<div class="dd-item-info">';
-                    html += '<div class="dd-item-name">' + highlightMatch(p.name, searchInput.value.trim()) + '</div>';
-                    html += '<div class="dd-item-barcode">' + escapeHtml(p.barcode) + '</div>';
-                    html += '</div>';
-                    html += '<div class="dd-item-qoh">QOH: ' + parseInt(p.qoh) + '</div>';
+
+                var html = '';
+                products.forEach(function(p) {
+                    var qohClass = (p.qoh || 0) > 0 ? 'in' : 'out';
+                    var alreadyAdded = lossItems.some(function(item) { return item.barcode === p.barcode; });
+                    var addedClass = alreadyAdded ? ' already-added' : '';
+                    var imgHtml = p.image ? '<img class="psm-card-img" src="../img/' + escapeHtml(p.image) + '" alt="" loading="lazy">' :
+                        '<div class="psm-card-noimg"><i class="fas fa-box"></i></div>';
+                    html += '<div class="psm-card' + addedClass + '" data-barcode="' + escapeHtml(p.barcode) + '" data-name="' + escapeHtml(p.name) + '" data-qoh="' + (p.qoh || 0) + '" onclick="selectProductFromCard(this);">';
+                    html += imgHtml;
+                    html += '<div class="psm-card-name">' + escapeHtml(p.name) + '</div>';
+                    html += '<div class="psm-card-meta">' + escapeHtml(p.barcode) + '</div>';
+                    if (p.rack) { html += '<div class="psm-card-rack"><i class="fas fa-map-marker-alt"></i> ' + escapeHtml(p.rack) + '</div>'; }
+                    html += '<div class="psm-card-qoh ' + qohClass + '">QOH: ' + (p.qoh || 0) + '</div>';
                     html += '</div>';
                 });
-                dropdown.innerHTML = html;
-            })
-            .catch(function() {
-                dropdown.innerHTML = '<div class="dd-msg">Search failed</div>';
-            });
-        }, 300);
-    });
 
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.search-wrap')) {
-            dropdown.classList.remove('active');
-        }
-    });
+                psmCurrentOffset += products.length;
+                var loaded = psmCurrentOffset;
+                var hasMore = loaded < psmTotal;
 
-    // ===================== ADD / REMOVE PRODUCTS =====================
+                if (append) {
+                    var grid = container.querySelector('.psm-grid');
+                    if (grid) grid.insertAdjacentHTML('beforeend', html);
+                    var oldBtn = document.getElementById('psmLoadMoreBtn');
+                    if (oldBtn) oldBtn.remove();
+                    var countEl = container.querySelector('.psm-result-count');
+                    if (countEl) countEl.textContent = 'Showing ' + loaded + ' of ' + psmTotal + ' products';
+                } else {
+                    container.innerHTML = '<div class="psm-result-count">Showing ' + loaded + ' of ' + psmTotal + ' products</div><div class="psm-grid">' + html + '</div>';
+                }
 
-    function addProduct(barcode, name, qoh) {
+                if (hasMore) {
+                    container.insertAdjacentHTML('beforeend', '<button class="psm-load-more" id="psmLoadMoreBtn" onclick="loadMoreProducts();">Load More (' + (psmTotal - loaded) + ' remaining)</button>');
+                }
+            },
+            error: function() { psmSearchXhr = null; }
+        });
+    }
+
+    function selectProductFromCard(el) {
+        var barcode = el.getAttribute('data-barcode');
+        var name = el.getAttribute('data-name');
+        var qoh = parseInt(el.getAttribute('data-qoh')) || 0;
+
         // Check if already added
-        if (lossItems.some(item => item.barcode === barcode)) {
+        if (lossItems.some(function(item) { return item.barcode === barcode; })) {
             Swal.fire({ icon: 'info', title: 'Already Added', text: 'This product is already in the list.', confirmButtonColor: '#C8102E', timer: 1500, showConfirmButton: false });
             return;
         }
 
+        addProduct(barcode, name, qoh);
+        productSearchModal.hide();
+
+        var Toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 1500, timerProgressBar: true });
+        Toast.fire({ icon: 'success', title: 'Added: ' + name });
+    }
+
+    // ===================== ADD / REMOVE PRODUCTS =====================
+
+    function addProduct(barcode, name, qoh) {
         itemIdCounter++;
         const item = {
             id: itemIdCounter,
@@ -418,11 +494,6 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
             imageData: null
         };
         lossItems.push(item);
-
-        dropdown.classList.remove('active');
-        searchInput.value = '';
-        searchInput.focus();
-
         renderList();
     }
 
