@@ -208,6 +208,24 @@ if ($action === 'record_multiple') {
 
     echo json_encode(['success' => $deleted . ' record(s) deleted successfully.']);
 
+} elseif ($action === 'images_base64') {
+    // Convert image paths to base64 for Excel export
+    $paths = json_decode($_POST['paths'] ?? '[]', true);
+    if (!is_array($paths)) { echo json_encode([]); exit; }
+
+    $result = [];
+    foreach ($paths as $path) {
+        $filePath = __DIR__ . '/../staff/' . $path;
+        if (!empty($path) && file_exists($filePath)) {
+            $mime = mime_content_type($filePath);
+            $data = base64_encode(file_get_contents($filePath));
+            $result[$path] = 'data:' . $mime . ';base64,' . $data;
+        } else {
+            $result[$path] = '';
+        }
+    }
+    echo json_encode($result);
+
 } elseif ($action === 'monthly_summary') {
     $month = intval($_POST['month'] ?? 0);
     $year = intval($_POST['year'] ?? 0);

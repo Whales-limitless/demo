@@ -845,35 +845,35 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         loadRecent();
     });
 
-    // ===================== IMAGE TO BASE64 HELPER =====================
-    function imgToBase64(url) {
-        return new Promise(function(resolve) {
-            var img = new Image();
-            img.crossOrigin = 'Anonymous';
-            img.onload = function() {
-                var canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                canvas.getContext('2d').drawImage(img, 0, 0);
-                resolve(canvas.toDataURL('image/jpeg', 0.8));
-            };
-            img.onerror = function() { resolve(''); };
-            img.src = url;
-        });
-    }
-
-    function convertItemImages(items, imgPrefix) {
-        var promises = items.map(function(item) {
-            if (item.image_path) {
-                return imgToBase64(imgPrefix + item.image_path).then(function(b64) {
-                    item._base64 = b64;
-                });
-            } else {
-                item._base64 = '';
-                return Promise.resolve();
+    // ===================== IMAGE TO BASE64 HELPER (server-side) =====================
+    function convertItemImages(items) {
+        var paths = [];
+        items.forEach(function(item) {
+            if (item.image_path && paths.indexOf(item.image_path) === -1) {
+                paths.push(item.image_path);
             }
         });
-        return Promise.all(promises);
+        if (paths.length === 0) {
+            items.forEach(function(item) { item._base64 = ''; });
+            return Promise.resolve();
+        }
+        return new Promise(function(resolve) {
+            $.ajax({
+                type: 'POST', url: 'staff_stock_loss_ajax.php',
+                data: { action: 'images_base64', paths: JSON.stringify(paths) },
+                dataType: 'json',
+                success: function(map) {
+                    items.forEach(function(item) {
+                        item._base64 = (item.image_path && map[item.image_path]) ? map[item.image_path] : '';
+                    });
+                    resolve();
+                },
+                error: function() {
+                    items.forEach(function(item) { item._base64 = ''; });
+                    resolve();
+                }
+            });
+        });
     }
 
     function downloadExcel(html, fname) {
@@ -960,7 +960,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     // ===================== EXPORT EXCEL =====================
     function exportSessionExcel() {
         if (!currentSessionItems || currentSessionItems.length === 0) return;
-        convertItemImages(currentSessionItems, '').then(function() {
+        convertItemImages(currentSessionItems).then(function() {
             var html = buildExportHtml(true);
             if (!html) return;
             downloadExcel(html, 'StockLoss_' + (currentSessionId || 'export') + '.xls');
@@ -1125,7 +1125,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
     function exportMonthlyExcel() {
         if (!monthlyData || !monthlyData.items || monthlyData.items.length === 0) return;
-        convertItemImages(monthlyData.items, '').then(function() {
+        convertItemImages(monthlyData.items).then(function() {
             var html = buildMonthlyExportHtml(true);
             if (!html) return;
             var fname = 'StockLoss_' + monthNames[monthlyData.month - 1] + '_' + monthlyData.year + '.xls';
