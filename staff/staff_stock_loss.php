@@ -300,7 +300,10 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     </div>
 
     <!-- Recent Losses -->
-    <div class="section-header" style="margin-top: 24px;">Recent Sessions</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:24px;margin-bottom:12px;padding:0 2px;">
+        <span class="section-header" style="margin:0;">Recent Sessions</span>
+        <button class="btn-export btn-export-pdf" onclick="openMonthlyExportModal();" style="padding:7px 14px;"><i class="fas fa-calendar-alt"></i> Monthly Report</button>
+    </div>
     <div id="recentContainer">
         <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading sessions...</div>
     </div>
@@ -312,6 +315,36 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 </div>
 
 <?php include 'mobile-bottombar.php'; ?>
+
+<!-- Monthly Report Modal -->
+<div class="modal fade" id="monthlyExportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-calendar-alt" style="color:var(--primary);margin-right:6px;"></i>Monthly Report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="form-label fw-semibold">Month</label>
+                        <select id="exportMonth" class="form-select"></select>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label fw-semibold">Year</label>
+                        <select id="exportYear" class="form-select"></select>
+                    </div>
+                </div>
+                <div id="monthlySummaryPreview" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-export btn-export-pdf" id="btnMonthlyPdf" onclick="exportMonthlyPDF();" disabled style="padding:8px 16px;"><i class="fas fa-file-pdf"></i> PDF</button>
+                <button type="button" class="btn-export btn-export-excel" id="btnMonthlyExcel" onclick="exportMonthlyExcel();" disabled style="padding:8px 16px;"><i class="fas fa-file-excel"></i> Excel</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Session Detail Modal -->
 <div class="modal fade" id="sessionDetailModal" tabindex="-1" aria-hidden="true">
@@ -354,10 +387,14 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     const fileInput = document.getElementById('fileInput');
 
     var sessionDetailModal = null;
+    var monthlyExportModal = null;
     var currentSessionId = null;
     var currentSessionItems = [];
+    var monthlyData = null;
     document.addEventListener('DOMContentLoaded', function() {
         sessionDetailModal = new bootstrap.Modal(document.getElementById('sessionDetailModal'));
+        monthlyExportModal = new bootstrap.Modal(document.getElementById('monthlyExportModal'));
+        initMonthYearSelects();
     });
 
     // ===================== ADD / REMOVE ITEMS =====================
@@ -883,6 +920,177 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         var a = document.createElement('a');
         a.href = url;
         a.download = 'StockLoss_' + (currentSessionId || 'export') + '.xls';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // ===================== MONTHLY REPORT =====================
+    var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+    function initMonthYearSelects() {
+        var now = new Date();
+        var monthSel = document.getElementById('exportMonth');
+        var yearSel = document.getElementById('exportYear');
+        for (var m = 1; m <= 12; m++) {
+            var opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = monthNames[m - 1];
+            if (m === now.getMonth() + 1) opt.selected = true;
+            monthSel.appendChild(opt);
+        }
+        for (var y = now.getFullYear(); y >= now.getFullYear() - 5; y--) {
+            var opt = document.createElement('option');
+            opt.value = y;
+            opt.textContent = y;
+            yearSel.appendChild(opt);
+        }
+        monthSel.addEventListener('change', loadMonthlySummary);
+        yearSel.addEventListener('change', loadMonthlySummary);
+    }
+
+    function openMonthlyExportModal() {
+        monthlyData = null;
+        document.getElementById('monthlySummaryPreview').style.display = 'none';
+        document.getElementById('btnMonthlyPdf').disabled = true;
+        document.getElementById('btnMonthlyExcel').disabled = true;
+        monthlyExportModal.show();
+        loadMonthlySummary();
+    }
+
+    function loadMonthlySummary() {
+        var month = document.getElementById('exportMonth').value;
+        var year = document.getElementById('exportYear').value;
+        var preview = document.getElementById('monthlySummaryPreview');
+        preview.style.display = 'block';
+        preview.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+        document.getElementById('btnMonthlyPdf').disabled = true;
+        document.getElementById('btnMonthlyExcel').disabled = true;
+
+        $.ajax({
+            type: 'POST', url: 'staff_stock_loss_ajax.php', data: { action: 'monthly_summary', month: month, year: year }, dataType: 'json',
+            success: function(data) {
+                monthlyData = data;
+                if (!data.items || data.items.length === 0) {
+                    preview.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-info-circle"></i> No records for ' + monthNames[month - 1] + ' ' + year + '</div>';
+                    return;
+                }
+                document.getElementById('btnMonthlyPdf').disabled = false;
+                document.getElementById('btnMonthlyExcel').disabled = false;
+
+                var html = '<div style="background:#f9fafb;border-radius:10px;padding:14px;margin-top:8px;">';
+                html += '<div style="font-weight:700;font-size:14px;margin-bottom:10px;">' + monthNames[month - 1] + ' ' + year + ' Summary</div>';
+                html += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">';
+                html += '<div style="font-size:13px;"><strong>' + data.total_items + '</strong> record(s)</div>';
+                html += '<div style="font-size:13px;"><strong>' + data.total_qty + '</strong> total qty lost</div>';
+                html += '</div>';
+                var reasons = data.by_reason || {};
+                var badges = '';
+                for (var r in reasons) {
+                    badges += '<span class="reason-badge ' + getReasonBadgeClass(r) + '" style="margin-right:6px;">' + escapeHtml(r) + ': ' + reasons[r].count + ' (' + reasons[r].qty + ' qty)</span>';
+                }
+                if (badges) html += '<div>' + badges + '</div>';
+                html += '</div>';
+                preview.innerHTML = html;
+            },
+            error: function() {
+                preview.innerHTML = '<div style="text-align:center;padding:16px;color:#dc2626;">Failed to load data.</div>';
+            }
+        });
+    }
+
+    function buildMonthlyExportHtml() {
+        if (!monthlyData || !monthlyData.items || monthlyData.items.length === 0) return null;
+        var items = monthlyData.items;
+        var month = monthlyData.month;
+        var year = monthlyData.year;
+        var totalQty = 0;
+
+        var html = '<div style="font-family:Arial,sans-serif;padding:20px;max-width:900px;margin:0 auto;">';
+        html += '<h2 style="color:#C8102E;margin:0 0 4px;">Monthly Stock Loss Report</h2>';
+        html += '<p style="color:#6b7280;font-size:14px;margin:0 0 6px;"><strong>' + monthNames[month - 1] + ' ' + year + '</strong></p>';
+        html += '<p style="color:#6b7280;font-size:13px;margin:0 0 16px;">' + monthlyData.total_items + ' record(s) &middot; ' + monthlyData.total_qty + ' total qty lost</p>';
+
+        var reasons = monthlyData.by_reason || {};
+        html += '<table style="width:auto;border-collapse:collapse;font-size:13px;margin-bottom:16px;">';
+        html += '<thead><tr style="background:#f3f4f6;"><th style="padding:6px 14px;text-align:left;">Reason</th><th style="padding:6px 14px;text-align:center;">Records</th><th style="padding:6px 14px;text-align:center;">Total Qty</th></tr></thead><tbody>';
+        for (var r in reasons) {
+            html += '<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:6px 14px;font-weight:600;">' + escapeHtml(r) + '</td><td style="padding:6px 14px;text-align:center;">' + reasons[r].count + '</td><td style="padding:6px 14px;text-align:center;">' + reasons[r].qty + '</td></tr>';
+        }
+        html += '</tbody></table>';
+
+        html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+        html += '<thead><tr style="background:#1a1a1a;color:#fff;">';
+        html += '<th style="padding:6px 8px;text-align:left;">No</th>';
+        html += '<th style="padding:6px 8px;text-align:left;">Date</th>';
+        html += '<th style="padding:6px 8px;text-align:left;">Image</th>';
+        html += '<th style="padding:6px 8px;text-align:left;">Description</th>';
+        html += '<th style="padding:6px 8px;text-align:center;">Qty</th>';
+        html += '<th style="padding:6px 8px;text-align:left;">Reason</th>';
+        html += '<th style="padding:6px 8px;text-align:left;">Remark</th>';
+        html += '<th style="padding:6px 8px;text-align:left;">Recorded By</th>';
+        html += '</tr></thead><tbody>';
+
+        items.forEach(function(item, i) {
+            var qty = Math.abs(item.QTYADJ || 0);
+            totalQty += qty;
+            var imgTag = item.image_path
+                ? '<img src="' + escapeHtml(item.image_path) + '" style="width:50px;height:50px;object-fit:cover;border-radius:4px;">'
+                : '<div style="width:50px;height:50px;background:#f3f4f6;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#d1d5db;font-size:9px;">No img</div>';
+
+            html += '<tr style="border-bottom:1px solid #e5e7eb;">';
+            html += '<td style="padding:6px 8px;">' + (i + 1) + '</td>';
+            html += '<td style="padding:6px 8px;">' + escapeHtml(item.SDATE || '') + '</td>';
+            html += '<td style="padding:6px 8px;">' + imgTag + '</td>';
+            html += '<td style="padding:6px 8px;font-weight:600;">' + escapeHtml(item.PDESC || '') + '</td>';
+            html += '<td style="padding:6px 8px;text-align:center;font-weight:700;">' + qty + '</td>';
+            html += '<td style="padding:6px 8px;">' + escapeHtml(item.LOSS_REASON || '') + '</td>';
+            html += '<td style="padding:6px 8px;">' + escapeHtml(item.REMARK || '') + '</td>';
+            html += '<td style="padding:6px 8px;">' + escapeHtml(item.USER || '') + '</td>';
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        html += '<div style="text-align:right;font-size:13px;font-weight:700;margin-top:10px;color:#C8102E;">Total: ' + items.length + ' record(s) &middot; ' + totalQty + ' qty</div>';
+        html += '</div>';
+        return html;
+    }
+
+    function exportMonthlyPDF() {
+        var html = buildMonthlyExportHtml();
+        if (!html) return;
+
+        var container = document.createElement('div');
+        container.innerHTML = html;
+        document.body.appendChild(container);
+
+        var fname = 'StockLoss_' + monthNames[monthlyData.month - 1] + '_' + monthlyData.year + '.pdf';
+        html2pdf().set({
+            margin: 8,
+            filename: fname,
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { scale: 2, useCORS: true, allowTaint: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(container).save().then(function() {
+            document.body.removeChild(container);
+        });
+    }
+
+    function exportMonthlyExcel() {
+        var html = buildMonthlyExportHtml();
+        if (!html) return;
+
+        var fname = 'StockLoss_' + monthNames[monthlyData.month - 1] + '_' + monthlyData.year + '.xls';
+        var excelHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">';
+        excelHtml += '<head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Stock Loss</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>';
+        excelHtml += '<body>' + html + '</body></html>';
+
+        var blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = fname;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
