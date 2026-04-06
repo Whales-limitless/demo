@@ -959,12 +959,15 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
     // ===================== EXPORT EXCEL =====================
     function exportSessionExcel() {
-        if (!currentSessionItems || currentSessionItems.length === 0) return;
-        convertItemImages(currentSessionItems).then(function() {
-            var html = buildExportHtml(true);
-            if (!html) return;
-            downloadExcel(html, 'StockLoss_' + (currentSessionId || 'export') + '.xls');
-        });
+        if (!currentSessionId) return;
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'staff_stock_loss_ajax.php';
+        form.target = '_blank';
+        form.innerHTML = '<input type="hidden" name="action" value="export_excel"><input type="hidden" name="type" value="session"><input type="hidden" name="session_id" value="' + escapeHtml(currentSessionId) + '">';
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
     }
 
     // ===================== MONTHLY REPORT =====================
@@ -1124,13 +1127,15 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     }
 
     function exportMonthlyExcel() {
-        if (!monthlyData || !monthlyData.items || monthlyData.items.length === 0) return;
-        convertItemImages(monthlyData.items).then(function() {
-            var html = buildMonthlyExportHtml(true);
-            if (!html) return;
-            var fname = 'StockLoss_' + monthNames[monthlyData.month - 1] + '_' + monthlyData.year + '.xls';
-            downloadExcel(html, fname);
-        });
+        if (!monthlyData || !monthlyData.month || !monthlyData.year) return;
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'staff_stock_loss_ajax.php';
+        form.target = '_blank';
+        form.innerHTML = '<input type="hidden" name="action" value="export_excel"><input type="hidden" name="type" value="monthly"><input type="hidden" name="month" value="' + monthlyData.month + '"><input type="hidden" name="year" value="' + monthlyData.year + '">';
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
     }
 </script>
 
