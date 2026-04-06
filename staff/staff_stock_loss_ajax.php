@@ -211,6 +211,54 @@ if ($action === 'record_multiple') {
 
     echo json_encode(['success' => $deleted . ' record(s) deleted successfully.']);
 
+} elseif ($action === 'monthly_summary') {
+    $month = intval($_POST['month'] ?? 0);
+    $year = intval($_POST['year'] ?? 0);
+    if ($month < 1 || $month > 12 || $year < 2000) {
+        echo json_encode(['error' => 'Invalid month/year.']);
+        exit;
+    }
+
+    $startDate = sprintf('%04d-%02d-01', $year, $month);
+    $endDate = date('Y-m-t', strtotime($startDate));
+
+    $stmt = $connect->prepare("
+        SELECT `SDATE`, `STIME`, `PDESC`, `QTYADJ`, `LOSS_REASON`, `REMARK`, `USER`, `image_path`,
+               SUBSTRING_INDEX(`SALNUM`, '_', 1) AS session_id
+        FROM `stockadj`
+        WHERE `LOSS_REASON` IS NOT NULL AND `LOSS_REASON` != 'ADJUSTMENT'
+          AND `SDATE` >= ? AND `SDATE` <= ?
+        ORDER BY `SDATE` ASC, `ID` ASC
+    ");
+    $stmt->bind_param("ss", $startDate, $endDate);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $items = [];
+    while ($r = $result->fetch_assoc()) {
+        $r['QTYADJ'] = (float)$r['QTYADJ'];
+        $items[] = $r;
+    }
+    $stmt->close();
+
+    $byReason = [];
+    foreach ($items as $item) {
+        $reason = $item['LOSS_REASON'] ?? 'OTHER';
+        if (!isset($byReason[$reason])) {
+            $byReason[$reason] = ['count' => 0, 'qty' => 0];
+        }
+        $byReason[$reason]['count']++;
+        $byReason[$reason]['qty'] += abs($item['QTYADJ']);
+    }
+
+    echo json_encode([
+        'items' => $items,
+        'by_reason' => $byReason,
+        'month' => $month,
+        'year' => $year,
+        'total_items' => count($items),
+        'total_qty' => array_sum(array_map(function($i) { return abs($i['QTYADJ']); }, $items))
+    ]);
+
 } else {
     echo json_encode(['error' => 'Invalid action.']);
 }
