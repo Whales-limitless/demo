@@ -50,9 +50,9 @@ if ($action === 'record_multiple') {
         @mkdir($uploadDir, 0755, true);
     }
 
-    // Try to add columns if not exist
-    $connect->query("ALTER TABLE `stockadj` ADD COLUMN `branch_code` VARCHAR(20) DEFAULT NULL");
-    $connect->query("ALTER TABLE `stockadj` ADD COLUMN `image_path` VARCHAR(255) DEFAULT NULL");
+    // Add columns if not exist (suppress error if already exists)
+    @$connect->query("ALTER TABLE `stockadj` ADD COLUMN `branch_code` VARCHAR(20) DEFAULT NULL");
+    @$connect->query("ALTER TABLE `stockadj` ADD COLUMN `image_path` VARCHAR(255) DEFAULT NULL");
 
     $connect->begin_transaction();
 
@@ -89,8 +89,9 @@ if ($action === 'record_multiple') {
             }
 
             // Insert stock loss record (no barcode, no QOH adjustment)
+            $imgVal = $imagePath ?? '';
             $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`IP`,`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`MNO`,`BARCODE`,`PDESC`,`LOOSE`,`PGROUP`,`PRODTYPE`,`QTYADJ`,`SERIALNUMBER`,`REMARK`,`LOSS_REASON`,`branch_code`,`image_path`) VALUES ('','STOCKLOSS',?,?,?,?,?,'','',?,0,'','',?,'',?,?,?,?)");
-            $adjStmt->bind_param("ssssssdsssss", $staffName, $staffOutlet, $curDate, $curTime, $salnum, $desc, $negQty, $remark, $reason, $staffBranch, $imagePath);
+            $adjStmt->bind_param("ssssssdssss", $staffName, $staffOutlet, $curDate, $curTime, $salnum, $desc, $negQty, $remark, $reason, $staffBranch, $imgVal);
             if (!$adjStmt->execute()) {
                 throw new Exception('Failed to insert record: ' . $connect->error);
             }

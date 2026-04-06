@@ -48,8 +48,8 @@ if ($action === 'record_multiple') {
         @mkdir($uploadDir, 0755, true);
     }
 
-    // Try to add image_path column if not exist
-    $connect->query("ALTER TABLE `stockadj` ADD COLUMN `image_path` VARCHAR(255) DEFAULT NULL");
+    // Add image_path column if not exist (suppress error if already exists)
+    @$connect->query("ALTER TABLE `stockadj` ADD COLUMN `image_path` VARCHAR(255) DEFAULT NULL");
 
     $connect->begin_transaction();
 
@@ -86,8 +86,9 @@ if ($action === 'record_multiple') {
             }
 
             // Insert stock loss record (no barcode, no QOH adjustment)
+            $imgVal = $imagePath ?? '';
             $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`BARCODE`,`PDESC`,`QTYADJ`,`REMARK`,`LOSS_REASON`,`image_path`) VALUES ('STOCKLOSS',?,?,?,?,?,'',?,?,?,?,?)");
-            $adjStmt->bind_param("ssssssdssss", $adminUser, $adminUser, $curDate, $curTime, $salnum, $desc, $negQty, $remark, $reason, $imagePath);
+            $adjStmt->bind_param("ssssssdsss", $adminUser, $adminUser, $curDate, $curTime, $salnum, $desc, $negQty, $remark, $reason, $imgVal);
             if (!$adjStmt->execute()) {
                 throw new Exception('Failed to insert record: ' . $connect->error);
             }
