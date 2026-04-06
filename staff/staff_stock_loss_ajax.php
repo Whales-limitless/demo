@@ -93,7 +93,7 @@ if ($action === 'record_multiple') {
 
             // Insert stock loss record
             $imgVal = $imagePath ?? '';
-            $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`IP`,`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`MNO`,`BARCODE`,`PDESC`,`LOOSE`,`PGROUP`,`PRODTYPE`,`QTYADJ`,`SERIALNUMBER`,`REMARK`,`LOSS_REASON`,`branch_code`,`image_path`) VALUES ('','STOCKLOSS',?,?,?,?,?,'','',?,0,'','',?,'',?,?,?,?)");
+            $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`BARCODE`,`PDESC`,`QTYADJ`,`REMARK`,`LOSS_REASON`,`branch_code`,`image_path`) VALUES ('STOCKLOSS',?,?,?,?,?,'',?,?,?,?,?,?)");
             if (!$adjStmt) {
                 throw new Exception('Prepare failed: ' . $connect->error);
             }
