@@ -153,6 +153,115 @@ if ($action === 'search_products') {
         echo json_encode(['error' => $e->getMessage()]);
     }
 
+} elseif ($action === 'record_multiple') {
+    $itemsRaw = $_POST['items'] ?? '[]';
+    $items = json_decode($itemsRaw, true);
+    $adminUser = $_SESSION['admin_name'] ?? 'Admin';
+
+    if (!is_array($items) || empty($items)) {
+        echo json_encode(['error' => 'No items to record.']);
+        exit;
+    }
+
+    $validReasons = ['SPOILAGE', 'DAMAGE', 'THEFT', 'EXPIRED', 'OTHER'];
+
+    // Validate all items first
+    foreach ($items as $idx => $item) {
+        $barcode = trim($item['barcode'] ?? '');
+        $qty = floatval($item['qty'] ?? 0);
+        $reason = trim($item['reason'] ?? '');
+
+        if ($barcode === '' || $qty <= 0) {
+            echo json_encode(['error' => 'Invalid barcode or quantity for item #' . ($idx + 1) . '.']);
+            exit;
+        }
+        if (!in_array($reason, $validReasons)) {
+            echo json_encode(['error' => 'Invalid reason for item #' . ($idx + 1) . '.']);
+            exit;
+        }
+    }
+
+    // Ensure uploads directory exists for loss images
+    $uploadDir = __DIR__ . '/../staff/uploads/stock_loss/';
+    if (!is_dir($uploadDir)) {
+        @mkdir($uploadDir, 0755, true);
+    }
+
+    // Try to add image_path column if not exist
+    $connect->query("ALTER TABLE `stockadj` ADD COLUMN `image_path` VARCHAR(255) DEFAULT NULL");
+
+    $connect->begin_transaction();
+
+    try {
+        $curDate = date('Y-m-d');
+        $curTime = date('H:i:s');
+        $batchId = 'LOSS' . date('YmdHis') . str_pad(rand(0, 999), 3, '0', STR_PAD_LEFT);
+        $recorded = 0;
+
+        foreach ($items as $idx => $item) {
+            $barcode = trim($item['barcode']);
+            $qty = floatval($item['qty']);
+            $reason = trim($item['reason']);
+            $remark = trim($item['remark'] ?? '');
+
+            // Look up product name
+            $stmt = $connect->prepare("SELECT `name` FROM `PRODUCTS` WHERE `barcode` = ? LIMIT 1");
+            $stmt->bind_param("s", $barcode);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($result->num_rows === 0) {
+                throw new Exception('Product not found: ' . $barcode);
+            }
+            $product = $result->fetch_assoc();
+            $stmt->close();
+
+            $negQty = -$qty;
+            $desc = substr($product['name'], 0, 48);
+            $salnum = $batchId . '_' . ($idx + 1);
+
+            // Handle image if provided
+            $imagePath = null;
+            $imageKey = 'image_' . $idx;
+            if (!empty($_POST[$imageKey])) {
+                $imageData = $_POST[$imageKey];
+                if (preg_match('/^data:image\/(jpeg|png|gif|webp);base64,(.+)$/', $imageData, $matches)) {
+                    $ext = $matches[1] === 'jpeg' ? 'jpg' : $matches[1];
+                    $decoded = base64_decode($matches[2]);
+                    if ($decoded !== false) {
+                        $filename = $salnum . '.' . $ext;
+                        $filepath = $uploadDir . $filename;
+                        if (file_put_contents($filepath, $decoded)) {
+                            $imagePath = 'uploads/stock_loss/' . $filename;
+                        }
+                    }
+                }
+            }
+
+            // Insert stock adjustment
+            $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`BARCODE`,`PDESC`,`QTYADJ`,`REMARK`,`LOSS_REASON`,`image_path`) VALUES ('STOCKLOSS',?,?,?,?,?,?,?,?,?,?,?)");
+            $adjStmt->bind_param("sssssssdsss", $adminUser, $adminUser, $curDate, $curTime, $salnum, $barcode, $desc, $negQty, $remark, $reason, $imagePath);
+            if (!$adjStmt->execute()) {
+                throw new Exception('Failed to insert adjustment for ' . $barcode . ': ' . $connect->error);
+            }
+            $adjStmt->close();
+
+            // Deduct from PRODUCTS.qoh
+            $qohStmt = $connect->prepare("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) - ? WHERE `barcode` = ?");
+            $qohStmt->bind_param("ds", $qty, $barcode);
+            $qohStmt->execute();
+            $qohStmt->close();
+
+            $recorded++;
+        }
+
+        $connect->commit();
+        echo json_encode(['success' => $recorded . ' product(s) stock loss recorded successfully.']);
+
+    } catch (Exception $e) {
+        $connect->rollback();
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+
 } else {
     echo json_encode(['error' => 'Invalid action.']);
 }
