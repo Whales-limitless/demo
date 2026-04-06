@@ -17,24 +17,64 @@ $staffName = $_SESSION['user_name'] ?? 'Staff';
 $staffOutlet = $_SESSION['user_outlet'] ?? 'WEB';
 $staffBranch = $_SESSION['user_branch_code'] ?? ($_SESSION['user_outlet'] ?? '');
 
-if ($action === 'search') {
-    // Search by product name only (not barcode)
+if ($action === 'search' || $action === 'search_products') {
     $q = trim($_POST['q'] ?? '');
     if ($q === '') {
-        echo json_encode([]);
+        echo json_encode(['products' => [], 'total' => 0]);
         exit;
     }
-    $like = '%' . $q . '%';
-    $stmt = $connect->prepare("SELECT `barcode`, `name`, COALESCE(`qoh`, 0) AS qoh FROM `PRODUCTS` WHERE `name` LIKE ? AND (`checked` != 'N' OR `checked` IS NULL) ORDER BY `name` ASC LIMIT 20");
-    $stmt->bind_param("s", $like);
+
+    $offset = max(0, intval($_POST['offset'] ?? 0));
+    $limit = 50;
+
+    // Normalize quote variants
+    $normalizedSearch = $q;
+    $normalizedSearch = str_replace(["\u{201C}", "\u{201D}", "\u{2033}", "\u{FF02}"], '"', $normalizedSearch);
+    $normalizedSearch = str_replace(["\u{2018}", "\u{2019}", "\u{2032}", "\u{FF07}"], "'", $normalizedSearch);
+    $altSearch = str_replace('"', "''", $normalizedSearch);
+    $altSearch2 = str_replace("''", '"', $normalizedSearch);
+    $normalizedLike = '%' . $normalizedSearch . '%';
+    $altLike = '%' . $altSearch . '%';
+    $altLike2 = '%' . $altSearch2 . '%';
+
+    $cntStmt = $connect->prepare("
+        SELECT COUNT(DISTINCT p.`id`) AS cnt
+        FROM `PRODUCTS` p
+        WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?)
+          AND (p.`checked` != 'N' OR p.`checked` IS NULL)
+          AND EXISTS (SELECT 1 FROM `category` c WHERE c.`cat_code` = p.`cat_code` AND c.`sub_code` = p.`sub_code`)
+    ");
+    $cntStmt->bind_param("sss", $normalizedLike, $altLike, $altLike2);
+    $cntStmt->execute();
+    $total = (int)$cntStmt->get_result()->fetch_assoc()['cnt'];
+    $cntStmt->close();
+
+    $stmt = $connect->prepare("
+        SELECT DISTINCT p.`id`, p.`barcode`, p.`name`, p.`img1` AS image, p.`uom`,
+               COALESCE(p.`qoh`, 0) AS qoh, p.`cat_code`, p.`rack`,
+               c.`cat_name` AS category_name
+        FROM `PRODUCTS` p
+        INNER JOIN `category` c ON p.`cat_code` = c.`cat_code` AND p.`sub_code` = c.`sub_code`
+        WHERE (p.`name` LIKE ? OR p.`name` LIKE ? OR p.`name` LIKE ?)
+          AND (p.`checked` != 'N' OR p.`checked` IS NULL)
+        ORDER BY p.`name` ASC
+        LIMIT ? OFFSET ?
+    ");
+    $stmt->bind_param("sssii", $normalizedLike, $altLike, $altLike2, $limit, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
+
     $products = [];
-    while ($r = $result->fetch_assoc()) {
-        $products[] = $r;
+    $seen = [];
+    while ($row = $result->fetch_assoc()) {
+        if (isset($seen[$row['id']])) continue;
+        $seen[$row['id']] = true;
+        $row['id'] = (int)$row['id'];
+        $row['qoh'] = (float)$row['qoh'];
+        $products[] = $row;
     }
     $stmt->close();
-    echo json_encode($products);
+    echo json_encode(['products' => $products, 'total' => $total]);
 
 } elseif ($action === 'lookup') {
     $barcode = trim($_POST['barcode'] ?? '');
