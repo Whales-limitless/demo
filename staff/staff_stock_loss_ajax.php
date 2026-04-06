@@ -2,9 +2,8 @@
 require_once __DIR__ . '/session_security.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
-header('Content-Type: application/json; charset=utf-8');
-
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true) {
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['error' => 'Unauthorized']);
     exit;
 }
@@ -13,6 +12,11 @@ include('dbconnection.php');
 $connect->set_charset("utf8mb4");
 
 $action = $_POST['action'] ?? '';
+
+// Set JSON header for all actions except export_excel (which outputs binary)
+if ($action !== 'export_excel') {
+    header('Content-Type: application/json; charset=utf-8');
+}
 $staffName = $_SESSION['user_name'] ?? 'Staff';
 $staffOutlet = $_SESSION['user_outlet'] ?? 'WEB';
 $staffBranch = $_SESSION['user_branch_code'] ?? ($_SESSION['user_outlet'] ?? '');
@@ -212,6 +216,12 @@ if ($action === 'record_multiple') {
     echo json_encode(['success' => $deleted . ' record(s) deleted successfully.']);
 
 } elseif ($action === 'export_excel') {
+    error_reporting(E_ALL);
+    ini_set('display_errors', 0);
+    set_error_handler(function($errno, $errstr, $errfile, $errline) {
+        throw new Exception("$errstr in $errfile:$errline");
+    });
+    try {
     require_once __DIR__ . '/SimpleXlsxWriter.php';
 
     $type = $_POST['type'] ?? '';
@@ -293,6 +303,11 @@ if ($action === 'record_multiple') {
     readfile($tmpFile);
     unlink($tmpFile);
     exit;
+    } catch (Exception $e) {
+        header('Content-Type: text/plain');
+        echo 'Export error: ' . $e->getMessage();
+        exit;
+    }
 
 } elseif ($action === 'images_base64') {
     $paths = json_decode($_POST['paths'] ?? '[]', true);
