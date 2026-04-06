@@ -233,22 +233,24 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         .submit-bar .btn-submit:active { transform: scale(0.98); }
         .submit-bar .btn-submit:disabled { background: #9ca3af; cursor: not-allowed; transform: none; }
 
-        /* Recent Records Section */
+        /* Recent Sessions Section */
         .section-header {
             font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 600;
             color: var(--text); margin-bottom: 12px; margin-top: 8px; padding-left: 2px;
         }
 
-        .recent-card {
+        .session-card {
             background: var(--surface); border-radius: 12px;
             box-shadow: 0 1px 4px rgba(0,0,0,0.05); padding: 14px 16px; margin-bottom: 10px;
+            cursor: pointer; transition: box-shadow 0.2s;
         }
-        .recent-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-        .recent-card-date { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+        .session-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+        .session-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .session-card-date { font-size: 12px; color: var(--text-muted); font-weight: 500; }
 
         .reason-badge {
-            display: inline-block; padding: 3px 10px; border-radius: 20px;
-            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+            display: inline-block; padding: 3px 8px; border-radius: 20px;
+            font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
         }
         .reason-badge.spoilage { background: #fef3c7; color: #d97706; }
         .reason-badge.damage { background: #fee2e2; color: #dc2626; }
@@ -256,14 +258,28 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         .reason-badge.expired { background: #e5e7eb; color: #374151; }
         .reason-badge.other { background: #dbeafe; color: #2563eb; }
 
-        .recent-card-desc { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
-        .recent-card-barcode { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
-        .recent-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .recent-card-qty { font-size: 13px; font-weight: 700; color: var(--primary); }
-        .recent-card-remark {
-            font-size: 12px; color: var(--text-muted); font-style: italic;
-            text-align: right; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        }
+        .session-card-summary { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+        .session-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .session-card-qty { font-size: 13px; font-weight: 700; color: var(--primary); }
+        .session-card-user { font-size: 12px; color: var(--text-muted); }
+        .session-card-actions { display: flex; gap: 6px; margin-top: 8px; }
+        .session-btn { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+        .session-btn-view { background: #dbeafe; color: #2563eb; }
+        .session-btn-view:hover { background: #bfdbfe; }
+        .session-btn-delete { background: #fee2e2; color: #dc2626; }
+        .session-btn-delete:hover { background: #fca5a5; }
+
+        /* Detail modal items */
+        .detail-item { display: flex; gap: 12px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 10px; }
+        .detail-item-img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: #f3f4f6; flex-shrink: 0; }
+        .detail-item-noimg { width: 64px; height: 64px; border-radius: 8px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .detail-item-noimg i { font-size: 20px; color: #d1d5db; }
+        .detail-item-info { flex: 1; min-width: 0; }
+        .detail-item-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+        .detail-item-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .detail-item-fields { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+        .detail-item-fields span { background: #f3f4f6; padding: 3px 8px; border-radius: 6px; }
+        .detail-footer { text-align: right; font-size: 13px; font-weight: 700; margin-top: 8px; color: var(--primary); }
 
         .no-records { text-align: center; color: var(--text-muted); font-size: 14px; padding: 30px 16px; }
         .loading-spinner { text-align: center; padding: 24px; color: var(--text-muted); font-size: 14px; }
@@ -314,9 +330,9 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     </div>
 
     <!-- Recent Losses -->
-    <div class="section-header" style="margin-top: 24px;">Recent Records</div>
+    <div class="section-header" style="margin-top: 24px;">Recent Sessions</div>
     <div id="recentContainer">
-        <div class="loading-spinner">Loading recent records...</div>
+        <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading sessions...</div>
     </div>
 </div>
 
@@ -326,6 +342,25 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 </div>
 
 <?php include 'mobile-bottombar.php'; ?>
+
+<!-- Session Detail Modal -->
+<div class="modal fade" id="sessionDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-list" style="color:var(--primary);margin-right:6px;"></i>Session Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="sessionDetailBody">
+                <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" id="btnDeleteSession" onclick="deleteCurrentSession();"><i class="fas fa-trash"></i> Delete Session</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Product Search Modal (same as PO) -->
 <div class="modal fade" id="productSearchModal" tabindex="-1" aria-hidden="true">
@@ -363,8 +398,11 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
     const fileInput = document.getElementById('fileInput');
 
     var productSearchModal = null;
+    var sessionDetailModal = null;
+    var currentSessionId = null;
     document.addEventListener('DOMContentLoaded', function() {
         productSearchModal = new bootstrap.Modal(document.getElementById('productSearchModal'));
+        sessionDetailModal = new bootstrap.Modal(document.getElementById('sessionDetailModal'));
     });
 
     // ===================== PRODUCT SEARCH MODAL (same as PO) =====================
@@ -753,7 +791,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
         });
     }
 
-    // ===================== RECENT RECORDS =====================
+    // ===================== RECENT SESSIONS =====================
 
     function getReasonBadgeClass(reason) {
         switch (reason.toLowerCase()) {
@@ -767,45 +805,145 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 
     function loadRecent() {
         const container = document.getElementById('recentContainer');
-        container.innerHTML = '<div class="loading-spinner">Loading recent records...</div>';
+        container.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading sessions...</div>';
 
-        fetch('staff_stock_loss_ajax.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=recent'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (Array.isArray(data) && data.length > 0) {
-                let html = '';
-                data.forEach(function(rec) {
-                    const reason = rec.LOSS_REASON || 'Other';
-                    const badgeClass = getReasonBadgeClass(reason);
-                    const remarkText = rec.REMARK || '';
-                    const remarkHtml = remarkText ? '<span class="recent-card-remark">' + escapeHtml(remarkText) + '</span>' : '';
-                    const qty = Math.abs(parseFloat(rec.QTYADJ || 0));
+        $.ajax({
+            type: 'POST', url: 'staff_stock_loss_ajax.php', data: { action: 'list_sessions' }, dataType: 'json',
+            success: function(data) {
+                var sessions = data.sessions || [];
+                if (sessions.length === 0) {
+                    container.innerHTML = '<div class="no-records">No recent stock loss sessions found.</div>';
+                    return;
+                }
 
-                    html += '<div class="recent-card">';
-                    html += '  <div class="recent-card-top">';
-                    html += '    <span class="recent-card-date">' + escapeHtml(rec.SDATE || '') + '</span>';
-                    html += '    <span class="reason-badge ' + badgeClass + '">' + escapeHtml(reason) + '</span>';
+                var html = '';
+                sessions.forEach(function(s) {
+                    var reasons = (s.reasons || '').split(',');
+                    var reasonBadges = reasons.map(function(r) {
+                        return '<span class="reason-badge ' + getReasonBadgeClass(r) + '">' + escapeHtml(r) + '</span>';
+                    }).join(' ');
+
+                    html += '<div class="session-card" onclick="viewSession(\'' + escapeHtml(s.session_id) + '\');">';
+                    html += '  <div class="session-card-top">';
+                    html += '    <span class="session-card-date">' + escapeHtml(s.session_date || '') + ' ' + escapeHtml(s.session_time || '') + '</span>';
+                    html += '    <div>' + reasonBadges + '</div>';
                     html += '  </div>';
-                    html += '  <div class="recent-card-desc">' + escapeHtml(rec.PDESC || '') + '</div>';
-                    html += '  <div class="recent-card-barcode">Barcode: ' + escapeHtml(rec.BARCODE || '') + '</div>';
-                    html += '  <div class="recent-card-bottom">';
-                    html += '    <span class="recent-card-qty">-' + qty + ' unit(s)</span>';
-                    html += '    ' + remarkHtml;
+                    html += '  <div class="session-card-summary">' + s.item_count + ' product' + (s.item_count > 1 ? 's' : '') + '</div>';
+                    html += '  <div class="session-card-bottom">';
+                    html += '    <span class="session-card-qty">-' + s.total_qty + ' unit(s)</span>';
+                    html += '    <span class="session-card-user">' + escapeHtml(s.recorded_by || '') + '</span>';
+                    html += '  </div>';
+                    html += '  <div class="session-card-actions" onclick="event.stopPropagation();">';
+                    html += '    <button class="session-btn session-btn-view" onclick="viewSession(\'' + escapeHtml(s.session_id) + '\');"><i class="fas fa-eye"></i> View</button>';
+                    html += '    <button class="session-btn session-btn-delete" onclick="confirmDeleteSession(\'' + escapeHtml(s.session_id) + '\', ' + s.item_count + ', ' + s.total_qty + ');"><i class="fas fa-trash"></i> Delete</button>';
                     html += '  </div>';
                     html += '</div>';
                 });
                 container.innerHTML = html;
-            } else {
-                container.innerHTML = '<div class="no-records">No recent stock loss records found.</div>';
+            },
+            error: function() {
+                container.innerHTML = '<div class="no-records">Failed to load sessions.</div>';
             }
-        })
-        .catch(err => {
-            console.error('Load recent error:', err);
-            container.innerHTML = '<div class="no-records">Failed to load recent records.</div>';
+        });
+    }
+
+    // ===================== SESSION DETAIL & DELETE =====================
+
+    function viewSession(sessionId) {
+        currentSessionId = sessionId;
+        document.getElementById('sessionDetailBody').innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+        sessionDetailModal.show();
+
+        $.ajax({
+            type: 'POST', url: 'staff_stock_loss_ajax.php', data: { action: 'session_detail', session_id: sessionId }, dataType: 'json',
+            success: function(data) {
+                var items = data.items || [];
+                if (items.length === 0) {
+                    document.getElementById('sessionDetailBody').innerHTML = '<div class="loading-spinner">No items found.</div>';
+                    return;
+                }
+
+                var totalQty = 0;
+                var html = '<div style="margin-bottom:12px;font-size:13px;color:var(--text-muted);">' + escapeHtml(items[0].SDATE || '') + ' ' + escapeHtml(items[0].STIME || '') + ' &middot; By: <strong>' + escapeHtml(items[0].USER || '') + '</strong></div>';
+
+                items.forEach(function(item) {
+                    var qty = Math.abs(item.QTYADJ || 0);
+                    totalQty += qty;
+
+                    var imgHtml;
+                    if (item.image_path) {
+                        imgHtml = '<img class="detail-item-img" src="' + escapeHtml(item.image_path) + '" alt="" loading="lazy">';
+                    } else if (item.product_image) {
+                        imgHtml = '<img class="detail-item-img" src="../img/' + escapeHtml(item.product_image) + '" alt="" loading="lazy">';
+                    } else {
+                        imgHtml = '<div class="detail-item-noimg"><i class="fas fa-box"></i></div>';
+                    }
+
+                    html += '<div class="detail-item">';
+                    html += imgHtml;
+                    html += '<div class="detail-item-info">';
+                    html += '<div class="detail-item-name">' + escapeHtml(item.PDESC || '') + '</div>';
+                    html += '<div class="detail-item-meta">Barcode: ' + escapeHtml(item.BARCODE || '') + '</div>';
+                    html += '<div class="detail-item-fields">';
+                    html += '<span><strong>Qty:</strong> ' + qty + '</span>';
+                    html += '<span class="reason-badge ' + getReasonBadgeClass(item.LOSS_REASON || '') + '">' + escapeHtml(item.LOSS_REASON || '') + '</span>';
+                    if (item.REMARK) html += '<span>' + escapeHtml(item.REMARK) + '</span>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                });
+
+                html += '<div class="detail-footer">' + items.length + ' item(s) &middot; Total Qty: ' + totalQty + '</div>';
+                document.getElementById('sessionDetailBody').innerHTML = html;
+            },
+            error: function() {
+                document.getElementById('sessionDetailBody').innerHTML = '<div class="loading-spinner">Failed to load details.</div>';
+            }
+        });
+    }
+
+    function deleteCurrentSession() {
+        if (!currentSessionId) return;
+        sessionDetailModal.hide();
+        confirmDeleteSession(currentSessionId);
+    }
+
+    function confirmDeleteSession(sessionId, itemCount, totalQty) {
+        currentSessionId = sessionId;
+        var msg = 'This will delete ';
+        if (itemCount && totalQty) {
+            msg += '<strong>' + itemCount + ' item(s)</strong> with <strong>' + totalQty + ' unit(s)</strong>';
+        } else {
+            msg += 'all items in this session';
+        }
+        msg += ' and <strong>revert the QOH</strong> (add quantities back to stock).';
+
+        Swal.fire({
+            title: 'Delete Stock Loss Session?',
+            html: msg,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, Delete & Revert QOH',
+            cancelButtonText: 'Cancel'
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                $.ajax({
+                    type: 'POST', url: 'staff_stock_loss_ajax.php', data: { action: 'delete_session', session_id: sessionId }, dataType: 'json',
+                    success: function(data) {
+                        if (data.success) {
+                            Swal.fire({ icon: 'success', title: 'Deleted', text: data.success, confirmButtonColor: '#C8102E' });
+                            loadRecent();
+                        } else {
+                            Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#C8102E' });
+                        }
+                    },
+                    error: function() {
+                        Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to delete session.', confirmButtonColor: '#C8102E' });
+                    }
+                });
+            }
         });
     }
 
