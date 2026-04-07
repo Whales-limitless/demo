@@ -854,7 +854,8 @@ function renderProductTable(products) {
     var html = '';
     products.forEach(function(p) {
         var lastCount = p.last_stock_take ? formatDate(p.last_stock_take) : '';
-        var lastCountLabel = p.last_stock_take ? lastCount : '<span style="color:#dc2626;font-size:11px;">Never</span>';
+        var lastSessionCode = p.last_session_code || '';
+        var lastCountLabel = p.last_stock_take ? lastCount + (lastSessionCode ? '<br><span style="color:#6b7280;font-size:11px;">' + escapeHtml(lastSessionCode) + '</span>' : '') : '<span style="color:#dc2626;font-size:11px;">Never</span>';
         var inActive = parseInt(p.in_active_session) === 1;
         var rowStyle = inActive ? ' style="opacity:0.5;background:#fff3cd;"' : '';
         var cbDisabled = inActive ? ' disabled title="Already in active session: ' + escapeAttr(p.active_session_codes || '') + '"' : ' checked';
