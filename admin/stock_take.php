@@ -95,7 +95,12 @@ $lastStResult = $connect->query("
     SELECT p.`cat` AS filter_cat, p.`sub_cat` AS filter_sub_cat,
            COUNT(DISTINCT p.`barcode`) AS total_products,
            COUNT(DISTINCT sti.`barcode`) AS counted_products,
-           MAX(COALESCE(st.`approved_at`, st.`completed_at`, st.`submitted_at`)) AS last_completed
+           MAX(COALESCE(st.`approved_at`, st.`completed_at`, st.`submitted_at`)) AS last_completed,
+           (SELECT ls.`session_code` FROM `stock_take` ls
+            WHERE ls.`status` = 'APPROVED'
+              AND ls.`filter_cat` = p.`cat` AND ls.`filter_sub_cat` = p.`sub_cat`
+            ORDER BY COALESCE(ls.`approved_at`, ls.`completed_at`, ls.`submitted_at`) DESC
+            LIMIT 1) AS last_session_code
     FROM `PRODUCTS` p
     LEFT JOIN `stock_take_item` sti ON sti.`barcode` = p.`barcode`
     LEFT JOIN `stock_take` st ON st.`id` = sti.`stock_take_id` AND st.`status` = 'APPROVED'
@@ -728,7 +733,7 @@ function toggleFilters() {
 function getSubCatLastStockTake(cat, subCat) {
     var match = lastStockTakeSubCatsData.find(function(a) { return a.filter_cat === cat && a.filter_sub_cat === subCat; });
     if (!match) return null;
-    var result = { counted: match.counted_products, total: match.total_products, full: match.counted_products >= match.total_products };
+    var result = { counted: match.counted_products, total: match.total_products, full: match.counted_products >= match.total_products, session: match.last_session_code || '' };
     if (match.last_completed) {
         var d = new Date(match.last_completed);
         if (!isNaN(d.getTime())) {
@@ -787,10 +792,10 @@ function onCategoryChange() {
             } else {
                 var lastInfo = getSubCatLastStockTake(cat, s.sub_cat);
                 if (lastInfo && lastInfo.full) {
-                    opt.textContent = s.sub_cat + ' \u2714 Last count (' + lastInfo.counted + '/' + lastInfo.total + ') ' + (lastInfo.date || '-');
+                    opt.textContent = s.sub_cat + ' \u2714 Last count (' + lastInfo.counted + '/' + lastInfo.total + ') ' + (lastInfo.date || '-') + (lastInfo.session ? ' - ' + lastInfo.session : '');
                     opt.style.color = '#16a34a';
                 } else if (lastInfo) {
-                    opt.textContent = s.sub_cat + ' \u25CB Counted (' + lastInfo.counted + '/' + lastInfo.total + ') ' + (lastInfo.date ? lastInfo.date : '');
+                    opt.textContent = s.sub_cat + ' \u25CB Counted (' + lastInfo.counted + '/' + lastInfo.total + ') ' + (lastInfo.date || '') + (lastInfo.session ? ' - ' + lastInfo.session : '');
                     opt.style.color = '#2563eb';
                 } else {
                     opt.textContent = s.sub_cat;
@@ -849,7 +854,8 @@ function renderProductTable(products) {
     var html = '';
     products.forEach(function(p) {
         var lastCount = p.last_stock_take ? formatDate(p.last_stock_take) : '';
-        var lastCountLabel = p.last_stock_take ? lastCount : '<span style="color:#dc2626;font-size:11px;">Never</span>';
+        var lastSessionCode = p.last_session_code || '';
+        var lastCountLabel = p.last_stock_take ? lastCount + (lastSessionCode ? '<br><span style="color:#6b7280;font-size:11px;">' + escapeHtml(lastSessionCode) + '</span>' : '') : '<span style="color:#dc2626;font-size:11px;">Never</span>';
         var inActive = parseInt(p.in_active_session) === 1;
         var rowStyle = inActive ? ' style="opacity:0.5;background:#fff3cd;"' : '';
         var cbDisabled = inActive ? ' disabled title="Already in active session: ' + escapeAttr(p.active_session_codes || '') + '"' : ' checked';
