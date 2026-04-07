@@ -787,10 +787,10 @@ function onCategoryChange() {
             } else {
                 var lastInfo = getSubCatLastStockTake(cat, s.sub_cat);
                 if (lastInfo && lastInfo.full) {
-                    opt.textContent = s.sub_cat + ' \u2714 Last count: ' + (lastInfo.date || '-');
+                    opt.textContent = s.sub_cat + ' \u2714 Last count (' + lastInfo.counted + '/' + lastInfo.total + ') ' + (lastInfo.date || '-');
                     opt.style.color = '#16a34a';
                 } else if (lastInfo) {
-                    opt.textContent = s.sub_cat + ' \u25CB Counted ' + lastInfo.counted + '/' + lastInfo.total + (lastInfo.date ? ' - ' + lastInfo.date : '');
+                    opt.textContent = s.sub_cat + ' \u25CB Counted (' + lastInfo.counted + '/' + lastInfo.total + ') ' + (lastInfo.date ? lastInfo.date : '');
                     opt.style.color = '#2563eb';
                 } else {
                     opt.textContent = s.sub_cat;
