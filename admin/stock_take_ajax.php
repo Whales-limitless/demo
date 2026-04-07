@@ -35,7 +35,7 @@ if ($action === 'load_products') {
     // Also flag products that are in active (DRAFT/SUBMITTED) sessions as in_active_session
     $query = "SELECT p.`barcode`, p.`name`, COALESCE(p.`qoh`, 0) AS qoh,
               MAX(st.`created_at`) AS last_stock_take,
-              MAX(CASE WHEN ast.`id` IS NOT NULL THEN 1 ELSE 0 END) AS in_active_session,
+              MAX(CASE WHEN ast_s.`id` IS NOT NULL THEN 1 ELSE 0 END) AS in_active_session,
               GROUP_CONCAT(DISTINCT ast_s.`session_code` ORDER BY ast_s.`session_code` SEPARATOR ', ') AS active_session_codes
               FROM `PRODUCTS` p
               LEFT JOIN `stock_take_item` sti ON sti.`barcode` = p.`barcode`
