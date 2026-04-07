@@ -88,18 +88,26 @@ if ($activeCatResult) {
     }
 }
 
-// Fetch last completed stock take date per sub category (from APPROVED sessions)
+// Fetch last completed stock take info per sub category (from APPROVED sessions)
+// Compare counted products vs total products in that sub category
 $lastStockTakeSubCats = [];
 $lastStResult = $connect->query("
-    SELECT st.`filter_cat`, st.`filter_sub_cat`,
+    SELECT p.`cat` AS filter_cat, p.`sub_cat` AS filter_sub_cat,
+           COUNT(DISTINCT p.`barcode`) AS total_products,
+           COUNT(DISTINCT sti.`barcode`) AS counted_products,
            MAX(COALESCE(st.`approved_at`, st.`completed_at`, st.`submitted_at`)) AS last_completed
-    FROM `stock_take` st
-    WHERE st.`status` = 'APPROVED'
-      AND st.`filter_sub_cat` IS NOT NULL AND st.`filter_sub_cat` != ''
-    GROUP BY st.`filter_cat`, st.`filter_sub_cat`
+    FROM `PRODUCTS` p
+    LEFT JOIN `stock_take_item` sti ON sti.`barcode` = p.`barcode`
+    LEFT JOIN `stock_take` st ON st.`id` = sti.`stock_take_id` AND st.`status` = 'APPROVED'
+    WHERE p.`checked` = 'Y'
+      AND p.`sub_cat` IS NOT NULL AND p.`sub_cat` != ''
+    GROUP BY p.`cat`, p.`sub_cat`
+    HAVING counted_products > 0
 ");
 if ($lastStResult) {
     while ($r = $lastStResult->fetch_assoc()) {
+        $r['total_products'] = intval($r['total_products']);
+        $r['counted_products'] = intval($r['counted_products']);
         $lastStockTakeSubCats[] = $r;
     }
 }
@@ -719,13 +727,18 @@ function toggleFilters() {
 
 function getSubCatLastStockTake(cat, subCat) {
     var match = lastStockTakeSubCatsData.find(function(a) { return a.filter_cat === cat && a.filter_sub_cat === subCat; });
-    if (!match || !match.last_completed) return null;
-    var d = new Date(match.last_completed);
-    if (isNaN(d.getTime())) return null;
-    var dd = String(d.getDate()).padStart(2, '0');
-    var mm = String(d.getMonth() + 1).padStart(2, '0');
-    var yyyy = d.getFullYear();
-    return dd + '/' + mm + '/' + yyyy;
+    if (!match) return null;
+    var result = { counted: match.counted_products, total: match.total_products, full: match.counted_products >= match.total_products };
+    if (match.last_completed) {
+        var d = new Date(match.last_completed);
+        if (!isNaN(d.getTime())) {
+            var dd = String(d.getDate()).padStart(2, '0');
+            var mm = String(d.getMonth() + 1).padStart(2, '0');
+            var yyyy = d.getFullYear();
+            result.date = dd + '/' + mm + '/' + yyyy;
+        }
+    }
+    return result;
 }
 
 function getSubCatActiveInfo(cat, subCat) {
@@ -772,10 +785,13 @@ function onCategoryChange() {
                 opt.style.color = '#d97706';
                 opt.style.fontWeight = '600';
             } else {
-                var lastDate = getSubCatLastStockTake(cat, s.sub_cat);
-                if (lastDate) {
-                    opt.textContent = s.sub_cat + ' \u2714 Last count: ' + lastDate;
+                var lastInfo = getSubCatLastStockTake(cat, s.sub_cat);
+                if (lastInfo && lastInfo.full) {
+                    opt.textContent = s.sub_cat + ' \u2714 Last count: ' + (lastInfo.date || '-');
                     opt.style.color = '#16a34a';
+                } else if (lastInfo) {
+                    opt.textContent = s.sub_cat + ' \u25CB Counted ' + lastInfo.counted + '/' + lastInfo.total + (lastInfo.date ? ' - ' + lastInfo.date : '');
+                    opt.style.color = '#2563eb';
                 } else {
                     opt.textContent = s.sub_cat;
                 }
