@@ -88,6 +88,22 @@ if ($activeCatResult) {
     }
 }
 
+// Fetch last completed stock take date per sub category (from APPROVED sessions)
+$lastStockTakeSubCats = [];
+$lastStResult = $connect->query("
+    SELECT st.`filter_cat`, st.`filter_sub_cat`,
+           MAX(COALESCE(st.`approved_at`, st.`completed_at`, st.`submitted_at`)) AS last_completed
+    FROM `stock_take` st
+    WHERE st.`status` = 'APPROVED'
+      AND st.`filter_sub_cat` IS NOT NULL AND st.`filter_sub_cat` != ''
+    GROUP BY st.`filter_cat`, st.`filter_sub_cat`
+");
+if ($lastStResult) {
+    while ($r = $lastStResult->fetch_assoc()) {
+        $lastStockTakeSubCats[] = $r;
+    }
+}
+
 // Check if there's any active FULL stock take with progress & last update
 $activeFullSession = null;
 $fullChk = $connect->query("
@@ -595,6 +611,7 @@ var subCategoriesData = <?php echo json_encode($subCategories); ?>;
 var activeSubCatsData = <?php echo json_encode($activeSubCats); ?>;
 var activeCatsData = <?php echo json_encode($activeCats); ?>;
 var activeFullSession = <?php echo json_encode($activeFullSession); ?>;
+var lastStockTakeSubCatsData = <?php echo json_encode($lastStockTakeSubCats); ?>;
 </script>
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
@@ -700,6 +717,17 @@ function toggleFilters() {
     document.getElementById('filterFields').style.display = type === 'PARTIAL' ? 'block' : 'none';
 }
 
+function getSubCatLastStockTake(cat, subCat) {
+    var match = lastStockTakeSubCatsData.find(function(a) { return a.filter_cat === cat && a.filter_sub_cat === subCat; });
+    if (!match || !match.last_completed) return null;
+    var d = new Date(match.last_completed);
+    if (isNaN(d.getTime())) return null;
+    var dd = String(d.getDate()).padStart(2, '0');
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var yyyy = d.getFullYear();
+    return dd + '/' + mm + '/' + yyyy;
+}
+
 function getSubCatActiveInfo(cat, subCat) {
     // Check FULL session first (applies to all subcategories)
     if (activeFullSession) {
@@ -744,7 +772,13 @@ function onCategoryChange() {
                 opt.style.color = '#d97706';
                 opt.style.fontWeight = '600';
             } else {
-                opt.textContent = s.sub_cat;
+                var lastDate = getSubCatLastStockTake(cat, s.sub_cat);
+                if (lastDate) {
+                    opt.textContent = s.sub_cat + ' \u2714 Last count: ' + lastDate;
+                    opt.style.color = '#16a34a';
+                } else {
+                    opt.textContent = s.sub_cat;
+                }
             }
             subSelect.appendChild(opt);
         });
