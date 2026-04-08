@@ -229,7 +229,7 @@ function renderTable(rows, branches) {
 
     if (hasBranches) {
         // Two-row header: top row for branch group names, bottom row for In/Out/Adj per branch + totals
-        html += '<tr><th rowspan="2" style="vertical-align:middle;">No</th><th rowspan="2" style="vertical-align:middle;">Description</th><th rowspan="2" class="text-end" style="vertical-align:middle;">Opening</th>';
+        html += '<tr><th rowspan="2" style="vertical-align:middle;">No</th><th rowspan="2" style="vertical-align:middle;">Description</th><th rowspan="2" class="text-end" style="vertical-align:middle;" title="Stock balance before the start date, based on all historical transactions"><i class="fas fa-info-circle" style="font-size:10px;color:var(--text-muted);margin-right:3px;"></i>Opening</th>';
         branches.forEach(function(br) {
             html += '<th colspan="3" class="text-center" style="background:#f0f4ff;border-bottom:2px solid #3b82f6;">' + escHtml(br.name) + '</th>';
         });
@@ -243,7 +243,7 @@ function renderTable(rows, branches) {
         html += '<th class="text-end" style="font-size:11px;background:#f0fdf4;">In</th><th class="text-end" style="font-size:11px;background:#f0fdf4;">Out</th><th class="text-end" style="font-size:11px;background:#f0fdf4;">Adj</th>';
         html += '</tr>';
     } else {
-        html += '<tr><th>No</th><th>Description</th><th class="text-end">Opening</th><th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Adj</th><th class="text-end">Closing</th></tr>';
+        html += '<tr><th>No</th><th>Description</th><th class="text-end" title="Stock balance before the start date, based on all historical transactions"><i class="fas fa-info-circle" style="font-size:10px;color:var(--text-muted);margin-right:3px;"></i>Opening</th><th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Adj</th><th class="text-end">Closing</th></tr>';
     }
     html += '</thead><tbody>';
 

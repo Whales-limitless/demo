@@ -87,7 +87,12 @@ if ($action === 'stock_movement') {
                 COALESCE(orders.qty_stockin, 0) AS qty_stockin,
                 COALESCE(adj.adj_in, 0) AS adj_in,
                 COALESCE(adj.adj_out, 0) AS adj_out,
-                " . ($hasGrn ? "COALESCE(grn_in.qty_grn_in, 0)" : "0") . " AS qty_grn_in
+                " . ($hasGrn ? "COALESCE(grn_in.qty_grn_in, 0)" : "0") . " AS qty_grn_in,
+                COALESCE(orders_all.qty_out_all, 0) AS qty_out_all,
+                COALESCE(orders_all.qty_stockin_all, 0) AS qty_stockin_all,
+                COALESCE(adj_all.adj_in_all, 0) AS adj_in_all,
+                COALESCE(adj_all.adj_out_all, 0) AS adj_out_all,
+                " . ($hasGrn ? "COALESCE(grn_all.qty_grn_in_all, 0)" : "0") . " AS qty_grn_in_all
             FROM ($unionSql) combined
             LEFT JOIN `PRODUCTS` p ON combined.BARCODE $collate = p.barcode $collate
             LEFT JOIN (
@@ -105,7 +110,23 @@ if ($action === 'stock_movement') {
                 FROM `stockadj`
                 WHERE SDATE >= ? AND SDATE <= ?
                 GROUP BY BARCODE
-            ) adj ON combined.BARCODE $collate = adj.BARCODE $collate";
+            ) adj ON combined.BARCODE $collate = adj.BARCODE $collate
+            LEFT JOIN (
+                SELECT BARCODE,
+                    SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') THEN QTY ELSE 0 END) AS qty_out_all,
+                    SUM(CASE WHEN PTYPE = 'STOCKIN' THEN QTY ELSE 0 END) AS qty_stockin_all
+                FROM `orderlist`
+                WHERE SDATE >= ? AND BARCODE <> 'PT'
+                GROUP BY BARCODE
+            ) orders_all ON combined.BARCODE $collate = orders_all.BARCODE $collate
+            LEFT JOIN (
+                SELECT BARCODE,
+                    SUM(CASE WHEN QTYADJ > 0 THEN QTYADJ ELSE 0 END) AS adj_in_all,
+                    SUM(CASE WHEN QTYADJ < 0 THEN ABS(QTYADJ) ELSE 0 END) AS adj_out_all
+                FROM `stockadj`
+                WHERE SDATE >= ?
+                GROUP BY BARCODE
+            ) adj_all ON combined.BARCODE $collate = adj_all.BARCODE $collate";
 
     $allParams = $unionParams;
     $allTypes = $unionTypes;
@@ -113,6 +134,10 @@ if ($action === 'stock_movement') {
     $allParams[] = $startDate; $allParams[] = $endDate; $allTypes .= "ss";
     // adj subquery
     $allParams[] = $startDate; $allParams[] = $endDate; $allTypes .= "ss";
+    // orders_all subquery (from startDate to now, no end date - for accurate opening balance)
+    $allParams[] = $startDate; $allTypes .= "s";
+    // adj_all subquery (from startDate to now, no end date - for accurate opening balance)
+    $allParams[] = $startDate; $allTypes .= "s";
 
     if ($hasGrn) {
         $sql .= " LEFT JOIN (
@@ -122,6 +147,14 @@ if ($action === 'stock_movement') {
                 GROUP BY gi.barcode
             ) grn_in ON combined.BARCODE $collate = grn_in.BARCODE $collate";
         $allParams[] = $startDate; $allParams[] = $endDate; $allTypes .= "ss";
+        // grn_all subquery (from startDate to now, no end date - for accurate opening balance)
+        $sql .= " LEFT JOIN (
+                SELECT gi.barcode AS BARCODE, SUM(gi.qty_received) AS qty_grn_in_all
+                FROM `grn_item` gi LEFT JOIN `grn` g ON gi.grn_id = g.id
+                WHERE g.receive_date >= ?
+                GROUP BY gi.barcode
+            ) grn_all ON combined.BARCODE $collate = grn_all.BARCODE $collate";
+        $allParams[] = $startDate; $allTypes .= "s";
     }
 
     $sql .= " ORDER BY combined.description ASC";
@@ -145,7 +178,16 @@ if ($action === 'stock_movement') {
         $adjOut = floatval($r['adj_out']);
         $currentQoh = floatval($r['current_qoh']);
         $totalIn = $stockIn + $grnIn + $adjIn;
-        $opening = $currentQoh + $out - $totalIn + $adjOut;
+
+        // Opening balance: reverse ALL movements from startDate to NOW for accuracy
+        // (not just within the selected date range)
+        $outAll = floatval($r['qty_out_all']);
+        $stockInAll = floatval($r['qty_stockin_all']);
+        $grnInAll = floatval($r['qty_grn_in_all']);
+        $adjInAll = floatval($r['adj_in_all']);
+        $adjOutAll = floatval($r['adj_out_all']);
+        $totalInAll = $stockInAll + $grnInAll + $adjInAll;
+        $opening = $currentQoh + $outAll - $totalInAll + $adjOutAll;
         $closing = $opening + $totalIn - $out - $adjOut;
 
         $productRows[$r['BARCODE']] = [
