@@ -241,6 +241,7 @@ if ($action === 'stock_movement') {
         $closing = $opening + $totalIn - $out - $adjOut;
 
         $productRows[$r['BARCODE']] = [
+            'barcode' => $r['BARCODE'],
             'description' => $r['description'] ?: $r['BARCODE'],
             'opening' => $opening,
             'in' => $totalIn,
@@ -337,6 +338,96 @@ if ($action === 'stock_movement') {
         $response['branches'] = $branchInfo;
     }
     echo json_encode($response);
+
+// ── Opening Balance Detail (modal drill-down) ──
+} elseif ($action === 'opening_balance_detail') {
+    $barcode = trim($_POST['barcode'] ?? '');
+    $cutoffDate = isset($_POST['cutoff_date']) && $_POST['cutoff_date'] !== '' ? $_POST['cutoff_date'] : null;
+    $collate = "COLLATE utf8mb4_unicode_ci";
+
+    if ($barcode === '') {
+        echo json_encode(['error' => 'Barcode required']);
+        exit;
+    }
+
+    $hasGrn = $connect->query("SHOW TABLES LIKE 'grn'")->num_rows > 0
+           && $connect->query("SHOW TABLES LIKE 'grn_item'")->num_rows > 0;
+
+    // Lower bound: cutoff date if set, otherwise all history
+    $lowerBound = $cutoffDate ?: '1900-01-01';
+
+    // Fetch all transactions before startDate (or between cutoff and startDate)
+    $sql = "SELECT txn_date, txn_type, reference, qty_in, qty_out FROM (
+            SELECT o.SDATE AS txn_date,
+                CASE WHEN o.PTYPE = 'STOCKIN' THEN 'Stock In' ELSE 'Sale' END AS txn_type,
+                o.SALNUM AS reference,
+                CASE WHEN o.PTYPE = 'STOCKIN' THEN o.QTY ELSE 0 END AS qty_in,
+                CASE WHEN o.PTYPE IS NULL OR o.PTYPE <> 'STOCKIN' THEN o.QTY ELSE 0 END AS qty_out
+            FROM `orderlist` o
+            WHERE o.BARCODE $collate = ? AND o.SDATE >= ? AND o.SDATE < ?
+                AND o.STATUS = 'DONE' AND o.BARCODE <> 'PT'
+
+            UNION ALL
+
+            SELECT sa.SDATE AS txn_date,
+                CONCAT('Adjustment', CASE WHEN sa.LOSS_REASON IS NOT NULL AND sa.LOSS_REASON <> '' AND sa.LOSS_REASON <> 'ADJUSTMENT'
+                    THEN CONCAT(' (', sa.LOSS_REASON, ')') ELSE '' END) AS txn_type,
+                sa.REMARK AS reference,
+                CASE WHEN sa.QTYADJ > 0 THEN sa.QTYADJ ELSE 0 END AS qty_in,
+                CASE WHEN sa.QTYADJ < 0 THEN ABS(sa.QTYADJ) ELSE 0 END AS qty_out
+            FROM `stockadj` sa
+            WHERE sa.BARCODE $collate = ? AND sa.SDATE >= ? AND sa.SDATE < ?";
+
+    $params = [$barcode, $lowerBound, $startDate, $barcode, $lowerBound, $startDate];
+    $types = "ssssss";
+
+    if ($hasGrn) {
+        $sql .= "
+            UNION ALL
+
+            SELECT g.receive_date AS txn_date,
+                'GRN' AS txn_type,
+                COALESCE(g.grn_number, '') AS reference,
+                gi.qty_received AS qty_in,
+                0 AS qty_out
+            FROM `grn_item` gi
+            LEFT JOIN `grn` g ON gi.grn_id = g.id
+            WHERE gi.barcode $collate = ? AND g.receive_date >= ? AND g.receive_date < ?";
+        $params[] = $barcode;
+        $params[] = $lowerBound;
+        $params[] = $startDate;
+        $types .= "sss";
+    }
+
+    $sql .= ") AS combined ORDER BY txn_date ASC, qty_in DESC";
+
+    $stmt = $connect->prepare($sql);
+    if (!$stmt) {
+        echo json_encode(['error' => 'Query error: ' . $connect->error]);
+        exit;
+    }
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $rows = [];
+    $runningBalance = 0;
+    while ($r = $result->fetch_assoc()) {
+        $in = floatval($r['qty_in']);
+        $out = floatval($r['qty_out']);
+        $runningBalance += $in - $out;
+        $rows[] = [
+            'date' => $r['txn_date'],
+            'type' => $r['txn_type'],
+            'reference' => $r['reference'],
+            'qty_in' => $in,
+            'qty_out' => $out,
+            'balance' => $runningBalance
+        ];
+    }
+    $stmt->close();
+
+    echo json_encode(['rows' => $rows, 'opening_balance' => $runningBalance]);
 
 // ── Sales by Date Report ──
 } elseif ($action === 'sales_by_date') {

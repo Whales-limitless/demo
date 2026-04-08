@@ -96,6 +96,21 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 </div>
 
+<!-- Opening Balance Detail Modal -->
+<div class="modal fade" id="openingDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--bg);border-bottom:1px solid #e5e7eb;">
+        <h5 class="modal-title" id="openingDetailTitle" style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;">Opening Balance Detail</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="openingDetailBody" style="padding:20px;">
+        <p class="text-center text-muted">Loading...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -267,7 +282,7 @@ function renderTable(rows, branches) {
         html += '<tr>';
         html += '<td>' + (i+1) + '</td>';
         html += '<td>' + escHtml(r.description) + '</td>';
-        html += '<td class="text-end">' + fmtNum(r.opening) + '</td>';
+        html += '<td class="text-end"><a href="javascript:void(0)" class="opening-link" data-barcode="' + escHtml(r.barcode) + '" data-desc="' + escHtml(r.description) + '" style="text-decoration:underline;cursor:pointer;color:inherit;">' + fmtNum(r.opening) + '</a></td>';
 
         if (hasBranches && r.branches) {
             branches.forEach(function(br) {
@@ -308,6 +323,86 @@ function initDataTable() {
         ordering: true,
         order: []
     });
+}
+
+// ==================== OPENING BALANCE DETAIL MODAL ====================
+$(document).on('click', '.opening-link', function(e) {
+    e.preventDefault();
+    var barcode = $(this).data('barcode');
+    var desc = $(this).data('desc');
+    showOpeningDetail(barcode, desc);
+});
+
+function showOpeningDetail(barcode, description) {
+    var modal = new bootstrap.Modal(document.getElementById('openingDetailModal'));
+    document.getElementById('openingDetailTitle').textContent = 'Opening Balance Detail \u2014 ' + description;
+    document.getElementById('openingDetailBody').innerHTML = '<p class="text-center" style="padding:30px;"><i class="fas fa-spinner fa-spin"></i> Loading transactions...</p>';
+    modal.show();
+
+    var postData = {
+        action: 'opening_balance_detail',
+        barcode: barcode,
+        start_date: document.getElementById('startDate').value
+    };
+    var cutoff = document.getElementById('cutoffDate').value;
+    if (cutoff) postData.cutoff_date = cutoff;
+
+    $.ajax({
+        type: 'POST', url: 'report_ajax.php', data: postData, dataType: 'json',
+        success: function(data) {
+            if (data.error) {
+                document.getElementById('openingDetailBody').innerHTML = '<p class="text-danger text-center">' + escHtml(data.error) + '</p>';
+                return;
+            }
+            renderOpeningDetail(data.rows || [], data.opening_balance || 0);
+        },
+        error: function() {
+            document.getElementById('openingDetailBody').innerHTML = '<p class="text-danger text-center">Failed to load details.</p>';
+        }
+    });
+}
+
+function renderOpeningDetail(rows, openingBalance) {
+    var startVal = document.getElementById('startDate').value;
+    var cutoffVal = document.getElementById('cutoffDate').value;
+
+    if (rows.length === 0) {
+        var msg = cutoffVal
+            ? 'No transactions found between ' + cutoffVal + ' and ' + startVal
+            : 'No transactions found before ' + startVal;
+        document.getElementById('openingDetailBody').innerHTML =
+            '<p class="text-center text-muted" style="padding:30px;">' + msg + '<br><small>Opening balance: <strong>' + fmtNum(openingBalance) + '</strong></small></p>';
+        return;
+    }
+
+    var periodLabel = cutoffVal
+        ? cutoffVal + ' to ' + startVal
+        : 'All history before ' + startVal;
+
+    var html = '<div class="d-flex justify-content-between align-items-center mb-3">';
+    html += '<span style="font-size:12px;color:var(--text-muted);"><i class="fas fa-calendar-alt"></i> ' + escHtml(periodLabel) + '</span>';
+    html += '<span style="font-size:14px;font-weight:700;">Opening Balance: ' + fmtNum(openingBalance) + '</span>';
+    html += '</div>';
+
+    html += '<table class="table table-sm table-striped" style="font-size:13px;">';
+    html += '<thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Balance</th></tr></thead>';
+    html += '<tbody>';
+
+    rows.forEach(function(r) {
+        html += '<tr>';
+        html += '<td>' + escHtml(r.date) + '</td>';
+        html += '<td>' + escHtml(r.type) + '</td>';
+        html += '<td>' + escHtml(r.reference || '-') + '</td>';
+        html += '<td class="text-end text-success">' + (r.qty_in > 0 ? fmtNum(r.qty_in) : '') + '</td>';
+        html += '<td class="text-end text-danger">' + (r.qty_out > 0 ? fmtNum(r.qty_out) : '') + '</td>';
+        html += '<td class="text-end fw-bold">' + fmtNum(r.balance) + '</td>';
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    html += '<div class="text-end mt-2" style="font-size:12px;color:var(--text-muted);">' + rows.length + ' transaction(s)</div>';
+
+    document.getElementById('openingDetailBody').innerHTML = html;
 }
 </script>
 </body>
