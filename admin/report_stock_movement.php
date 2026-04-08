@@ -54,6 +54,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="filter-bar">
         <label>Start Date:</label><input type="date" id="startDate" value="<?php echo date('Y-m-01'); ?>">
         <label>End Date:</label><input type="date" id="endDate" value="<?php echo date('Y-m-d'); ?>">
+        <span style="border-left:1px solid #d1d5db;height:20px;margin:0 4px;align-self:center;"></span>
+        <label title="Optional: Ignore all stock data before this date (fresh start from this date)" style="cursor:help;">Count From <i class="fas fa-info-circle" style="font-size:10px;color:var(--text-muted);"></i>:</label>
+        <input type="date" id="cutoffDate" title="Leave empty to include all history. Set a date to start fresh — opening balance will only count movements from this date." style="max-width:160px;">
         <input type="text" id="searchInput" placeholder="Search product..." style="flex:1;max-width:250px;">
         <div style="position:relative;" id="branchFilterWrap">
             <button type="button" id="branchFilterBtn" onclick="toggleBranchDropdown();" style="padding:7px 14px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
@@ -196,6 +199,9 @@ function generateReport() {
         search: document.getElementById('searchInput').value.trim()
     };
 
+    var cutoff = document.getElementById('cutoffDate').value;
+    if (cutoff) postData.cutoff_date = cutoff;
+
     var selBranches = getSelectedBranches();
     for (var bi = 0; bi < selBranches.length; bi++) {
         postData['branches[' + bi + ']'] = selBranches[bi];
@@ -214,6 +220,11 @@ function generateReport() {
 }
 
 function renderTable(rows, branches) {
+    var cutoffVal = document.getElementById('cutoffDate').value;
+    var openingTip = cutoffVal
+        ? 'Opening balance counted from ' + cutoffVal + ' (fresh start — earlier data ignored)'
+        : 'Stock balance before the start date, based on all historical transactions';
+
     if (rows.length === 0) {
         document.getElementById('reportContent').innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px;">No data found for the selected period.</p>';
         document.getElementById('summaryCards').style.display = 'none';
@@ -229,7 +240,7 @@ function renderTable(rows, branches) {
 
     if (hasBranches) {
         // Two-row header: top row for branch group names, bottom row for In/Out/Adj per branch + totals
-        html += '<tr><th rowspan="2" style="vertical-align:middle;">No</th><th rowspan="2" style="vertical-align:middle;">Description</th><th rowspan="2" class="text-end" style="vertical-align:middle;" title="Stock balance before the start date, based on all historical transactions"><i class="fas fa-info-circle" style="font-size:10px;color:var(--text-muted);margin-right:3px;"></i>Opening</th>';
+        html += '<tr><th rowspan="2" style="vertical-align:middle;">No</th><th rowspan="2" style="vertical-align:middle;">Description</th><th rowspan="2" class="text-end" style="vertical-align:middle;" title="' + escHtml(openingTip) + '"><i class="fas fa-info-circle" style="font-size:10px;color:var(--text-muted);margin-right:3px;"></i>Opening</th>';
         branches.forEach(function(br) {
             html += '<th colspan="3" class="text-center" style="background:#f0f4ff;border-bottom:2px solid #3b82f6;">' + escHtml(br.name) + '</th>';
         });
@@ -243,7 +254,7 @@ function renderTable(rows, branches) {
         html += '<th class="text-end" style="font-size:11px;background:#f0fdf4;">In</th><th class="text-end" style="font-size:11px;background:#f0fdf4;">Out</th><th class="text-end" style="font-size:11px;background:#f0fdf4;">Adj</th>';
         html += '</tr>';
     } else {
-        html += '<tr><th>No</th><th>Description</th><th class="text-end" title="Stock balance before the start date, based on all historical transactions"><i class="fas fa-info-circle" style="font-size:10px;color:var(--text-muted);margin-right:3px;"></i>Opening</th><th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Adj</th><th class="text-end">Closing</th></tr>';
+        html += '<tr><th>No</th><th>Description</th><th class="text-end" title="' + escHtml(openingTip) + '"><i class="fas fa-info-circle" style="font-size:10px;color:var(--text-muted);margin-right:3px;"></i>Opening</th><th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Adj</th><th class="text-end">Closing</th></tr>';
     }
     html += '</thead><tbody>';
 

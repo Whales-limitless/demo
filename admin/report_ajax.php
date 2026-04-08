@@ -24,6 +24,10 @@ if ($action === 'stock_movement') {
     $selectedBranches = array_values(array_filter($selectedBranches, function($v) { return trim($v) !== ''; }));
     $hasBranchFilter = !empty($selectedBranches);
 
+    // Optional cutoff date: ignore all movements before this date (fresh start)
+    $cutoffDate = isset($_POST['cutoff_date']) && $_POST['cutoff_date'] !== '' ? $_POST['cutoff_date'] : null;
+    $hasCutoff = !empty($cutoffDate);
+
     $searchParam = '';
     if ($search !== '') {
         $searchParam = '%' . $search . '%';
@@ -92,7 +96,12 @@ if ($action === 'stock_movement') {
                 COALESCE(orders_all.qty_stockin_all, 0) AS qty_stockin_all,
                 COALESCE(adj_all.adj_in_all, 0) AS adj_in_all,
                 COALESCE(adj_all.adj_out_all, 0) AS adj_out_all,
-                " . ($hasGrn ? "COALESCE(grn_all.qty_grn_in_all, 0)" : "0") . " AS qty_grn_in_all
+                " . ($hasGrn ? "COALESCE(grn_all.qty_grn_in_all, 0)" : "0") . " AS qty_grn_in_all,
+                " . ($hasCutoff ? "COALESCE(orders_cutoff.qty_out_cutoff, 0)" : "0") . " AS qty_out_cutoff,
+                " . ($hasCutoff ? "COALESCE(orders_cutoff.qty_stockin_cutoff, 0)" : "0") . " AS qty_stockin_cutoff,
+                " . ($hasCutoff ? "COALESCE(adj_cutoff.adj_in_cutoff, 0)" : "0") . " AS adj_in_cutoff,
+                " . ($hasCutoff ? "COALESCE(adj_cutoff.adj_out_cutoff, 0)" : "0") . " AS adj_out_cutoff,
+                " . ($hasCutoff && $hasGrn ? "COALESCE(grn_cutoff.qty_grn_in_cutoff, 0)" : "0") . " AS qty_grn_in_cutoff
             FROM ($unionSql) combined
             LEFT JOIN `PRODUCTS` p ON combined.BARCODE $collate = p.barcode $collate
             LEFT JOIN (
@@ -157,6 +166,37 @@ if ($action === 'stock_movement') {
         $allParams[] = $startDate; $allTypes .= "s";
     }
 
+    // Cutoff (fresh start) subqueries - movements from cutoffDate to day before startDate
+    if ($hasCutoff) {
+        $sql .= " LEFT JOIN (
+                SELECT BARCODE,
+                    SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') THEN QTY ELSE 0 END) AS qty_out_cutoff,
+                    SUM(CASE WHEN PTYPE = 'STOCKIN' THEN QTY ELSE 0 END) AS qty_stockin_cutoff
+                FROM `orderlist`
+                WHERE SDATE >= ? AND SDATE < ? AND BARCODE <> 'PT'
+                GROUP BY BARCODE
+            ) orders_cutoff ON combined.BARCODE $collate = orders_cutoff.BARCODE $collate
+            LEFT JOIN (
+                SELECT BARCODE,
+                    SUM(CASE WHEN QTYADJ > 0 THEN QTYADJ ELSE 0 END) AS adj_in_cutoff,
+                    SUM(CASE WHEN QTYADJ < 0 THEN ABS(QTYADJ) ELSE 0 END) AS adj_out_cutoff
+                FROM `stockadj`
+                WHERE SDATE >= ? AND SDATE < ?
+                GROUP BY BARCODE
+            ) adj_cutoff ON combined.BARCODE $collate = adj_cutoff.BARCODE $collate";
+        $allParams[] = $cutoffDate; $allParams[] = $startDate; $allTypes .= "ss";
+        $allParams[] = $cutoffDate; $allParams[] = $startDate; $allTypes .= "ss";
+        if ($hasGrn) {
+            $sql .= " LEFT JOIN (
+                    SELECT gi.barcode AS BARCODE, SUM(gi.qty_received) AS qty_grn_in_cutoff
+                    FROM `grn_item` gi LEFT JOIN `grn` g ON gi.grn_id = g.id
+                    WHERE g.receive_date >= ? AND g.receive_date < ?
+                    GROUP BY gi.barcode
+                ) grn_cutoff ON combined.BARCODE $collate = grn_cutoff.BARCODE $collate";
+            $allParams[] = $cutoffDate; $allParams[] = $startDate; $allTypes .= "ss";
+        }
+    }
+
     $sql .= " ORDER BY combined.description ASC";
 
     $stmt = $connect->prepare($sql);
@@ -179,15 +219,25 @@ if ($action === 'stock_movement') {
         $currentQoh = floatval($r['current_qoh']);
         $totalIn = $stockIn + $grnIn + $adjIn;
 
-        // Opening balance: reverse ALL movements from startDate to NOW for accuracy
-        // (not just within the selected date range)
-        $outAll = floatval($r['qty_out_all']);
-        $stockInAll = floatval($r['qty_stockin_all']);
-        $grnInAll = floatval($r['qty_grn_in_all']);
-        $adjInAll = floatval($r['adj_in_all']);
-        $adjOutAll = floatval($r['adj_out_all']);
-        $totalInAll = $stockInAll + $grnInAll + $adjInAll;
-        $opening = $currentQoh + $outAll - $totalInAll + $adjOutAll;
+        if ($hasCutoff) {
+            // Fresh start: opening = net movements from cutoffDate to day before startDate
+            // Treats stock as 0 at cutoffDate, ignoring all older data
+            $outCutoff = floatval($r['qty_out_cutoff']);
+            $stockInCutoff = floatval($r['qty_stockin_cutoff']);
+            $grnInCutoff = floatval($r['qty_grn_in_cutoff']);
+            $adjInCutoff = floatval($r['adj_in_cutoff']);
+            $adjOutCutoff = floatval($r['adj_out_cutoff']);
+            $opening = ($stockInCutoff + $grnInCutoff + $adjInCutoff) - $outCutoff - $adjOutCutoff;
+        } else {
+            // Normal: reverse ALL movements from startDate to NOW for accuracy
+            $outAll = floatval($r['qty_out_all']);
+            $stockInAll = floatval($r['qty_stockin_all']);
+            $grnInAll = floatval($r['qty_grn_in_all']);
+            $adjInAll = floatval($r['adj_in_all']);
+            $adjOutAll = floatval($r['adj_out_all']);
+            $totalInAll = $stockInAll + $grnInAll + $adjInAll;
+            $opening = $currentQoh + $outAll - $totalInAll + $adjOutAll;
+        }
         $closing = $opening + $totalIn - $out - $adjOut;
 
         $productRows[$r['BARCODE']] = [
