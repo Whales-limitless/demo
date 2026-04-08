@@ -336,6 +336,28 @@ if ($action === 'list') {
     }
 
     if ($stmt->execute()) {
+        // Sync rack_product junction table when rack changed
+        if ($rack !== $oldRack && $barcode !== '') {
+            $delRpStmt = $connect->prepare("DELETE FROM `rack_product` WHERE `barcode` = ?");
+            $delRpStmt->bind_param("s", $barcode);
+            $delRpStmt->execute();
+            $delRpStmt->close();
+
+            if ($rack !== '') {
+                $findRackStmt = $connect->prepare("SELECT `id` FROM `rack` WHERE `code` = ? AND `status` = 'ACTIVE' LIMIT 1");
+                $findRackStmt->bind_param("s", $rack);
+                $findRackStmt->execute();
+                $rackRow = $findRackStmt->get_result()->fetch_assoc();
+                $findRackStmt->close();
+
+                if ($rackRow) {
+                    $insRpStmt = $connect->prepare("INSERT INTO `rack_product` (`rack_id`, `barcode`, `assigned_at`) VALUES (?, ?, ?)");
+                    $insRpStmt->bind_param("iss", $rackRow['id'], $barcode, $nowMY);
+                    $insRpStmt->execute();
+                    $insRpStmt->close();
+                }
+            }
+        }
         echo json_encode(['success' => 'Product updated successfully.']);
     } else {
         echo json_encode(['error' => 'Failed to update product: ' . $connect->error]);
@@ -665,14 +687,42 @@ if ($action === 'list') {
     $updated = 0;
     $nowMY = date('Y-m-d H:i:s');
     $stmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = ? WHERE `id` = ?");
+    $barcodeStmt = $connect->prepare("SELECT `barcode` FROM `PRODUCTS` WHERE `id` = ?");
+    $delStmt = $connect->prepare("DELETE FROM `rack_product` WHERE `barcode` = ?");
+    $rackStmt = $connect->prepare("SELECT `id` FROM `rack` WHERE `code` = ? AND `status` = 'ACTIVE' LIMIT 1");
+    $insStmt = $connect->prepare("INSERT INTO `rack_product` (`rack_id`, `barcode`, `assigned_at`) VALUES (?, ?, ?)");
     foreach ($items as $item) {
         $id = intval($item['id'] ?? 0);
         $rack = trim($item['rack'] ?? '');
         if ($id <= 0) continue;
         $stmt->bind_param("ssi", $rack, $nowMY, $id);
-        if ($stmt->execute()) $updated++;
+        if ($stmt->execute()) {
+            $updated++;
+            // Sync rack_product junction table
+            $barcodeStmt->bind_param("i", $id);
+            $barcodeStmt->execute();
+            $barcodeRow = $barcodeStmt->get_result()->fetch_assoc();
+            $barcode = $barcodeRow['barcode'] ?? '';
+            if ($barcode !== '') {
+                $delStmt->bind_param("s", $barcode);
+                $delStmt->execute();
+                if ($rack !== '') {
+                    $rackStmt->bind_param("s", $rack);
+                    $rackStmt->execute();
+                    $rackRow = $rackStmt->get_result()->fetch_assoc();
+                    if ($rackRow) {
+                        $insStmt->bind_param("iss", $rackRow['id'], $barcode, $nowMY);
+                        $insStmt->execute();
+                    }
+                }
+            }
+        }
     }
     $stmt->close();
+    $barcodeStmt->close();
+    $delStmt->close();
+    $rackStmt->close();
+    $insStmt->close();
     echo json_encode(['success' => $updated . ' product(s) rack updated.', 'updated' => $updated]);
     exit;
 
