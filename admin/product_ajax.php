@@ -921,6 +921,51 @@ if ($action === 'list') {
 
     if ($stmt->execute()) {
         $affected = $stmt->affected_rows;
+
+        // Sync rack_product junction table if rack was changed
+        if (array_key_exists('rack', $updates)) {
+            $newRack = trim($updates['rack']);
+            $nowMY = date('Y-m-d H:i:s');
+
+            // Look up new rack ID (if not clearing)
+            $newRackId = null;
+            if ($newRack !== '') {
+                $rkStmt = $connect->prepare("SELECT `id` FROM `rack` WHERE `code` = ? AND `status` = 'ACTIVE' LIMIT 1");
+                $rkStmt->bind_param("s", $newRack);
+                $rkStmt->execute();
+                $rkRow = $rkStmt->get_result()->fetch_assoc();
+                $rkStmt->close();
+                if ($rkRow) $newRackId = $rkRow['id'];
+            }
+
+            // Get barcodes for affected products
+            $bcPlaceholders = implode(',', array_fill(0, count($ids), '?'));
+            $bcTypes = str_repeat('i', count($ids));
+            $bcStmt = $connect->prepare("SELECT `barcode` FROM `PRODUCTS` WHERE `id` IN ($bcPlaceholders) AND `barcode` != ''");
+            $bcStmt->bind_param($bcTypes, ...array_map('intval', $ids));
+            $bcStmt->execute();
+            $bcResult = $bcStmt->get_result();
+            $barcodes = [];
+            while ($bcRow = $bcResult->fetch_assoc()) {
+                $barcodes[] = $bcRow['barcode'];
+            }
+            $bcStmt->close();
+
+            // Delete old mappings and insert new ones
+            $delRpStmt = $connect->prepare("DELETE FROM `rack_product` WHERE `barcode` = ?");
+            $insRpStmt = $connect->prepare("INSERT INTO `rack_product` (`rack_id`, `barcode`, `assigned_at`) VALUES (?, ?, ?)");
+            foreach ($barcodes as $bc) {
+                $delRpStmt->bind_param("s", $bc);
+                $delRpStmt->execute();
+                if ($newRackId) {
+                    $insRpStmt->bind_param("iss", $newRackId, $bc, $nowMY);
+                    $insRpStmt->execute();
+                }
+            }
+            $delRpStmt->close();
+            $insRpStmt->close();
+        }
+
         echo json_encode(['success' => $affected . ' product(s) updated.']);
     } else {
         echo json_encode(['error' => 'Failed: ' . $connect->error]);
