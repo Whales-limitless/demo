@@ -282,7 +282,7 @@ function renderTable(rows, branches) {
         html += '<tr>';
         html += '<td>' + (i+1) + '</td>';
         html += '<td>' + escHtml(r.description) + '</td>';
-        html += '<td class="text-end"><a href="javascript:void(0)" class="opening-link" data-barcode="' + escHtml(r.barcode) + '" data-desc="' + escHtml(r.description) + '" style="text-decoration:underline;cursor:pointer;color:inherit;">' + fmtNum(r.opening) + '</a></td>';
+        html += '<td class="text-end"><a href="javascript:void(0)" class="opening-link" data-barcode="' + escHtml(r.barcode) + '" data-desc="' + escHtml(r.description) + '" data-opening="' + r.opening + '" style="text-decoration:underline;cursor:pointer;color:inherit;">' + fmtNum(r.opening) + '</a></td>';
 
         if (hasBranches && r.branches) {
             branches.forEach(function(br) {
@@ -330,10 +330,11 @@ $(document).on('click', '.opening-link', function(e) {
     e.preventDefault();
     var barcode = $(this).data('barcode');
     var desc = $(this).data('desc');
-    showOpeningDetail(barcode, desc);
+    var correctOpening = parseFloat($(this).data('opening')) || 0;
+    showOpeningDetail(barcode, desc, correctOpening);
 });
 
-function showOpeningDetail(barcode, description) {
+function showOpeningDetail(barcode, description, correctOpening) {
     var modal = new bootstrap.Modal(document.getElementById('openingDetailModal'));
     document.getElementById('openingDetailTitle').textContent = 'Opening Balance Detail \u2014 ' + description;
     document.getElementById('openingDetailBody').innerHTML = '<p class="text-center" style="padding:30px;"><i class="fas fa-spinner fa-spin"></i> Loading transactions...</p>';
@@ -354,7 +355,7 @@ function showOpeningDetail(barcode, description) {
                 document.getElementById('openingDetailBody').innerHTML = '<p class="text-danger text-center">' + escHtml(data.error) + '</p>';
                 return;
             }
-            renderOpeningDetail(data.rows || [], data.opening_balance || 0);
+            renderOpeningDetail(data.rows || [], data.opening_balance || 0, correctOpening);
         },
         error: function() {
             document.getElementById('openingDetailBody').innerHTML = '<p class="text-danger text-center">Failed to load details.</p>';
@@ -362,16 +363,19 @@ function showOpeningDetail(barcode, description) {
     });
 }
 
-function renderOpeningDetail(rows, openingBalance) {
+function renderOpeningDetail(rows, transactionTotal, correctOpening) {
     var startVal = document.getElementById('startDate').value;
     var cutoffVal = document.getElementById('cutoffDate').value;
 
-    if (rows.length === 0) {
+    // System initial stock = difference between actual opening and recorded transactions
+    var systemStock = correctOpening - transactionTotal;
+
+    if (rows.length === 0 && systemStock === 0) {
         var msg = cutoffVal
             ? 'No transactions found between ' + cutoffVal + ' and ' + startVal
             : 'No transactions found before ' + startVal;
         document.getElementById('openingDetailBody').innerHTML =
-            '<p class="text-center text-muted" style="padding:30px;">' + msg + '<br><small>Opening balance: <strong>' + fmtNum(openingBalance) + '</strong></small></p>';
+            '<p class="text-center text-muted" style="padding:30px;">' + msg + '<br><small>Opening balance: <strong>' + fmtNum(correctOpening) + '</strong></small></p>';
         return;
     }
 
@@ -381,21 +385,40 @@ function renderOpeningDetail(rows, openingBalance) {
 
     var html = '<div class="d-flex justify-content-between align-items-center mb-3">';
     html += '<span style="font-size:12px;color:var(--text-muted);"><i class="fas fa-calendar-alt"></i> ' + escHtml(periodLabel) + '</span>';
-    html += '<span style="font-size:14px;font-weight:700;">Opening Balance: ' + fmtNum(openingBalance) + '</span>';
+    html += '<span style="font-size:14px;font-weight:700;">Opening Balance: ' + fmtNum(correctOpening) + '</span>';
     html += '</div>';
 
     html += '<table class="table table-sm table-striped" style="font-size:13px;">';
     html += '<thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Balance</th></tr></thead>';
     html += '<tbody>';
 
+    // Show system initial stock as first row if non-zero
+    var runningBalance = 0;
+    if (Math.abs(systemStock) > 0.001) {
+        runningBalance = systemStock;
+        html += '<tr style="background:#fff8e1;">';
+        html += '<td>-</td>';
+        html += '<td><em>System Initial Stock</em></td>';
+        html += '<td style="color:var(--text-muted);font-size:11px;">QOH loaded before any transaction</td>';
+        html += '<td class="text-end text-success">' + (systemStock > 0 ? fmtNum(systemStock) : '') + '</td>';
+        html += '<td class="text-end text-danger">' + (systemStock < 0 ? fmtNum(Math.abs(systemStock)) : '') + '</td>';
+        html += '<td class="text-end fw-bold">' + fmtNum(runningBalance) + '</td>';
+        html += '</tr>';
+    }
+
+    // Recalculate running balance from systemStock
     rows.forEach(function(r) {
+        var qIn = parseFloat(r.qty_in) || 0;
+        var qOut = parseFloat(r.qty_out) || 0;
+        runningBalance += qIn - qOut;
+
         html += '<tr>';
         html += '<td>' + escHtml(r.date) + '</td>';
         html += '<td>' + escHtml(r.type) + '</td>';
         html += '<td>' + escHtml(r.reference || '-') + '</td>';
-        html += '<td class="text-end text-success">' + (r.qty_in > 0 ? fmtNum(r.qty_in) : '') + '</td>';
-        html += '<td class="text-end text-danger">' + (r.qty_out > 0 ? fmtNum(r.qty_out) : '') + '</td>';
-        html += '<td class="text-end fw-bold">' + fmtNum(r.balance) + '</td>';
+        html += '<td class="text-end text-success">' + (qIn > 0 ? fmtNum(qIn) : '') + '</td>';
+        html += '<td class="text-end text-danger">' + (qOut > 0 ? fmtNum(qOut) : '') + '</td>';
+        html += '<td class="text-end fw-bold">' + fmtNum(runningBalance) + '</td>';
         html += '</tr>';
     });
 
