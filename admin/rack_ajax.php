@@ -208,6 +208,13 @@ if ($action === 'list') {
     $unlinked = $countStmt->get_result()->fetch_assoc()['cnt'];
     $countStmt->close();
 
+    // Clear PRODUCTS.rack for all products assigned to this rack
+    $nowMY = date('Y-m-d H:i:s');
+    $clearStmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = '', `rack_updated_at` = ? WHERE `barcode` IN (SELECT `barcode` FROM `rack_product` WHERE `rack_id` = ?)");
+    $clearStmt->bind_param("si", $nowMY, $id);
+    $clearStmt->execute();
+    $clearStmt->close();
+
     // Remove all product assignments for this rack
     $delProducts = $connect->prepare("DELETE FROM `rack_product` WHERE `rack_id` = ?");
     $delProducts->bind_param("i", $id);
@@ -290,6 +297,12 @@ if ($action === 'list') {
         exit;
     }
 
+    // Remove old rack mapping for this product first
+    $delOld = $connect->prepare("DELETE FROM `rack_product` WHERE `barcode` = ?");
+    $delOld->bind_param("s", $barcode);
+    $delOld->execute();
+    $delOld->close();
+
     $stmt = $connect->prepare("INSERT INTO `rack_product` (`rack_id`, `barcode`) VALUES (?, ?)");
     $stmt->bind_param("is", $rackId, $barcode);
     if ($stmt->execute()) {
@@ -337,11 +350,14 @@ if ($action === 'list') {
     $added = 0;
     $skipped = 0;
     $nowMY = date('Y-m-d H:i:s');
+    $delOldStmt = $connect->prepare("DELETE FROM `rack_product` WHERE `barcode` = ?");
     $stmt = $connect->prepare("INSERT INTO `rack_product` (`rack_id`, `barcode`) VALUES (?, ?)");
     $updStmt = $connect->prepare("UPDATE `PRODUCTS` SET `rack` = ?, `rack_updated_at` = ? WHERE `barcode` = ?");
     foreach ($barcodes as $bc) {
         $bc = trim($bc);
         if ($bc === '') continue;
+        $delOldStmt->bind_param("s", $bc);
+        $delOldStmt->execute();
         $stmt->bind_param("is", $rackId, $bc);
         if ($stmt->execute()) {
             $added++;
@@ -351,10 +367,11 @@ if ($action === 'list') {
             $skipped++;
         }
     }
+    $delOldStmt->close();
     $stmt->close();
     $updStmt->close();
 
-    echo json_encode(['success' => $added . ' product(s) added, ' . $skipped . ' skipped (already assigned).']);
+    echo json_encode(['success' => $added . ' product(s) added, ' . $skipped . ' skipped.']);
 
 } elseif ($action === 'remove_product') {
     $mappingId = intval($_POST['mapping_id'] ?? 0);
