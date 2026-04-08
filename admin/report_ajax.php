@@ -356,6 +356,58 @@ if ($action === 'stock_movement') {
     // Lower bound: cutoff date if set, otherwise all history
     $lowerBound = $cutoffDate ?: '1900-01-01';
 
+    // Calculate transferred/initial balance (only when no cutoff - cutoff means fresh start from 0)
+    $initialBalance = 0;
+    if (!$cutoffDate) {
+        // Get current QOH
+        $qohStmt = $connect->prepare("SELECT COALESCE(qoh, 0) AS qoh FROM `PRODUCTS` WHERE barcode $collate = ?");
+        $qohStmt->bind_param("s", $barcode);
+        $qohStmt->execute();
+        $qohRow = $qohStmt->get_result()->fetch_assoc();
+        $currentQoh = $qohRow ? floatval($qohRow['qoh']) : 0;
+        $qohStmt->close();
+
+        // Get ALL PW orderlist movements (all time) to reverse
+        $olStmt = $connect->prepare("SELECT
+            COALESCE(SUM(CASE WHEN PTYPE = 'STOCKIN' THEN QTY ELSE 0 END), 0) AS total_stockin,
+            COALESCE(SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') THEN QTY ELSE 0 END), 0) AS total_out
+            FROM `orderlist` WHERE BARCODE $collate = ? AND SALNUM LIKE 'PW%' AND BARCODE <> 'PT'");
+        $olStmt->bind_param("s", $barcode);
+        $olStmt->execute();
+        $olRow = $olStmt->get_result()->fetch_assoc();
+        $allOut = floatval($olRow['total_out']);
+        $allStockIn = floatval($olRow['total_stockin']);
+        $olStmt->close();
+
+        // Get ALL stockadj movements
+        $adjStmt = $connect->prepare("SELECT
+            COALESCE(SUM(CASE WHEN QTYADJ > 0 THEN QTYADJ ELSE 0 END), 0) AS adj_in,
+            COALESCE(SUM(CASE WHEN QTYADJ < 0 THEN ABS(QTYADJ) ELSE 0 END), 0) AS adj_out
+            FROM `stockadj` WHERE BARCODE $collate = ?");
+        $adjStmt->bind_param("s", $barcode);
+        $adjStmt->execute();
+        $adjRow = $adjStmt->get_result()->fetch_assoc();
+        $allAdjIn = floatval($adjRow['adj_in']);
+        $allAdjOut = floatval($adjRow['adj_out']);
+        $adjStmt->close();
+
+        // Get ALL GRN movements
+        $allGrnIn = 0;
+        if ($hasGrn) {
+            $grnStmt = $connect->prepare("SELECT COALESCE(SUM(gi.qty_received), 0) AS grn_in
+                FROM `grn_item` gi LEFT JOIN `grn` g ON gi.grn_id = g.id
+                WHERE gi.barcode $collate = ?");
+            $grnStmt->bind_param("s", $barcode);
+            $grnStmt->execute();
+            $grnRow = $grnStmt->get_result()->fetch_assoc();
+            $allGrnIn = floatval($grnRow['grn_in']);
+            $grnStmt->close();
+        }
+
+        // Reverse all movements from current QOH to get transferred stock level
+        $initialBalance = $currentQoh + $allOut - $allStockIn + $allAdjOut - $allAdjIn - $allGrnIn;
+    }
+
     // Fetch all transactions before startDate (or between cutoff and startDate)
     $sql = "SELECT txn_date, txn_type, reference, qty_in, qty_out FROM (
             SELECT o.SDATE AS txn_date,
@@ -411,7 +463,20 @@ if ($action === 'stock_movement') {
     $result = $stmt->get_result();
 
     $rows = [];
-    $runningBalance = 0;
+    $runningBalance = $initialBalance;
+
+    // Show transferred balance as first row when it exists (non-cutoff mode)
+    if ($initialBalance != 0) {
+        $rows[] = [
+            'date' => '',
+            'type' => 'Transferred Balance',
+            'reference' => 'Stock from old system',
+            'qty_in' => $initialBalance > 0 ? $initialBalance : 0,
+            'qty_out' => $initialBalance < 0 ? abs($initialBalance) : 0,
+            'balance' => $initialBalance
+        ];
+    }
+
     while ($r = $result->fetch_assoc()) {
         $in = floatval($r['qty_in']);
         $out = floatval($r['qty_out']);
