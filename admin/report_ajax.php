@@ -84,6 +84,17 @@ if ($action === 'stock_movement') {
         $unionSql .= " GROUP BY gi.barcode";
     }
 
+    // Include matching products from PRODUCTS table when searching,
+    // so products with no activity in the period still appear
+    if ($search !== '') {
+        $unionSql .= " UNION SELECT p4.barcode $collate AS BARCODE, p4.name AS description
+                FROM `PRODUCTS` p4
+                WHERE (p4.barcode LIKE ? OR p4.name LIKE ?)";
+        $unionParams[] = $searchParam;
+        $unionParams[] = $searchParam;
+        $unionTypes .= "ss";
+    }
+
     // ── STEP 2: Main query with total In/Out/Adj ──
     $sql = "SELECT combined.BARCODE, combined.description,
                 COALESCE(p.qoh, 0) AS current_qoh,
