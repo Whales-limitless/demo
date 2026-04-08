@@ -41,7 +41,7 @@ if ($action === 'stock_movement') {
 
     // ── STEP 1: Get all products with movement (combined UNION) ──
     $unionSql = "SELECT BARCODE $collate AS BARCODE, PDESC AS description FROM `orderlist`
-                WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'";
+                WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT' AND SALNUM LIKE 'PW%'";
     $unionParams = [$startDate, $endDate];
     $unionTypes = "ss";
     if ($search !== '') {
@@ -109,7 +109,7 @@ if ($action === 'stock_movement') {
                     SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') THEN QTY ELSE 0 END) AS qty_out,
                     SUM(CASE WHEN PTYPE = 'STOCKIN' THEN QTY ELSE 0 END) AS qty_stockin
                 FROM `orderlist`
-                WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'
+                WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT' AND SALNUM LIKE 'PW%'
                 GROUP BY BARCODE
             ) orders ON combined.BARCODE $collate = orders.BARCODE $collate
             LEFT JOIN (
@@ -125,7 +125,7 @@ if ($action === 'stock_movement') {
                     SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') THEN QTY ELSE 0 END) AS qty_out_all,
                     SUM(CASE WHEN PTYPE = 'STOCKIN' THEN QTY ELSE 0 END) AS qty_stockin_all
                 FROM `orderlist`
-                WHERE SDATE >= ? AND BARCODE <> 'PT'
+                WHERE SDATE >= ? AND BARCODE <> 'PT' AND SALNUM LIKE 'PW%'
                 GROUP BY BARCODE
             ) orders_all ON combined.BARCODE $collate = orders_all.BARCODE $collate
             LEFT JOIN (
@@ -173,7 +173,7 @@ if ($action === 'stock_movement') {
                     SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') THEN QTY ELSE 0 END) AS qty_out_cutoff,
                     SUM(CASE WHEN PTYPE = 'STOCKIN' THEN QTY ELSE 0 END) AS qty_stockin_cutoff
                 FROM `orderlist`
-                WHERE SDATE >= ? AND SDATE < ? AND BARCODE <> 'PT'
+                WHERE SDATE >= ? AND SDATE < ? AND BARCODE <> 'PT' AND SALNUM LIKE 'PW%'
                 GROUP BY BARCODE
             ) orders_cutoff ON combined.BARCODE $collate = orders_cutoff.BARCODE $collate
             LEFT JOIN (
@@ -273,7 +273,7 @@ if ($action === 'stock_movement') {
                 SUM(CASE WHEN QTY > 0 AND STATUS = 'DONE' AND (PTYPE IS NULL OR PTYPE <> 'STOCKIN') THEN QTY ELSE 0 END) AS qty_out,
                 SUM(CASE WHEN PTYPE = 'STOCKIN' THEN QTY ELSE 0 END) AS qty_stockin
             FROM `orderlist`
-            WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT'
+            WHERE SDATE >= ? AND SDATE <= ? AND BARCODE <> 'PT' AND SALNUM LIKE 'PW%'
                 AND COALESCE(branch_code, '') IN ($branchInPlaceholders)
             GROUP BY BARCODE, branch_code";
         $brOrderParams = [$startDate, $endDate];
@@ -365,7 +365,7 @@ if ($action === 'stock_movement') {
                 CASE WHEN o.PTYPE IS NULL OR o.PTYPE <> 'STOCKIN' THEN o.QTY ELSE 0 END AS qty_out
             FROM `orderlist` o
             WHERE o.BARCODE $collate = ? AND o.SDATE >= ? AND o.SDATE < ?
-                AND o.STATUS = 'DONE' AND o.BARCODE <> 'PT'
+                AND o.STATUS = 'DONE' AND o.BARCODE <> 'PT' AND o.SALNUM LIKE 'PW%'
 
             UNION ALL
 
