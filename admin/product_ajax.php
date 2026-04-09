@@ -318,13 +318,14 @@ if ($action === 'list') {
     }
     $image = is_string($imageResult) ? $imageResult : $existingImage;
 
-    // Check if rack changed to update rack_updated_at
-    $oldRackStmt = $connect->prepare("SELECT `rack` FROM `PRODUCTS` WHERE `id` = ? LIMIT 1");
-    $oldRackStmt->bind_param("i", $id);
-    $oldRackStmt->execute();
-    $oldRackRow = $oldRackStmt->get_result()->fetch_assoc();
-    $oldRackStmt->close();
-    $oldRack = $oldRackRow ? trim($oldRackRow['rack'] ?? '') : '';
+    // Check if rack or QOH changed
+    $oldStmt = $connect->prepare("SELECT `rack`, `qoh`, `barcode`, `name` FROM `PRODUCTS` WHERE `id` = ? LIMIT 1");
+    $oldStmt->bind_param("i", $id);
+    $oldStmt->execute();
+    $oldRow = $oldStmt->get_result()->fetch_assoc();
+    $oldStmt->close();
+    $oldRack = $oldRow ? trim($oldRow['rack'] ?? '') : '';
+    $oldQoh = $oldRow ? floatval($oldRow['qoh']) : 0;
 
     if ($rack !== $oldRack) {
         $nowMY = date('Y-m-d H:i:s');
@@ -358,6 +359,22 @@ if ($action === 'list') {
                 }
             }
         }
+        // Log adjustment if QOH was changed
+        if ($oldRow && floatval($qoh) !== $oldQoh) {
+            $adjQty = floatval($qoh) - $oldQoh;
+            $adminUser = $_SESSION['admin_name'] ?? 'Admin';
+            $curDate = date('Y-m-d');
+            $curTime = date('H:i:s');
+            $salnum = 'PRODADJ' . date('YmdHis') . rand(100, 999);
+            $adjBarcode = $barcode !== '' ? $barcode : ($oldRow['barcode'] ?? '');
+            $adjDesc = mb_substr($name, 0, 48);
+            $adjRemark = 'Product Edit QOH Adj: ' . $oldQoh . ' -> ' . $qoh;
+            $adjStmt = $connect->prepare("INSERT INTO `stockadj` (`ACCODE`,`USER`,`OUTLET`,`SDATE`,`STIME`,`SALNUM`,`BARCODE`,`PDESC`,`QTYADJ`,`REMARK`,`LOSS_REASON`) VALUES ('PRODUCTADJ',?,?,?,?,?,?,?,?,?,'ADJUSTMENT')");
+            $adjStmt->bind_param("sssssssds", $adminUser, $adminUser, $curDate, $curTime, $salnum, $adjBarcode, $adjDesc, $adjQty, $adjRemark);
+            $adjStmt->execute();
+            $adjStmt->close();
+        }
+
         echo json_encode(['success' => 'Product updated successfully.']);
     } else {
         echo json_encode(['error' => 'Failed to update product: ' . $connect->error]);
