@@ -53,6 +53,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .badge-received { background: #dcfce7; color: #16a34a; }
 .badge-closed { background: #f3e8ff; color: #7c3aed; }
 .badge-cancelled { background: #fee2e2; color: #dc2626; }
+.badge-done { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.btn-done { background: #0d9488; } .btn-done:hover { background: #0f766e; }
 .btn-action { padding: 5px 12px; border: none; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); display: inline-block; margin: 1px; color: #fff; }
 .btn-edit { background: #3b82f6; } .btn-edit:hover { background: #2563eb; }
 .btn-view { background: #6366f1; } .btn-view:hover { background: #4f46e5; }
@@ -161,6 +163,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             <div class="status-tab" data-status="PARTIALLY_RECEIVED" onclick="filterStatus(this);">Partial</div>
             <div class="status-tab" data-status="RECEIVED" onclick="filterStatus(this);">Received</div>
             <div class="status-tab" data-status="CANCELLED" onclick="filterStatus(this);">Cancelled</div>
+            <div class="status-tab" data-status="DONE" onclick="filterStatus(this);"><i class="fas fa-history"></i> History</div>
         </div>
 
         <div class="table-toolbar">
@@ -450,6 +453,9 @@ function renderPOTable(pos) {
             html += '<button class="btn-action btn-cancel-po" onclick="cancelPO(' + po.id + ', \'' + escHtml(po.po_number) + '\');"><i class="fas fa-ban"></i></button>';
         } else if (po.status === 'APPROVED') {
             html += '<button class="btn-action btn-cancel-po" onclick="cancelPO(' + po.id + ', \'' + escHtml(po.po_number) + '\');"><i class="fas fa-ban"></i></button>';
+        }
+        if (po.status === 'APPROVED' || po.status === 'PARTIALLY_RECEIVED' || po.status === 'RECEIVED') {
+            html += ' <button class="btn-action btn-done" onclick="donePO(' + po.id + ', \'' + escHtml(po.po_number) + '\');" title="Mark as Done"><i class="fas fa-check-double"></i></button>';
         }
         html += '</td>';
         html += '</tr>';
@@ -1078,8 +1084,8 @@ function downloadPDF(id) {
             html += '</div>';
 
             var statusLower = (po.status || '').toLowerCase();
-            var statusColors = { draft: '#92400e', approved: '#1e40af', received: '#166534', partially_received: '#166534', cancelled: '#991b1b', closed: '#6b21a8' };
-            var statusBgs = { draft: '#fef3c7', approved: '#dbeafe', received: '#dcfce7', partially_received: '#dcfce7', cancelled: '#fee2e2', closed: '#f3e8ff' };
+            var statusColors = { draft: '#92400e', approved: '#1e40af', received: '#166534', partially_received: '#166534', cancelled: '#991b1b', closed: '#6b21a8', done: '#15803d' };
+            var statusBgs = { draft: '#fef3c7', approved: '#dbeafe', received: '#dcfce7', partially_received: '#dcfce7', cancelled: '#fee2e2', closed: '#f3e8ff', done: '#f0fdf4' };
 
             html += '<div style="display:flex;flex-wrap:wrap;margin-bottom:20px;">';
             html += '<div style="width:50%;">';
@@ -1185,6 +1191,31 @@ function cancelPO(id, poNumber) {
         if (result.isConfirmed) {
             $.ajax({
                 type: 'POST', url: 'po_ajax.php', data: { action: 'cancel', id: id }, dataType: 'json',
+                success: function(data) {
+                    if (data.success) {
+                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadPOs(); });
+                    } else {
+                        Swal.fire({ icon: 'error', text: data.error });
+                    }
+                }
+            });
+        }
+    });
+}
+
+// ==================== MARK PO AS DONE ====================
+function donePO(id, poNumber) {
+    Swal.fire({
+        title: 'Mark PO as Done?',
+        text: 'Mark "' + poNumber + '" as done? It will be hidden from the main list and goods receiving. You can view it in History.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0d9488',
+        confirmButtonText: 'Yes, Done'
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.ajax({
+                type: 'POST', url: 'po_ajax.php', data: { action: 'mark_done', id: id }, dataType: 'json',
                 success: function(data) {
                     if (data.success) {
                         Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadPOs(); });
