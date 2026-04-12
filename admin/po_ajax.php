@@ -37,6 +37,8 @@ if ($action === 'list') {
         $where .= " AND po.status = ?";
         $params[] = $status;
         $types .= "s";
+    } else {
+        $where .= " AND po.status != 'DONE'";
     }
 
     $sql = "SELECT po.*, s.name AS supplier_name FROM `purchase_order` po LEFT JOIN `supplier` s ON po.supplier_id = s.id WHERE $where ORDER BY po.id DESC LIMIT 200";
@@ -300,6 +302,20 @@ if ($action === 'list') {
         echo json_encode(['success' => 'PO cancelled.']);
     } else {
         echo json_encode(['error' => 'Could not cancel.']);
+    }
+    $stmt->close();
+
+// ==================== MARK PO AS DONE ====================
+} elseif ($action === 'mark_done') {
+    $id = intval($_POST['id'] ?? 0);
+    $stmt = $connect->prepare("UPDATE `purchase_order` SET `status`='DONE' WHERE `id`=? AND `status` NOT IN ('DRAFT','CANCELLED','DONE')");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+
+    if ($stmt->affected_rows > 0) {
+        echo json_encode(['success' => 'PO marked as done.']);
+    } else {
+        echo json_encode(['error' => 'Could not mark as done.']);
     }
     $stmt->close();
 
