@@ -29,7 +29,7 @@ $currentPage = 'staff_po';
     --text: #1a1a1a; --text-muted: #6b7280; --radius: 12px;
     --shadow-md: 0 4px 16px rgba(0,0,0,0.08); --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.po-page-content { max-width: 1400px; margin: 0 auto; padding: 20px 24px 100px; }
+.po-page-content { max-width: 1400px; margin: 0 auto; padding: 20px 24px 160px; }
 .po-page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
 .po-page-header h1 { font-family: 'Outfit', sans-serif; font-size: 22px; font-weight: 700; margin: 0; }
 .btn-add { background: var(--primary); color: #fff; border: none; padding: 9px 20px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: background var(--transition); display: inline-flex; align-items: center; gap: 6px; }
