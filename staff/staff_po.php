@@ -453,7 +453,7 @@ function renderPOTable(pos) {
         } else if (po.status === 'APPROVED') {
             html += '<button class="btn-action btn-cancel-po" onclick="cancelPO(' + po.id + ', \'' + escHtml(po.po_number) + '\');"><i class="fas fa-ban"></i></button>';
         }
-        if (po.status === 'APPROVED' || po.status === 'PARTIALLY_RECEIVED' || po.status === 'RECEIVED') {
+        if (po.status !== 'DONE') {
             html += ' <button class="btn-action btn-done" onclick="donePO(' + po.id + ', \'' + escHtml(po.po_number) + '\');" title="Mark as Done"><i class="fas fa-check-double"></i></button>';
         }
         html += '</td>';
