@@ -308,7 +308,7 @@ if ($action === 'list') {
 // ==================== MARK PO AS DONE ====================
 } elseif ($action === 'mark_done') {
     $id = intval($_POST['id'] ?? 0);
-    $stmt = $connect->prepare("UPDATE `purchase_order` SET `status`='DONE' WHERE `id`=? AND `status` NOT IN ('DRAFT','CANCELLED','DONE')");
+    $stmt = $connect->prepare("UPDATE `purchase_order` SET `status`='DONE' WHERE `id`=? AND `status` != 'DONE'");
     $stmt->bind_param("i", $id);
     $stmt->execute();
 
