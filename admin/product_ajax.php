@@ -753,6 +753,9 @@ if ($action === 'list') {
     $rackStmt->close();
     $insStmt->close();
     echo json_encode(['success' => $updated . ' product(s) rack updated.', 'updated' => $updated]);
+    $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+    @unlink($cacheDir . '/all_products.json');
+    @unlink($cacheDir . '/pending_qty.json');
     exit;
 
 // ===================== LEGACY ENDPOINTS =====================
@@ -996,6 +999,9 @@ if ($action === 'list') {
         }
 
         echo json_encode(['success' => $affected . ' product(s) updated.']);
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
     } else {
         echo json_encode(['error' => 'Failed: ' . $connect->error]);
     }

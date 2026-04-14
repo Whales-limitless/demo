@@ -29,6 +29,10 @@ if ($action === 'update_name') {
     $stmt->close();
 
     if ($updated) {
+        // Invalidate staff product cache
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         echo json_encode(['success' => true, 'name' => $name]);
     } else {
         echo json_encode(['success' => false, 'error' => 'Update failed']);

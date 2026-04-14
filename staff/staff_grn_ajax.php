@@ -305,6 +305,10 @@ if ($action === 'list') {
         }
 
         $connect->commit();
+        // Invalidate staff product cache after QOH changes
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         echo json_encode(['success' => 'GRN ' . $grnNumber . ' created. Stock quantities updated.', 'grn_id' => $grnId]);
 
     } catch (Exception $e) {

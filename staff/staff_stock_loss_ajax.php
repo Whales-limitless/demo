@@ -111,6 +111,10 @@ if ($action === 'record_multiple') {
         }
 
         $connect->commit();
+        // Invalidate staff product cache
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         echo json_encode(['success' => $recorded . ' stock loss record(s) saved successfully.']);
 
     } catch (Exception $e) {

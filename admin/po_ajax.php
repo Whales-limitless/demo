@@ -206,6 +206,10 @@ if ($action === 'list') {
 
     $connect->query("UPDATE `purchase_order` SET `total_amount` = $totalAmount WHERE `id` = $newPoId");
 
+    // Invalidate staff product cache after product name updates
+    $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+    @unlink($cacheDir . '/all_products.json');
+    @unlink($cacheDir . '/pending_qty.json');
     echo json_encode(['success' => 'PO ' . $poNumber . ' created.', 'po_id' => $newPoId]);
 
 // ==================== UPDATE PO ====================
@@ -273,6 +277,10 @@ if ($action === 'list') {
 
     $connect->query("UPDATE `purchase_order` SET `total_amount` = $totalAmount WHERE `id` = " . intval($id));
 
+    // Invalidate staff product cache after product name updates
+    $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+    @unlink($cacheDir . '/all_products.json');
+    @unlink($cacheDir . '/pending_qty.json');
     echo json_encode(['success' => 'PO updated.', 'po_id' => $id]);
 
 // ==================== APPROVE PO ====================
@@ -334,6 +342,10 @@ if ($action === 'list') {
     $stmt->bind_param("ss", $name, $barcode);
     $stmt->execute();
     $stmt->close();
+    // Invalidate staff product cache after product name update
+    $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+    @unlink($cacheDir . '/all_products.json');
+    @unlink($cacheDir . '/pending_qty.json');
     echo json_encode(['success' => true, 'name' => $name]);
 
 } else {

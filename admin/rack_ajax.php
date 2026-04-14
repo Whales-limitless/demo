@@ -225,6 +225,10 @@ if ($action === 'list') {
     $delRack = $connect->prepare("DELETE FROM `rack` WHERE `id` = ?");
     $delRack->bind_param("i", $id);
     if ($delRack->execute()) {
+        // Invalidate staff product cache after rack cleared from products
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         echo json_encode(['success' => 'Rack deleted. ' . $unlinked . ' product(s) unlinked.']);
     } else {
         echo json_encode(['error' => 'Failed: ' . $connect->error]);
@@ -320,6 +324,10 @@ if ($action === 'list') {
         $updStmt->execute();
         $updStmt->close();
 
+        // Invalidate staff product cache
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         echo json_encode(['success' => 'Product added to rack.']);
     } else {
         if (strpos($connect->error, 'Duplicate') !== false) {
@@ -371,6 +379,10 @@ if ($action === 'list') {
     $stmt->close();
     $updStmt->close();
 
+    // Invalidate staff product cache
+    $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+    @unlink($cacheDir . '/all_products.json');
+    @unlink($cacheDir . '/pending_qty.json');
     echo json_encode(['success' => $added . ' product(s) added, ' . $skipped . ' skipped.']);
 
 } elseif ($action === 'remove_product') {
@@ -400,6 +412,10 @@ if ($action === 'list') {
             $updStmt->execute();
             $updStmt->close();
         }
+        // Invalidate staff product cache
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         echo json_encode(['success' => 'Product removed from rack.']);
     } else {
         echo json_encode(['error' => 'Failed: ' . $connect->error]);
