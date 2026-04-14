@@ -244,7 +244,6 @@ var OfflineSync = (function() {
       '/staff/staff_stock_loss.php',
       '/staff/staff_stock_loss_ajax.php',
       '/staff/product_rack_ajax.php',
-      '/staff/product_search_ajax.php',
       '/staff/navbar.php',
       '/staff/mobile-bottombar.php',
       '/staff/offline_download.php',

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pwstaff-v9';
+const CACHE_NAME = 'pwstaff-v10';
 
 // Pre-cache static assets
 const urlsToCache = [
@@ -55,6 +55,12 @@ self.addEventListener('fetch', event => {
         });
       })
     );
+    return;
+  }
+
+  // For AJAX endpoints: always go to network for fresh data (never serve from cache)
+  const url = new URL(event.request.url);
+  if (url.pathname.endsWith('_ajax.php')) {
     return;
   }
 
