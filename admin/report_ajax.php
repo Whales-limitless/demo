@@ -422,6 +422,8 @@ if ($action === 'stock_movement') {
     // Fetch all transactions before startDate (or between cutoff and startDate)
     $sql = "SELECT txn_date, txn_type, reference, qty_in, qty_out FROM (
             SELECT o.SDATE AS txn_date,
+                COALESCE(o.TTIME, '00:00:00') AS txn_time,
+                o.ID AS source_id,
                 CASE WHEN o.PTYPE = 'STOCKIN' THEN 'Stock In' ELSE 'Sale' END AS txn_type,
                 o.SALNUM AS reference,
                 CASE WHEN o.PTYPE = 'STOCKIN' THEN o.QTY ELSE 0 END AS qty_in,
@@ -433,6 +435,8 @@ if ($action === 'stock_movement') {
             UNION ALL
 
             SELECT sa.SDATE AS txn_date,
+                COALESCE(sa.STIME, '00:00:00') AS txn_time,
+                sa.ID AS source_id,
                 CONCAT('Adjustment', CASE WHEN sa.LOSS_REASON IS NOT NULL AND sa.LOSS_REASON <> '' AND sa.LOSS_REASON <> 'ADJUSTMENT'
                     THEN CONCAT(' (', sa.LOSS_REASON, ')') ELSE '' END) AS txn_type,
                 sa.REMARK AS reference,
@@ -449,6 +453,8 @@ if ($action === 'stock_movement') {
             UNION ALL
 
             SELECT g.receive_date AS txn_date,
+                '00:00:00' AS txn_time,
+                gi.id AS source_id,
                 'GRN' AS txn_type,
                 COALESCE(g.grn_number, '') AS reference,
                 gi.qty_received AS qty_in,
@@ -462,7 +468,7 @@ if ($action === 'stock_movement') {
         $types .= "sss";
     }
 
-    $sql .= ") AS combined ORDER BY txn_date ASC, qty_in DESC";
+    $sql .= ") AS combined ORDER BY txn_date ASC, txn_time ASC, source_id ASC";
 
     $stmt = $connect->prepare($sql);
     if (!$stmt) {
