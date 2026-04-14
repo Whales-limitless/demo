@@ -281,6 +281,10 @@ if ($action === 'list') {
     $stmt->bind_param("ssssssssssssdss", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $rack_remark, $rackUpdatedAt, $qoh, $checked, $image);
 
     if ($stmt->execute()) {
+        // Invalidate staff product cache so new product appears immediately
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         echo json_encode(['success' => 'Product created successfully.']);
     } else {
         echo json_encode(['error' => 'Failed to create product: ' . $connect->error]);
@@ -375,6 +379,10 @@ if ($action === 'list') {
             $adjStmt->close();
         }
 
+        // Invalidate staff product cache so changes appear immediately
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         echo json_encode(['success' => 'Product updated successfully.']);
     } else {
         echo json_encode(['error' => 'Failed to update product: ' . $connect->error]);
@@ -392,6 +400,10 @@ if ($action === 'list') {
     $stmt->bind_param("i", $id);
 
     if ($stmt->execute()) {
+        // Invalidate staff product cache so removal appears immediately
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         echo json_encode(['success' => 'Product deactivated.']);
     } else {
         echo json_encode(['error' => 'Failed: ' . $connect->error]);
