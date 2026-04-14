@@ -497,7 +497,12 @@ if ($action === 'stock_movement') {
     while ($r = $result->fetch_assoc()) {
         $in = floatval($r['qty_in']);
         $out = floatval($r['qty_out']);
-        $runningBalance += $in - $out;
+        // Product Edit QOH adjustments reset balance to the target QOH
+        if (preg_match('/^Product Edit QOH Adj:.*->\s*([\d.]+)/', $r['reference'] ?? '', $m)) {
+            $runningBalance = floatval($m[1]);
+        } else {
+            $runningBalance += $in - $out;
+        }
         $rows[] = [
             'date' => $r['txn_date'],
             'type' => $r['txn_type'],
