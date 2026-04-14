@@ -65,6 +65,10 @@ if ($action === 'update_rack') {
     }
 
     if ($updated) {
+        // Invalidate staff product cache
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         $now = date('Y-m-d H:i:s');
         echo json_encode(['success' => true, 'rack' => $rack, 'rack_updated_at' => $now]);
     } else {

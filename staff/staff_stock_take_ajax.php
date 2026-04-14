@@ -282,6 +282,10 @@ if ($action === 'list_sessions') {
         }
 
         $connect->commit();
+        // Invalidate staff product cache
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         echo json_encode(['success' => true, 'new_desc' => $newDesc]);
     } catch (Exception $e) {
         $connect->rollback();

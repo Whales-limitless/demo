@@ -73,6 +73,10 @@ if ($action === "done") {
                     }
                 }
             }
+            // Invalidate staff product cache after QOH changes
+            $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+            @unlink($cacheDir . '/all_products.json');
+            @unlink($cacheDir . '/pending_qty.json');
             echo "Saved.";
         } elseif ($result1 && $affected1 == 0) {
             echo "Error: No rows updated. Order may already be DONE.";

@@ -160,6 +160,10 @@ if ($action === 'search_products') {
 
     if ($stmt->execute()) {
         $newId = $connect->insert_id;
+        // Invalidate staff product cache
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         echo json_encode([
             'success' => 'Product created.',
             'product' => ['id' => $newId, 'barcode' => $barcode, 'name' => $name, 'uom' => $uom, 'image' => $image, 'qoh' => 0]
@@ -248,6 +252,10 @@ if ($action === 'search_products') {
     $itemStmt->close();
     $prodNameStmt->close();
 
+    // Invalidate staff product cache after product name updates
+    $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+    @unlink($cacheDir . '/all_products.json');
+    @unlink($cacheDir . '/pending_qty.json');
     echo json_encode(['success' => 'PO ' . $poNumber . ' created.', 'po_id' => $newPoId]);
 
 // ==================== UPDATE PO ====================
@@ -302,6 +310,10 @@ if ($action === 'search_products') {
     $itemStmt->close();
     $prodNameStmt->close();
 
+    // Invalidate staff product cache after product name updates
+    $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+    @unlink($cacheDir . '/all_products.json');
+    @unlink($cacheDir . '/pending_qty.json');
     echo json_encode(['success' => 'PO updated.', 'po_id' => $id]);
 
 // ==================== GET PO DETAIL ====================
@@ -575,6 +587,10 @@ if ($action === 'search_products') {
     $stmt->bind_param("ssssssssssssdss", $barcode, $code, $name, $description, $cat, $sub_cat, $cat_code, $sub_code, $uom, $rack, $rack_remark, $rackUpdatedAt, $qoh, $checked, $image);
 
     if ($stmt->execute()) {
+        // Invalidate staff product cache
+        $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+        @unlink($cacheDir . '/all_products.json');
+        @unlink($cacheDir . '/pending_qty.json');
         echo json_encode(['success' => 'Product created successfully.', 'product' => ['barcode' => $barcode, 'name' => $name, 'uom' => $uom]]);
     } else {
         echo json_encode(['error' => 'Failed to create product: ' . $connect->error]);
@@ -610,6 +626,10 @@ if ($action === 'search_products') {
     $stmt->bind_param("ss", $name, $barcode);
     $stmt->execute();
     $stmt->close();
+    // Invalidate staff product cache
+    $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+    @unlink($cacheDir . '/all_products.json');
+    @unlink($cacheDir . '/pending_qty.json');
     echo json_encode(['success' => true, 'name' => $name]);
 
 } else {

@@ -356,13 +356,21 @@ function initProductData(categories) {
 function patchProductData(freshData) {
   // Build lookup: id → fresh product data
   var freshMap = {};
+  var freshCount = 0;
   (freshData.categories || []).forEach(function(cat) {
     cat.subcategories.forEach(function(sc) {
       sc.products.forEach(function(p) {
         freshMap[p.id] = p;
+        freshCount++;
       });
     });
   });
+
+  // If products were added or removed, do a full re-render
+  if (freshCount !== allProductsFlat.length || allProductsFlat.some(function(p) { return !freshMap[p.id]; })) {
+    applyProductData(freshData);
+    return;
+  }
 
   // Update stock-take barcodes
   stockTakeBarcodes = {};
