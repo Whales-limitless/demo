@@ -27,6 +27,15 @@ $sidebarSections = [
         ['page' => 'del_location',  'href' => 'del_location.php',  'icon' => 'fas fa-map-marker-alt',    'label' => 'Locations'],
         ['page' => 'del_report',    'href' => 'del_report.php',    'icon' => 'fas fa-chart-bar',         'label' => 'Delivery Reports'],
     ],
+    'LEAVE' => [
+        ['page' => 'leave_report',  'href' => 'leave_report.php',  'icon' => 'fas fa-calendar-check', 'label' => 'Leave Report'],
+    ],
+    'EMPLOYEE KPI' => [
+        ['page' => 'kpi_report',  'href' => 'kpi_report.php',  'icon' => 'fas fa-chart-bar', 'label' => 'KPI Report'],
+    ],
+    'KPI CALIBRATION' => [
+        ['page' => 'kpi_calibration',  'href' => 'kpi_calibration.php',  'icon' => 'fas fa-sliders-h', 'label' => 'KPI Calibration'],
+    ],
     'REPORTS' => [
         ['page' => 'report_stock_take',     'href' => 'report_stock_take.php',     'icon' => 'fas fa-clipboard-list', 'label' => 'Stock Take Report'],
         ['page' => 'report_stock_movement', 'href' => 'report_stock_movement.php', 'icon' => 'fas fa-exchange-alt',   'label' => 'Stock Movement'],
