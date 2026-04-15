@@ -313,6 +313,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-add-cart.active:hover { background: var(--primary-dark); transform: translateY(-1px); }
 .btn-add-cart.disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
 .btn-add-cart.stock-take { background: #fef3c7; color: #92400e; cursor: not-allowed; font-size: 11px; }
+.btn-add-cart.out-of-stock { background: #fee2e2; color: #991b1b; cursor: not-allowed; font-size: 12px; }
 .cart-feedback { font-size: 12px; text-align: center; height: 16px; margin-top: 4px; }
 
 @media (max-width: 768px) { .main { padding: 16px 12px 80px; } .product-grid { gap: 10px; } .product-name { font-size: 12px; } .product-info { padding: 10px; } .category-title { font-size: 20px; } .toolbar { gap: 8px; } }
@@ -526,6 +527,10 @@ function renderProductCard(p, index) {
     bc = 'stock-take';
     bt = 'Active Stock Take Session';
     btnDisabled = true;
+  } else if (!p.inStock) {
+    bc = 'out-of-stock';
+    bt = 'Out of Stock';
+    btnDisabled = true;
   } else {
     bc = 'active';
     bt = 'Add to Cart';
@@ -727,6 +732,15 @@ function findProduct(id) {
 function addToCart(productId) {
   var product = findProduct(productId);
   if (!product) return;
+
+  // Prevent adding out-of-stock products (available_qty accounts for pending)
+  if (product.available_qty <= 0) {
+    var fb = document.getElementById('feedback_' + productId);
+    fb.style.color = 'var(--primary)';
+    fb.textContent = 'Out of stock!';
+    setTimeout(function() { fb.textContent = ''; }, 2000);
+    return;
+  }
 
   var qty = parseInt(document.getElementById('qty_' + productId).value) || 1;
 

@@ -66,6 +66,50 @@ if (!empty($orderBarcodes)) {
     }
 }
 
+// For PURCHASE orders, check available quantity (qoh minus pending) for each item
+if ($orderType !== 'STOCKIN') {
+    // Compute pending qty per barcode
+    $pendingQtyMap = [];
+    $pendingRes = mysqli_query($connect, "SELECT BARCODE, SUM(QTY) AS pending_qty FROM `orderlist` WHERE STATUS = 'PENDING' AND PTYPE = 'PURCHASE' AND QTY > 0 GROUP BY BARCODE");
+    if ($pendingRes) {
+        while ($pRow = mysqli_fetch_assoc($pendingRes)) {
+            $pendingQtyMap[$pRow['BARCODE']] = intval($pRow['pending_qty']);
+        }
+    }
+
+    $outOfStockItems = [];
+    foreach ($items as $item) {
+        $barcode = clean($connect, $item['barcode'] ?? '');
+        if ($barcode === '') continue;
+
+        $qohStmt = $connect->prepare("SELECT IFNULL(qoh, 0) AS qoh, name FROM `PRODUCTS` WHERE `barcode` = ? LIMIT 1");
+        $qohStmt->bind_param('s', $barcode);
+        $qohStmt->execute();
+        $qohResult = $qohStmt->get_result();
+        $qohRow = $qohResult->fetch_assoc();
+        $qohStmt->close();
+
+        if ($qohRow) {
+            $qoh = intval($qohRow['qoh']);
+            $pending = $pendingQtyMap[$barcode] ?? 0;
+            $available = $qoh - $pending;
+            if ($available <= 0) {
+                $outOfStockItems[] = $qohRow['name'] ?: $barcode;
+            }
+        }
+    }
+
+    if (!empty($outOfStockItems)) {
+        echo json_encode([
+            'success' => false,
+            'error' => 'The following product(s) are out of stock (after pending orders): ' . implode(', ', $outOfStockItems) . '. Please remove them from your cart.',
+            'out_of_stock' => true,
+            'out_of_stock_items' => $outOfStockItems
+        ]);
+        exit;
+    }
+}
+
 // Generate unique SALNUM: PW + YYYYMMDD + HHMMSS + 3-digit random
 $salnum = 'PW' . date('YmdHis') . str_pad(rand(0, 999), 3, '0', STR_PAD_LEFT);
 

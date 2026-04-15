@@ -302,6 +302,28 @@ function finishOrder() {
             localStorage.removeItem('pw_all_products_ts');
             // Redirect to preview/print page
             window.location.href = 'stockin_preview.php?salnum=' + encodeURIComponent(resp.salnum);
+          } else if (resp.out_of_stock && resp.out_of_stock_items) {
+            var oosHtml = '<div style="text-align:left;max-height:200px;overflow-y:auto;margin-top:10px;">';
+            resp.out_of_stock_items.forEach(function(name) {
+              oosHtml += '<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:13px;"><strong>' + name + '</strong></div>';
+            });
+            oosHtml += '</div>';
+
+            var alertDiv = document.createElement('div');
+            alertDiv.id = 'outOfStockAlert';
+            alertDiv.style.cssText = 'background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px 16px;margin-bottom:16px;';
+            alertDiv.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+              '<svg style="width:20px;height:20px;fill:none;stroke:#dc2626;stroke-width:2;flex-shrink:0;"><circle cx="10" cy="10" r="9"/><line x1="10" y1="6" x2="10" y2="11"/><circle cx="10" cy="14" r="0.5" fill="#dc2626"/></svg>' +
+              '<strong style="color:#991b1b;font-size:14px;">Out of Stock</strong></div>' +
+              '<p style="font-size:13px;color:#991b1b;margin:0;">The following product(s) are out of stock (after pending orders) and cannot be purchased:</p>' +
+              oosHtml;
+
+            var existingOos = document.getElementById('outOfStockAlert');
+            if (existingOos) existingOos.remove();
+            var mainEl = document.querySelector('.main');
+            mainEl.insertBefore(alertDiv, mainEl.children[1]);
+
+            updateType();
           } else {
             alert('Order failed: ' + (resp.error || 'Unknown error'));
             updateType();
