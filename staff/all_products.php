@@ -161,6 +161,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-add-cart.active { background: var(--primary); color: #fff; }
 .btn-add-cart.active:hover { background: var(--primary-dark); transform: translateY(-1px); }
 .btn-add-cart.stock-take { background: #fef3c7; color: #92400e; cursor: not-allowed; font-size: 11px; }
+.btn-add-cart.out-of-stock { background: #fee2e2; color: #991b1b; cursor: not-allowed; font-size: 12px; }
 .cart-feedback { font-size: 12px; text-align: center; height: 16px; margin-top: 4px; }
 
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 15px; }
@@ -670,7 +671,9 @@ function renderProductCard(p, index) {
         '</div>' +
         (stockTakeBarcodes[p.barcode] ?
           '<button class="btn-add-cart stock-take" disabled>Active Stock Take Session</button>' :
-          '<button class="btn-add-cart active" onclick="addToCart(' + p.id + ')">Add to Cart</button>') +
+          (!p.inStock ?
+            '<button class="btn-add-cart out-of-stock" disabled>Out of Stock</button>' :
+            '<button class="btn-add-cart active" onclick="addToCart(' + p.id + ')">Add to Cart</button>')) +
         '<div class="cart-feedback" id="feedback_' + p.id + '"></div>' +
       '</div>' +
     '</div>' +
@@ -892,6 +895,15 @@ function addToCart(productId) {
   var product = findProduct(productId);
   if (!product) return;
 
+  // Prevent adding out-of-stock products (available_qty accounts for pending)
+  if (product.available_qty <= 0) {
+    var fb = document.getElementById('feedback_' + productId);
+    fb.style.color = 'var(--primary)';
+    fb.textContent = 'Out of stock!';
+    setTimeout(function() { fb.textContent = ''; }, 2000);
+    return;
+  }
+
   var qty = parseInt(document.getElementById('qty_' + productId).value) || 1;
 
   var cart = [];
@@ -903,7 +915,7 @@ function addToCart(productId) {
   }
 
   if (existing) {
-    existing.qty = existing.qty + qty;
+    existing.qty = Math.min(existing.qty + qty, product.available_qty);
   } else {
     cart.push({
       id: product.id,
@@ -912,8 +924,8 @@ function addToCart(productId) {
       barcode: product.barcode || '',
       img: product.image ? '/img/' + product.image : '',
       rack: product.rack_location || null,
-      qty: qty,
-      maxQty: product.quantity,
+      qty: Math.min(qty, product.available_qty),
+      maxQty: product.available_qty,
       checked: true
     });
   }
