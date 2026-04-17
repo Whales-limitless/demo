@@ -15,6 +15,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="components.css">
+<link rel="stylesheet" href="pending_sources.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -404,7 +405,7 @@ function patchProductData(freshData) {
 
     if (qtyChanged) {
       var qtyEl = card.querySelector('.qty-label');
-      if (qtyEl) qtyEl.innerHTML = 'Qty: <span>' + p.available_qty + '</span>' + (p.pending_qty > 0 ? ' <span style="font-size:10px;color:var(--primary);font-weight:600;">(' + p.pending_qty + ' pending)</span>' : '');
+      if (qtyEl) qtyEl.innerHTML = 'Qty: <span>' + p.available_qty + '</span>' + (p.pending_qty > 0 ? ' <button type="button" class="pending-link" style="font-size:10px;" onclick="showPendingSources(\'' + escAttr(p.barcode || '') + '\', \'' + escAttr(p.name || '') + '\')">(' + p.pending_qty + ' pending)</button>' : '');
     }
     if (nameChanged) {
       var nameEl = card.querySelector('.product-name');
@@ -661,7 +662,7 @@ function renderProductCard(p, index) {
     '<div class="product-info">' +
       '<div class="product-name" onclick="openEditNameModal(' + p.id + ')">' + escHtml(p.name) + '</div>' +
       '<div class="product-tags">' + tags + '</div>' +
-      '<div class="qty-label">Qty: <span>' + p.available_qty + '</span>' + (p.pending_qty > 0 ? ' <span style="font-size:10px;color:var(--primary);font-weight:600;">(' + p.pending_qty + ' pending)</span>' : '') + '</div>' +
+      '<div class="qty-label">Qty: <span>' + p.available_qty + '</span>' + (p.pending_qty > 0 ? ' <button type="button" class="pending-link" style="font-size:10px;" onclick="showPendingSources(\'' + escAttr(p.barcode || '') + '\', \'' + escAttr(p.name || '') + '\')">(' + p.pending_qty + ' pending)</button>' : '') + '</div>' +
       '<div class="product-actions">' +
         '<div class="qty-row">' +
           '<button class="qty-btn" onclick="updateQty(\'minus\',' + p.id + ')">−</button>' +
@@ -1219,5 +1220,6 @@ document.getElementById('editNameInput').addEventListener('keydown', function(e)
   </div>
 </div>
 
+<script src="pending_sources.js" defer></script>
 </body>
 </html>

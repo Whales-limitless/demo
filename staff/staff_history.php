@@ -12,6 +12,7 @@ $userName = $_SESSION['user_name'] ?? '';
 
 // Month filter - default to current month
 $selectedMonth = $_GET['ym'] ?? date('Y-m');
+$searchQuery = trim($_GET['q'] ?? '');
 
 // Fetch STOCKIN orders grouped by SALNUM for selected month
 $stockInRecords = [];
@@ -19,14 +20,31 @@ if (!empty($selectedMonth)) {
     $ymStart = $selectedMonth . '-01';
     $ymEnd = date('Y-m-t', strtotime($ymStart));
 
-    $stmt = $connect->prepare("
-        SELECT SALNUM, NAME, SDATE, TTIME, SUM(QTY) AS TOTAL_QTY, COUNT(*) AS ITEM_COUNT, TXTTO, PTYPE
-        FROM `orderlist`
-        WHERE PTYPE IN ('STOCKIN','PURCHASE') AND SDATE BETWEEN ? AND ?
-        GROUP BY SALNUM
-        ORDER BY SDATE DESC, TTIME DESC
-    ");
-    $stmt->bind_param("ss", $ymStart, $ymEnd);
+    if ($searchQuery !== '') {
+        $like = '%' . $searchQuery . '%';
+        $stmt = $connect->prepare("
+            SELECT SALNUM, NAME, SDATE, TTIME, SUM(QTY) AS TOTAL_QTY, COUNT(*) AS ITEM_COUNT, TXTTO, PTYPE
+            FROM `orderlist`
+            WHERE PTYPE IN ('STOCKIN','PURCHASE') AND SDATE BETWEEN ? AND ?
+              AND SALNUM IN (
+                  SELECT DISTINCT SALNUM FROM `orderlist`
+                  WHERE PTYPE IN ('STOCKIN','PURCHASE') AND SDATE BETWEEN ? AND ?
+                    AND (SALNUM LIKE ? OR PDESC LIKE ?)
+              )
+            GROUP BY SALNUM
+            ORDER BY SDATE DESC, TTIME DESC
+        ");
+        $stmt->bind_param("ssssss", $ymStart, $ymEnd, $ymStart, $ymEnd, $like, $like);
+    } else {
+        $stmt = $connect->prepare("
+            SELECT SALNUM, NAME, SDATE, TTIME, SUM(QTY) AS TOTAL_QTY, COUNT(*) AS ITEM_COUNT, TXTTO, PTYPE
+            FROM `orderlist`
+            WHERE PTYPE IN ('STOCKIN','PURCHASE') AND SDATE BETWEEN ? AND ?
+            GROUP BY SALNUM
+            ORDER BY SDATE DESC, TTIME DESC
+        ");
+        $stmt->bind_param("ss", $ymStart, $ymEnd);
+    }
     $stmt->execute();
     $result = $stmt->get_result();
     while ($row = $result->fetch_assoc()) {
@@ -63,7 +81,7 @@ for ($i = 0; $i <= 6; $i++) {
         .main-content { max-width: 700px; margin: 0 auto; padding: 16px; }
 
         /* Month filter */
-        .filter-bar { margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+        .filter-bar { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
         .filter-bar label { font-size: 14px; font-weight: 600; white-space: nowrap; }
         .filter-bar select {
             flex: 1;
@@ -81,6 +99,23 @@ for ($i = 0; $i <= 6; $i++) {
             cursor: pointer;
         }
         .filter-bar select:focus { outline: none; border-color: var(--primary); }
+
+        /* Search bar */
+        .search-form { margin-bottom: 16px; position: relative; }
+        .search-form input {
+            width: 100%;
+            padding: 10px 40px 10px 40px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px;
+            background: var(--surface);
+            color: var(--text);
+        }
+        .search-form input:focus { outline: none; border-color: var(--primary); }
+        .search-form .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--text-muted); pointer-events: none; }
+        .search-form .clear-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; padding: 4px; cursor: pointer; color: var(--text-muted); display: flex; text-decoration: none; }
+        .search-form .clear-btn svg { width: 16px; height: 16px; }
 
         .record-count { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
         .record-count strong { color: var(--text); }
@@ -141,7 +176,7 @@ for ($i = 0; $i <= 6; $i++) {
         <!-- Month Filter -->
         <div class="filter-bar">
             <label>Month:</label>
-            <select id="monthFilter" onchange="window.location.href='staff_history.php?ym='+this.value">
+            <select id="monthFilter" onchange="applyMonthFilter(this.value)">
                 <?php foreach ($monthOptions as $mo): ?>
                 <option value="<?php echo $mo; ?>" <?php echo ($mo === $selectedMonth) ? 'selected' : ''; ?>>
                     <?php echo date('F Y', strtotime($mo . '-01')); ?>
@@ -150,14 +185,26 @@ for ($i = 0; $i <= 6; $i++) {
             </select>
         </div>
 
-        <div class="record-count">Showing <strong><?php echo count($stockInRecords); ?></strong> record(s) for <strong><?php echo date('F Y', strtotime($selectedMonth . '-01')); ?></strong></div>
+        <!-- Search -->
+        <form class="search-form" method="get" action="staff_history.php">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" name="q" placeholder="Search by purchase no. or item..." value="<?php echo htmlspecialchars($searchQuery); ?>" autocomplete="off">
+            <input type="hidden" name="ym" value="<?php echo htmlspecialchars($selectedMonth); ?>">
+            <?php if ($searchQuery !== ''): ?>
+            <a class="clear-btn" href="staff_history.php?ym=<?php echo urlencode($selectedMonth); ?>" title="Clear">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </a>
+            <?php endif; ?>
+        </form>
+
+        <div class="record-count">Showing <strong><?php echo count($stockInRecords); ?></strong> record(s) for <strong><?php echo date('F Y', strtotime($selectedMonth . '-01')); ?></strong><?php if ($searchQuery !== ''): ?> matching "<strong><?php echo htmlspecialchars($searchQuery); ?></strong>"<?php endif; ?></div>
 
         <?php if (count($stockInRecords) === 0): ?>
         <div class="empty-state">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
             </svg>
-            <p>No stock-in records for this month.</p>
+            <p><?php echo $searchQuery !== '' ? 'No records match your search.' : 'No stock-in records for this month.'; ?></p>
         </div>
         <?php else: ?>
         <?php foreach ($stockInRecords as $rec): ?>
@@ -257,6 +304,12 @@ for ($i = 0; $i <= 6; $i++) {
 
     function closeItems() {
         document.getElementById('itemsOverlay').classList.remove('active');
+    }
+
+    function applyMonthFilter(ym) {
+        var params = new URLSearchParams(window.location.search);
+        params.set('ym', ym);
+        window.location.href = 'staff_history.php?' + params.toString();
     }
 
     function escHtml(s) {
