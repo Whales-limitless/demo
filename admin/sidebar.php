@@ -34,6 +34,7 @@ $sidebarSections = [
         ['page' => 'report_sales_staff',    'href' => 'report_sales_staff.php',    'icon' => 'fas fa-user-tie',       'label' => 'Sales by Staff'],
         ['page' => 'report_sales_product',  'href' => 'report_sales_product.php',  'icon' => 'fas fa-box-open',       'label' => 'Sales by Product'],
         ['page' => 'report_sales_branch',   'href' => 'report_sales_branch.php',   'icon' => 'fas fa-store',          'label' => 'Sales by Branch'],
+        ['page' => 'report_purchase',       'href' => 'report_purchase.php',       'icon' => 'fas fa-dolly',          'label' => 'Purchase History'],
     ],
     'ADMIN' => [
         ['page' => 'user',        'href' => 'user.php',             'icon' => 'fas fa-users',                'label' => 'Users'],
