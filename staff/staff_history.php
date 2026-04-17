@@ -14,37 +14,43 @@ $userName = $_SESSION['user_name'] ?? '';
 $selectedMonth = $_GET['ym'] ?? date('Y-m');
 $searchQuery = trim($_GET['q'] ?? '');
 
-// Fetch STOCKIN orders grouped by SALNUM for selected month
 $stockInRecords = [];
-if (!empty($selectedMonth)) {
+
+if ($searchQuery !== '') {
+    // Search across ALL purchases (all users, all months)
+    $like = '%' . $searchQuery . '%';
+    $stmt = $connect->prepare("
+        SELECT SALNUM, NAME, SDATE, TTIME, SUM(QTY) AS TOTAL_QTY, COUNT(*) AS ITEM_COUNT, TXTTO, PTYPE
+        FROM `orderlist`
+        WHERE PTYPE IN ('STOCKIN','PURCHASE')
+          AND SALNUM IN (
+              SELECT DISTINCT SALNUM FROM `orderlist`
+              WHERE PTYPE IN ('STOCKIN','PURCHASE')
+                AND (SALNUM LIKE ? OR PDESC LIKE ?)
+          )
+        GROUP BY SALNUM
+        ORDER BY SDATE DESC, TTIME DESC
+        LIMIT 200
+    ");
+    $stmt->bind_param("ss", $like, $like);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $stockInRecords[] = $row;
+    }
+    $stmt->close();
+} elseif (!empty($selectedMonth)) {
     $ymStart = $selectedMonth . '-01';
     $ymEnd = date('Y-m-t', strtotime($ymStart));
 
-    if ($searchQuery !== '') {
-        $like = '%' . $searchQuery . '%';
-        $stmt = $connect->prepare("
-            SELECT SALNUM, NAME, SDATE, TTIME, SUM(QTY) AS TOTAL_QTY, COUNT(*) AS ITEM_COUNT, TXTTO, PTYPE
-            FROM `orderlist`
-            WHERE PTYPE IN ('STOCKIN','PURCHASE') AND SDATE BETWEEN ? AND ?
-              AND SALNUM IN (
-                  SELECT DISTINCT SALNUM FROM `orderlist`
-                  WHERE PTYPE IN ('STOCKIN','PURCHASE') AND SDATE BETWEEN ? AND ?
-                    AND (SALNUM LIKE ? OR PDESC LIKE ?)
-              )
-            GROUP BY SALNUM
-            ORDER BY SDATE DESC, TTIME DESC
-        ");
-        $stmt->bind_param("ssssss", $ymStart, $ymEnd, $ymStart, $ymEnd, $like, $like);
-    } else {
-        $stmt = $connect->prepare("
-            SELECT SALNUM, NAME, SDATE, TTIME, SUM(QTY) AS TOTAL_QTY, COUNT(*) AS ITEM_COUNT, TXTTO, PTYPE
-            FROM `orderlist`
-            WHERE PTYPE IN ('STOCKIN','PURCHASE') AND SDATE BETWEEN ? AND ?
-            GROUP BY SALNUM
-            ORDER BY SDATE DESC, TTIME DESC
-        ");
-        $stmt->bind_param("ss", $ymStart, $ymEnd);
-    }
+    $stmt = $connect->prepare("
+        SELECT SALNUM, NAME, SDATE, TTIME, SUM(QTY) AS TOTAL_QTY, COUNT(*) AS ITEM_COUNT, TXTTO, PTYPE
+        FROM `orderlist`
+        WHERE PTYPE IN ('STOCKIN','PURCHASE') AND SDATE BETWEEN ? AND ?
+        GROUP BY SALNUM
+        ORDER BY SDATE DESC, TTIME DESC
+    ");
+    $stmt->bind_param("ss", $ymStart, $ymEnd);
     $stmt->execute();
     $result = $stmt->get_result();
     while ($row = $result->fetch_assoc()) {
@@ -197,7 +203,7 @@ for ($i = 0; $i <= 6; $i++) {
             <?php endif; ?>
         </form>
 
-        <div class="record-count">Showing <strong><?php echo count($stockInRecords); ?></strong> record(s) for <strong><?php echo date('F Y', strtotime($selectedMonth . '-01')); ?></strong><?php if ($searchQuery !== ''): ?> matching "<strong><?php echo htmlspecialchars($searchQuery); ?></strong>"<?php endif; ?></div>
+        <div class="record-count">Showing <strong><?php echo count($stockInRecords); ?></strong> record(s)<?php if ($searchQuery !== ''): ?> matching "<strong><?php echo htmlspecialchars($searchQuery); ?></strong>" (across all months)<?php else: ?> for <strong><?php echo date('F Y', strtotime($selectedMonth . '-01')); ?></strong><?php endif; ?></div>
 
         <?php if (count($stockInRecords) === 0): ?>
         <div class="empty-state">
