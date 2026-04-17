@@ -902,6 +902,73 @@ if ($action === 'stock_movement') {
     }
     echo json_encode(['sub_categories' => $subCats]);
 
+} elseif ($action === 'purchase_history') {
+    $search = trim($_POST['search'] ?? '');
+    $ym = trim($_POST['ym'] ?? '');
+
+    $rows = [];
+    if ($search !== '') {
+        $like = '%' . $search . '%';
+        $stmt = $connect->prepare("
+            SELECT SALNUM, NAME, SDATE, TTIME, SUM(QTY) AS TOTAL_QTY, COUNT(*) AS ITEM_COUNT, TXTTO, PTYPE
+            FROM `orderlist`
+            WHERE PTYPE IN ('STOCKIN','PURCHASE')
+              AND SALNUM IN (
+                  SELECT DISTINCT SALNUM FROM `orderlist`
+                  WHERE PTYPE IN ('STOCKIN','PURCHASE')
+                    AND (SALNUM LIKE ? OR PDESC LIKE ?)
+              )
+            GROUP BY SALNUM
+            ORDER BY SDATE DESC, TTIME DESC
+            LIMIT 500
+        ");
+        $stmt->bind_param("ss", $like, $like);
+    } else {
+        if ($ym === '' || !preg_match('/^\d{4}-\d{2}$/', $ym)) {
+            $ym = date('Y-m');
+        }
+        $ymStart = $ym . '-01';
+        $ymEnd = date('Y-m-t', strtotime($ymStart));
+        $stmt = $connect->prepare("
+            SELECT SALNUM, NAME, SDATE, TTIME, SUM(QTY) AS TOTAL_QTY, COUNT(*) AS ITEM_COUNT, TXTTO, PTYPE
+            FROM `orderlist`
+            WHERE PTYPE IN ('STOCKIN','PURCHASE') AND SDATE BETWEEN ? AND ?
+            GROUP BY SALNUM
+            ORDER BY SDATE DESC, TTIME DESC
+        ");
+        $stmt->bind_param("ss", $ymStart, $ymEnd);
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($r = $result->fetch_assoc()) {
+        $rows[] = $r;
+    }
+    $stmt->close();
+
+    echo json_encode(['rows' => $rows]);
+
+} elseif ($action === 'purchase_history_items') {
+    $salnum = trim($_POST['salnum'] ?? '');
+    if ($salnum === '') {
+        echo json_encode(['error' => 'Missing purchase number']);
+        exit;
+    }
+    $items = [];
+    $stmt = $connect->prepare("
+        SELECT BARCODE, PDESC, QTY
+        FROM `orderlist`
+        WHERE SALNUM = ? AND PTYPE IN ('STOCKIN','PURCHASE') AND BARCODE <> 'PT'
+        ORDER BY ID ASC
+    ");
+    $stmt->bind_param("s", $salnum);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($r = $result->fetch_assoc()) {
+        $items[] = $r;
+    }
+    $stmt->close();
+    echo json_encode(['items' => $items]);
+
 } else {
     echo json_encode(['error' => 'Invalid action.']);
 }
