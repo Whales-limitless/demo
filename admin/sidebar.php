@@ -35,6 +35,7 @@ $sidebarSections = [
         ['page' => 'report_sales_product',  'href' => 'report_sales_product.php',  'icon' => 'fas fa-box-open',       'label' => 'Sales by Product'],
         ['page' => 'report_sales_branch',   'href' => 'report_sales_branch.php',   'icon' => 'fas fa-store',          'label' => 'Sales by Branch'],
         ['page' => 'report_purchase',       'href' => 'report_purchase.php',       'icon' => 'fas fa-dolly',          'label' => 'Purchase History'],
+        ['page' => 'report_negative_qoh',   'href' => 'report_negative_qoh.php',   'icon' => 'fas fa-exclamation-triangle', 'label' => 'Negative QOH'],
     ],
     'ADMIN' => [
         ['page' => 'user',        'href' => 'user.php',             'icon' => 'fas fa-users',                'label' => 'Users'],

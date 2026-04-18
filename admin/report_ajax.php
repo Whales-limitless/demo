@@ -902,6 +902,35 @@ if ($action === 'stock_movement') {
     }
     echo json_encode(['sub_categories' => $subCats]);
 
+// ── Negative QOH Report ──
+} elseif ($action === 'negative_qoh') {
+    $search = trim($_POST['search'] ?? '');
+    $rows = [];
+
+    $sql = "SELECT `barcode`, `name`, `cat`, `sub_cat`, `rack`, `uom`, `qoh`
+            FROM `PRODUCTS`
+            WHERE `qoh` < 0";
+    $params = [];
+    $types = '';
+    if ($search !== '') {
+        $sql .= " AND (`barcode` LIKE ? OR `name` LIKE ? OR `cat` LIKE ? OR `sub_cat` LIKE ?)";
+        $like = '%' . $search . '%';
+        $params = [$like, $like, $like, $like];
+        $types = 'ssss';
+    }
+    $sql .= " ORDER BY `qoh` ASC, `name` ASC";
+
+    $stmt = $connect->prepare($sql);
+    if ($types !== '') {
+        $stmt->bind_param($types, ...$params);
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($r = $result->fetch_assoc()) { $rows[] = $r; }
+    $stmt->close();
+
+    echo json_encode(['rows' => $rows]);
+
 } else {
     echo json_encode(['error' => 'Invalid action.']);
 }
