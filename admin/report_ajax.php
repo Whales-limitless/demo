@@ -430,7 +430,8 @@ if ($action === 'stock_movement') {
                 CASE WHEN o.PTYPE IS NULL OR o.PTYPE <> 'STOCKIN' THEN o.QTY ELSE 0 END AS qty_out
             FROM `orderlist` o
             WHERE o.BARCODE $collate = ? AND o.SDATE >= ? AND o.SDATE < ?
-                AND o.STATUS = 'DONE' AND o.BARCODE <> 'PT' AND o.SALNUM LIKE 'PW%'
+                AND (o.STATUS = 'DONE' OR o.PTYPE = 'STOCKIN')
+                AND o.BARCODE <> 'PT' AND o.SALNUM LIKE 'PW%'
 
             UNION ALL
 
