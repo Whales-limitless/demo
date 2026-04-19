@@ -419,7 +419,10 @@ if ($action === 'stock_movement') {
         $initialBalance = $currentQoh + $allOut - $allStockIn + $allAdjOut - $allAdjIn - $allGrnIn;
     }
 
-    // Fetch all transactions before startDate (or between cutoff and startDate)
+    // Fetch all transactions from lowerBound up to today (transactions on/after
+    // startDate are flagged as post-opening so the modal can render a divider
+    // and keep running the balance to today's actual qty).
+    $upperBound = date('Y-m-d');
     $sql = "SELECT txn_date, txn_type, reference, qty_in, qty_out FROM (
             SELECT o.SDATE AS txn_date,
                 COALESCE(o.TTIME, '00:00:00') AS txn_time,
@@ -429,7 +432,7 @@ if ($action === 'stock_movement') {
                 CASE WHEN o.PTYPE = 'STOCKIN' THEN o.QTY ELSE 0 END AS qty_in,
                 CASE WHEN o.PTYPE IS NULL OR o.PTYPE <> 'STOCKIN' THEN o.QTY ELSE 0 END AS qty_out
             FROM `orderlist` o
-            WHERE o.BARCODE $collate = ? AND o.SDATE >= ? AND o.SDATE < ?
+            WHERE o.BARCODE $collate = ? AND o.SDATE >= ? AND o.SDATE <= ?
                 AND (o.STATUS = 'DONE' OR o.PTYPE = 'STOCKIN')
                 AND o.BARCODE <> 'PT' AND o.SALNUM LIKE 'PW%'
 
@@ -444,9 +447,9 @@ if ($action === 'stock_movement') {
                 CASE WHEN sa.QTYADJ > 0 THEN sa.QTYADJ ELSE 0 END AS qty_in,
                 CASE WHEN sa.QTYADJ < 0 THEN ABS(sa.QTYADJ) ELSE 0 END AS qty_out
             FROM `stockadj` sa
-            WHERE sa.BARCODE $collate = ? AND sa.SDATE >= ? AND sa.SDATE < ?";
+            WHERE sa.BARCODE $collate = ? AND sa.SDATE >= ? AND sa.SDATE <= ?";
 
-    $params = [$barcode, $lowerBound, $startDate, $barcode, $lowerBound, $startDate];
+    $params = [$barcode, $lowerBound, $upperBound, $barcode, $lowerBound, $upperBound];
     $types = "ssssss";
 
     if ($hasGrn) {
@@ -462,10 +465,10 @@ if ($action === 'stock_movement') {
                 0 AS qty_out
             FROM `grn_item` gi
             LEFT JOIN `grn` g ON gi.grn_id = g.id
-            WHERE gi.barcode $collate = ? AND g.receive_date >= ? AND g.receive_date < ?";
+            WHERE gi.barcode $collate = ? AND g.receive_date >= ? AND g.receive_date <= ?";
         $params[] = $barcode;
         $params[] = $lowerBound;
-        $params[] = $startDate;
+        $params[] = $upperBound;
         $types .= "sss";
     }
 
@@ -482,6 +485,8 @@ if ($action === 'stock_movement') {
 
     $rows = [];
     $runningBalance = $initialBalance;
+    $openingBalance = $initialBalance;
+    $hasPostOpening = false;
 
     // Show transferred balance as first row when it exists (non-cutoff mode)
     if ($initialBalance != 0) {
@@ -491,7 +496,8 @@ if ($action === 'stock_movement') {
             'reference' => 'Stock from old system',
             'qty_in' => $initialBalance > 0 ? $initialBalance : 0,
             'qty_out' => $initialBalance < 0 ? abs($initialBalance) : 0,
-            'balance' => $initialBalance
+            'balance' => $initialBalance,
+            'is_post_opening' => false
         ];
     }
 
@@ -504,18 +510,32 @@ if ($action === 'stock_movement') {
         } else {
             $runningBalance += $in - $out;
         }
+        $isPostOpening = ($r['txn_date'] >= $startDate);
+        if (!$isPostOpening) {
+            $openingBalance = $runningBalance;
+        } else {
+            $hasPostOpening = true;
+        }
         $rows[] = [
             'date' => $r['txn_date'],
             'type' => $r['txn_type'],
             'reference' => $r['reference'],
             'qty_in' => $in,
             'qty_out' => $out,
-            'balance' => $runningBalance
+            'balance' => $runningBalance,
+            'is_post_opening' => $isPostOpening
         ];
     }
     $stmt->close();
 
-    echo json_encode(['rows' => $rows, 'opening_balance' => $runningBalance]);
+    echo json_encode([
+        'rows' => $rows,
+        'opening_balance' => $openingBalance,
+        'current_balance' => $runningBalance,
+        'start_date' => $startDate,
+        'upper_bound' => $upperBound,
+        'has_post_opening' => $hasPostOpening
+    ]);
 
 // ── Sales by Date Report ──
 } elseif ($action === 'sales_by_date') {
