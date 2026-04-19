@@ -354,7 +354,7 @@ function showOpeningDetail(barcode, description) {
                 document.getElementById('openingDetailBody').innerHTML = '<p class="text-danger text-center">' + escHtml(data.error) + '</p>';
                 return;
             }
-            renderOpeningDetail(data.rows || [], data.opening_balance || 0);
+            renderOpeningDetail(data);
         },
         error: function() {
             document.getElementById('openingDetailBody').innerHTML = '<p class="text-danger text-center">Failed to load details.</p>';
@@ -362,34 +362,49 @@ function showOpeningDetail(barcode, description) {
     });
 }
 
-function renderOpeningDetail(rows, openingBalance) {
-    var startVal = document.getElementById('startDate').value;
+function renderOpeningDetail(data) {
+    var rows = data.rows || [];
+    var openingBalance = data.opening_balance || 0;
+    var currentBalance = (data.current_balance !== undefined) ? data.current_balance : openingBalance;
+    var startVal = data.start_date || document.getElementById('startDate').value;
+    var upperVal = data.upper_bound || '';
+    var hasPostOpening = !!data.has_post_opening;
     var cutoffVal = document.getElementById('cutoffDate').value;
 
     if (rows.length === 0) {
         var msg = cutoffVal
-            ? 'No transactions found between ' + cutoffVal + ' and ' + startVal
-            : 'No transactions found before ' + startVal;
+            ? 'No transactions found between ' + cutoffVal + ' and today'
+            : 'No transactions found up to today';
         document.getElementById('openingDetailBody').innerHTML =
             '<p class="text-center text-muted" style="padding:30px;">' + msg + '<br><small>Opening balance: <strong>' + fmtNum(openingBalance) + '</strong></small></p>';
         return;
     }
 
     var periodLabel = cutoffVal
-        ? cutoffVal + ' to ' + startVal
-        : 'All history before ' + startVal;
+        ? cutoffVal + ' to ' + (upperVal || 'today')
+        : 'History up to ' + (upperVal || 'today');
 
     var html = '<div class="d-flex justify-content-between align-items-center mb-3">';
     html += '<span style="font-size:12px;color:var(--text-muted);"><i class="fas fa-calendar-alt"></i> ' + escHtml(periodLabel) + '</span>';
-    html += '<span style="font-size:14px;font-weight:700;">Opening Balance: ' + fmtNum(openingBalance) + '</span>';
+    html += '<span style="font-size:14px;font-weight:700;">Opening Balance (' + escHtml(startVal) + '): ' + fmtNum(openingBalance) + '</span>';
     html += '</div>';
 
     html += '<table class="table table-sm table-striped" style="font-size:13px;">';
     html += '<thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Balance</th></tr></thead>';
     html += '<tbody>';
 
+    var dividerInserted = false;
     rows.forEach(function(r) {
-        html += '<tr>';
+        if (r.is_post_opening && !dividerInserted) {
+            html += '<tr class="opening-divider">' +
+                '<td colspan="6" style="background:#fef2f2;border-top:2px solid #dc2626;border-bottom:2px solid #dc2626;color:#b91c1c;font-weight:700;font-size:11px;text-align:center;padding:6px 8px;letter-spacing:0.4px;">' +
+                '\u25BC OPENING BALANCE ' + fmtNum(openingBalance) + ' AS OF ' + escHtml(startVal) + ' \u2014 transactions below are on/after ' + escHtml(startVal) +
+                '</td></tr>';
+            dividerInserted = true;
+        }
+
+        var rowStyle = r.is_post_opening ? ' style="background:#fff7f7;"' : '';
+        html += '<tr' + rowStyle + '>';
         html += '<td>' + escHtml(r.date) + '</td>';
         html += '<td>' + escHtml(r.type) + '</td>';
         html += '<td>' + escHtml(r.reference || '-') + '</td>';
@@ -400,7 +415,12 @@ function renderOpeningDetail(rows, openingBalance) {
     });
 
     html += '</tbody></table>';
-    html += '<div class="text-end mt-2" style="font-size:12px;color:var(--text-muted);">' + rows.length + ' transaction(s)</div>';
+    html += '<div class="d-flex justify-content-between align-items-center mt-2" style="font-size:12px;">';
+    html += '<span style="color:var(--text-muted);">' + rows.length + ' transaction(s)</span>';
+    if (hasPostOpening) {
+        html += '<span style="font-weight:700;font-size:14px;">Current Balance: ' + fmtNum(currentBalance) + '</span>';
+    }
+    html += '</div>';
 
     document.getElementById('openingDetailBody').innerHTML = html;
 }
