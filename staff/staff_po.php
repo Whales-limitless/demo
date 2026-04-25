@@ -923,11 +923,18 @@ function viewPO(id) {
 
             html += '<div style="overflow-x:auto;">';
             html += '<table class="line-items-table">';
-            html += '<thead><tr><th>#</th><th>Product</th><th>Barcode</th><th>UOM</th><th>Ordered</th><th>Received</th></tr></thead>';
+            html += '<thead><tr><th style="width:40px">#</th><th style="width:60px">Image</th><th>Product</th><th>Barcode</th><th>UOM</th><th>Ordered</th><th>Received</th></tr></thead>';
             html += '<tbody>';
             items.forEach(function(item, i) {
+                var imgTag;
+                if (item.product_image) {
+                    imgTag = '<img src="../img/' + escHtml(item.product_image) + '" alt="" loading="lazy" style="width:48px;height:48px;object-fit:cover;border-radius:4px;display:block;">';
+                } else {
+                    imgTag = '<div style="width:48px;height:48px;background:#f3f4f6;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px;"><i class="fas fa-image"></i></div>';
+                }
                 html += '<tr>';
                 html += '<td>' + (i + 1) + '</td>';
+                html += '<td>' + imgTag + '</td>';
                 html += '<td>' + escHtml(item.product_desc) + '</td>';
                 html += '<td><small class="text-muted">' + escHtml(item.barcode) + '</small></td>';
                 html += '<td>' + escHtml(item.uom || '-') + '</td>';
