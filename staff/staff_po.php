@@ -280,6 +280,7 @@ $currentPage = 'staff_po';
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger text-white" onclick="downloadCurrentPDF();" style="margin-right:auto;"><i class="fas fa-file-pdf"></i> Download PDF</button>
+                <button type="button" class="btn btn-success text-white" onclick="downloadCurrentExcel();"><i class="fas fa-file-excel"></i> Export Excel</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -945,102 +946,214 @@ function viewPO(id) {
     });
 }
 
+// ==================== LETTERHEAD / EXPORT HELPERS ====================
+function buildLetterheadHtml(company) {
+    company = company || {};
+    var name = company.business_name || '';
+    var reg = company.business_register_no || '';
+    var line1 = name ? (name + (reg ? ' (' + reg + ')' : '')) : '';
+    var addrParts = [];
+    if (company.address_line1) addrParts.push(company.address_line1);
+    if (company.address_line2) addrParts.push(company.address_line2);
+    if (company.address_line3) addrParts.push(company.address_line3);
+    var contactParts = [];
+    if (company.tel_no) contactParts.push('TEL NO: ' + company.tel_no);
+    if (company.email) contactParts.push('EMAIL: ' + company.email);
+
+    var html = '<div style="text-align:center;margin-bottom:18px;font-family:\'Times New Roman\',Times,serif;line-height:1.45;">';
+    if (line1) html += '<div style="font-size:18px;font-weight:bold;color:#000;">' + escHtml(line1) + '</div>';
+    if (addrParts.length) html += '<div style="font-size:13px;color:#000;margin-top:4px;">' + addrParts.map(escHtml).join('<br>') + '</div>';
+    if (contactParts.length) html += '<div style="font-size:13px;color:#000;margin-top:6px;">' + contactParts.map(escHtml).join('<br>') + '</div>';
+    html += '</div>';
+    return html;
+}
+
+function fetchCompany() {
+    return new Promise(function(resolve) {
+        $.ajax({
+            type: 'POST', url: 'staff_po_ajax.php', data: { action: 'get_company' }, dataType: 'json',
+            success: function(d) { resolve((d && d.company) || {}); },
+            error: function() { resolve({}); }
+        });
+    });
+}
+
+function fetchProductImagesBase64(items) {
+    var paths = [];
+    items.forEach(function(it) {
+        if (it.product_image && paths.indexOf(it.product_image) === -1) paths.push(it.product_image);
+    });
+    if (paths.length === 0) {
+        items.forEach(function(it) { it._imgBase64 = ''; });
+        return Promise.resolve();
+    }
+    return new Promise(function(resolve) {
+        $.ajax({
+            type: 'POST', url: 'staff_po_ajax.php',
+            data: { action: 'images_base64', paths: JSON.stringify(paths) },
+            dataType: 'json',
+            success: function(map) {
+                items.forEach(function(it) {
+                    it._imgBase64 = (it.product_image && map[it.product_image]) ? map[it.product_image] : '';
+                });
+                resolve();
+            },
+            error: function() {
+                items.forEach(function(it) { it._imgBase64 = ''; });
+                resolve();
+            }
+        });
+    });
+}
+
+function buildPOExportHtml(po, items, company, opts) {
+    opts = opts || {};
+    var useBase64 = !!opts.useBase64;
+    var html = buildLetterheadHtml(company);
+
+    html += '<div style="text-align:center;margin-bottom:18px;border-top:1px solid #1a1a1a;border-bottom:1px solid #1a1a1a;padding:8px 0;">';
+    html += '<h1 style="font-size:20px;margin:0 0 4px;letter-spacing:0.05em;">PURCHASE ORDER</h1>';
+    html += '<div style="font-size:14px;font-weight:bold;">' + escHtml(po.po_number) + '</div>';
+    html += '</div>';
+
+    var statusLower = (po.status || '').toLowerCase();
+    var statusColors = { draft: '#92400e', approved: '#1e40af', received: '#166534', partially_received: '#166534', cancelled: '#991b1b', closed: '#6b21a8', done: '#15803d' };
+    var statusBgs = { draft: '#fef3c7', approved: '#dbeafe', received: '#dcfce7', partially_received: '#dcfce7', cancelled: '#fee2e2', closed: '#f3e8ff', done: '#f0fdf4' };
+
+    html += '<table style="width:100%;margin-bottom:16px;border-collapse:collapse;font-size:12px;"><tr><td style="width:50%;vertical-align:top;padding:0;">';
+    html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Status:</span><span style="display:inline-block;padding:2px 10px;border-radius:4px;font-weight:bold;font-size:11px;text-transform:uppercase;background:' + (statusBgs[statusLower]||'#e5e7eb') + ';color:' + (statusColors[statusLower]||'#374151') + ';">' + escHtml(po.status) + '</span></div>';
+    html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Supplier:</span>' + escHtml(po.supplier_name || '-') + '</div>';
+    html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Order Date:</span>' + escHtml(po.order_date || '-') + '</div>';
+    html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Expected Date:</span>' + escHtml(po.expected_date || '-') + '</div>';
+    html += '</td><td style="width:50%;vertical-align:top;padding:0;">';
+    html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Created By:</span>' + escHtml(po.created_by || '-') + '</div>';
+    if (po.approved_by) {
+        html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Approved By:</span>' + escHtml(po.approved_by) + '</div>';
+        html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Approved Date:</span>' + escHtml(po.approved_date || '-') + '</div>';
+    }
+    if (po.remark) {
+        html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Remark:</span>' + escHtml(po.remark) + '</div>';
+    }
+    html += '</td></tr></table>';
+
+    html += '<table style="width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed;">';
+    html += '<colgroup>';
+    html += '<col style="width:32px"><col style="width:64px"><col style="width:90px"><col><col style="width:50px"><col style="width:60px"><col style="width:60px">';
+    html += '</colgroup>';
+    html += '<thead><tr>';
+    html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:left;font-size:11px;text-transform:uppercase;">#</th>';
+    html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:center;font-size:11px;text-transform:uppercase;">Image</th>';
+    html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:left;font-size:11px;text-transform:uppercase;">Barcode</th>';
+    html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:left;font-size:11px;text-transform:uppercase;">Product</th>';
+    html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:left;font-size:11px;text-transform:uppercase;">UOM</th>';
+    html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:right;font-size:11px;text-transform:uppercase;">Ordered</th>';
+    html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:right;font-size:11px;text-transform:uppercase;">Received</th>';
+    html += '</tr></thead><tbody>';
+
+    var totalOrdered = 0, totalReceived = 0;
+    items.forEach(function(item, i) {
+        var ordered = parseFloat(item.qty_ordered || 0);
+        var received = parseFloat(item.qty_received || 0);
+        totalOrdered += ordered;
+        totalReceived += received;
+        var bgColor = (i % 2 === 1) ? '#f9fafb' : '#fff';
+
+        var imgTag;
+        if (useBase64 && item._imgBase64) {
+            imgTag = '<img src="' + item._imgBase64 + '" style="width:50px;height:50px;object-fit:cover;border-radius:4px;display:block;margin:0 auto;">';
+        } else if (item.product_image) {
+            imgTag = '<img src="../img/' + escHtml(item.product_image) + '" style="width:50px;height:50px;object-fit:cover;border-radius:4px;display:block;margin:0 auto;">';
+        } else {
+            imgTag = '<div style="width:50px;height:50px;background:#f3f4f6;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:9px;margin:0 auto;">No image</div>';
+        }
+
+        var cellStyle = 'padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;line-height:1.45;word-break:break-word;overflow-wrap:break-word;vertical-align:middle;';
+        html += '<tr style="background:' + bgColor + ';">';
+        html += '<td style="' + cellStyle + '">' + (i + 1) + '</td>';
+        html += '<td style="' + cellStyle + 'text-align:center;">' + imgTag + '</td>';
+        html += '<td style="' + cellStyle + '">' + escHtml(item.barcode) + '</td>';
+        html += '<td style="' + cellStyle + '">' + escHtml(item.product_desc) + '</td>';
+        html += '<td style="' + cellStyle + '">' + escHtml(item.uom || '-') + '</td>';
+        html += '<td style="' + cellStyle + 'text-align:right;">' + ordered.toFixed(2) + '</td>';
+        html += '<td style="' + cellStyle + 'text-align:right;">' + received.toFixed(2) + '</td>';
+        html += '</tr>';
+    });
+    html += '<tr>';
+    html += '<td colspan="5" style="padding:7px 8px;font-weight:bold;border-top:2px solid #1a1a1a;text-align:right;">Total</td>';
+    html += '<td style="padding:7px 8px;font-weight:bold;border-top:2px solid #1a1a1a;text-align:right;">' + totalOrdered.toFixed(2) + '</td>';
+    html += '<td style="padding:7px 8px;font-weight:bold;border-top:2px solid #1a1a1a;text-align:right;">' + totalReceived.toFixed(2) + '</td>';
+    html += '</tr>';
+    html += '</tbody></table>';
+
+    html += '<table style="width:100%;margin-top:36px;border-collapse:collapse;"><tr>';
+    html += '<td style="width:50%;text-align:center;"><div style="border-top:1px solid #1a1a1a;margin-top:50px;padding-top:6px;font-size:11px;display:inline-block;min-width:180px;">Prepared By</div></td>';
+    html += '<td style="width:50%;text-align:center;"><div style="border-top:1px solid #1a1a1a;margin-top:50px;padding-top:6px;font-size:11px;display:inline-block;min-width:180px;">Approved By</div></td>';
+    html += '</tr></table>';
+
+    return html;
+}
+
 // ==================== DOWNLOAD PDF ====================
 function downloadCurrentPDF() {
     if (currentViewPOId) downloadPDF(currentViewPOId);
 }
 
 function downloadPDF(id) {
-    $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: { action: 'get_po', id: id }, dataType: 'json',
-        success: function(data) {
-            if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
-            var po = data.po;
-            var items = data.items || [];
+    Promise.all([
+        $.ajax({ type: 'POST', url: 'staff_po_ajax.php', data: { action: 'get_po', id: id }, dataType: 'json' }),
+        fetchCompany()
+    ]).then(function(results) {
+        var data = results[0];
+        var company = results[1];
+        if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
+        var po = data.po;
+        var items = data.items || [];
 
+        return fetchProductImagesBase64(items).then(function() {
             var container = document.createElement('div');
             container.style.width = '210mm';
-            container.style.padding = '20mm';
+            container.style.padding = '15mm';
             container.style.fontFamily = 'Arial, Helvetica, sans-serif';
             container.style.fontSize = '12px';
             container.style.color = '#1a1a1a';
-
-            var html = '';
-            html += '<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1a1a1a;padding-bottom:12px;">';
-            html += '<div style="font-size:16px;font-weight:bold;margin-bottom:2px;">Parkway Departmental Store</div>';
-            html += '<h1 style="font-size:22px;margin:0 0 4px;">PURCHASE ORDER</h1>';
-            html += '<div style="font-size:16px;font-weight:bold;">' + escHtml(po.po_number) + '</div>';
-            html += '</div>';
-
-            var statusLower = (po.status || '').toLowerCase();
-            var statusColors = { draft: '#92400e', approved: '#1e40af', received: '#166534', partially_received: '#166534', cancelled: '#991b1b', closed: '#6b21a8', done: '#15803d' };
-            var statusBgs = { draft: '#fef3c7', approved: '#dbeafe', received: '#dcfce7', partially_received: '#dcfce7', cancelled: '#fee2e2', closed: '#f3e8ff', done: '#f0fdf4' };
-
-            html += '<div style="display:flex;flex-wrap:wrap;margin-bottom:20px;">';
-            html += '<div style="width:50%;">';
-            html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Status:</span><span style="display:inline-block;padding:2px 10px;border-radius:4px;font-weight:bold;font-size:11px;text-transform:uppercase;background:' + (statusBgs[statusLower]||'#e5e7eb') + ';color:' + (statusColors[statusLower]||'#374151') + ';">' + escHtml(po.status) + '</span></div>';
-            html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Supplier:</span>' + escHtml(po.supplier_name || '-') + '</div>';
-            html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Order Date:</span>' + escHtml(po.order_date || '-') + '</div>';
-            html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Expected Date:</span>' + escHtml(po.expected_date || '-') + '</div>';
-            html += '</div>';
-            html += '<div style="width:50%;">';
-            html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Created By:</span>' + escHtml(po.created_by || '-') + '</div>';
-            if (po.approved_by) {
-                html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Approved By:</span>' + escHtml(po.approved_by) + '</div>';
-                html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Approved Date:</span>' + escHtml(po.approved_date || '-') + '</div>';
-            }
-            if (po.remark) {
-                html += '<div style="margin-bottom:6px;"><span style="font-weight:bold;display:inline-block;width:130px;">Remark:</span>' + escHtml(po.remark) + '</div>';
-            }
-            html += '</div>';
-            html += '</div>';
-
-            html += '<table style="width:100%;border-collapse:collapse;margin-top:16px;">';
-            html += '<thead><tr>';
-            html += '<th style="background:#1a1a1a;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;">#</th>';
-            html += '<th style="background:#1a1a1a;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;">Product</th>';
-            html += '<th style="background:#1a1a1a;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;">Barcode</th>';
-            html += '<th style="background:#1a1a1a;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;">UOM</th>';
-            html += '<th style="background:#1a1a1a;color:#fff;padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase;">Ordered</th>';
-            html += '<th style="background:#1a1a1a;color:#fff;padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase;">Received</th>';
-            html += '</tr></thead>';
-            html += '<tbody>';
-            var totalOrdered = 0;
-            items.forEach(function(item, i) {
-                var ordered = parseFloat(item.qty_ordered || 0);
-                var received = parseFloat(item.qty_received || 0);
-                totalOrdered += ordered;
-                var bgColor = (i % 2 === 1) ? '#f9fafb' : '#fff';
-                html += '<tr style="background:' + bgColor + ';">';
-                html += '<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">' + (i + 1) + '</td>';
-                html += '<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">' + escHtml(item.product_desc) + '</td>';
-                html += '<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">' + escHtml(item.barcode) + '</td>';
-                html += '<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">' + escHtml(item.uom || '-') + '</td>';
-                html += '<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:right;">' + ordered.toFixed(2) + '</td>';
-                html += '<td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:right;">' + received.toFixed(2) + '</td>';
-                html += '</tr>';
-            });
-            html += '<tr><td colspan="4" style="padding:7px 10px;font-weight:bold;border-top:2px solid #1a1a1a;text-align:right;">Total</td><td style="padding:7px 10px;font-weight:bold;border-top:2px solid #1a1a1a;text-align:right;">' + totalOrdered.toFixed(2) + '</td><td style="padding:7px 10px;border-top:2px solid #1a1a1a;"></td></tr>';
-            html += '</tbody></table>';
-
-            html += '<div style="margin-top:40px;display:flex;justify-content:space-between;">';
-            html += '<div style="width:200px;text-align:center;"><div style="border-top:1px solid #1a1a1a;margin-top:60px;padding-top:6px;font-size:11px;">Prepared By</div></div>';
-            html += '<div style="width:200px;text-align:center;"><div style="border-top:1px solid #1a1a1a;margin-top:60px;padding-top:6px;font-size:11px;">Approved By</div></div>';
-            html += '</div>';
-
-            container.innerHTML = html;
+            container.style.background = '#ffffff';
+            container.style.position = 'fixed';
+            container.style.left = '-9999px';
+            container.style.top = '0';
+            container.innerHTML = buildPOExportHtml(po, items, company, { useBase64: true });
+            document.body.appendChild(container);
 
             var opt = {
                 margin: 0,
                 filename: (po.po_number || 'PO') + '.pdf',
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                image: { type: 'jpeg', quality: 0.95 },
+                html2canvas: { scale: 2, useCORS: true, allowTaint: true, letterRendering: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak: { mode: ['css', 'legacy'] }
             };
 
-            html2pdf().set(opt).from(container).save();
-        }
+            return html2pdf().set(opt).from(container).save().then(function() {
+                if (container.parentNode) container.parentNode.removeChild(container);
+            }).catch(function(err) {
+                if (container.parentNode) container.parentNode.removeChild(container);
+                console.error(err);
+                Swal.fire({ icon: 'error', text: 'PDF generation failed.' });
+            });
+        });
     });
+}
+
+// ==================== EXPORT EXCEL ====================
+function downloadCurrentExcel() {
+    if (!currentViewPOId) return;
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'staff_po_ajax.php';
+    form.style.display = 'none';
+    form.innerHTML = '<input type="hidden" name="action" value="export_excel"><input type="hidden" name="id" value="' + escHtml(String(currentViewPOId)) + '">';
+    document.body.appendChild(form);
+    form.submit();
+    setTimeout(function() { document.body.removeChild(form); }, 1000);
 }
 
 // ==================== APPROVE / CANCEL ====================

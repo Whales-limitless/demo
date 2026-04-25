@@ -38,7 +38,8 @@ $sidebarSections = [
         ['page' => 'report_negative_qoh',   'href' => 'report_negative_qoh.php',   'icon' => 'fas fa-exclamation-triangle', 'label' => 'Negative QOH'],
     ],
     'ADMIN' => [
-        ['page' => 'user',        'href' => 'user.php',             'icon' => 'fas fa-users',                'label' => 'Users'],
+        ['page' => 'user',             'href' => 'user.php',             'icon' => 'fas fa-users',     'label' => 'Users'],
+        ['page' => 'company_setting',  'href' => 'company_setting.php',  'icon' => 'fas fa-building',  'label' => 'Company Setting'],
     ],
 ];
 ?>

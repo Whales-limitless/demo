@@ -2,17 +2,25 @@
 require_once __DIR__ . '/../staff/session_security.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
-header('Content-Type: application/json; charset=utf-8');
+$action = $_POST['action'] ?? '';
+
+// export_excel writes a binary stream; everything else returns JSON.
+if ($action !== 'export_excel') {
+    header('Content-Type: application/json; charset=utf-8');
+}
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    echo json_encode(['error' => 'Unauthorized']);
+    if ($action === 'export_excel') {
+        header('Content-Type: text/plain');
+        echo 'Unauthorized';
+    } else {
+        echo json_encode(['error' => 'Unauthorized']);
+    }
     exit;
 }
 
 include('../staff/dbconnection.php');
 $connect->set_charset("utf8mb4");
-
-$action = $_POST['action'] ?? '';
 
 // Generate next PO number: PO-YYYYMM-0001
 function generatePONumber($connect) {
@@ -347,6 +355,187 @@ if ($action === 'list') {
     @unlink($cacheDir . '/all_products.json');
     @unlink($cacheDir . '/pending_qty.json');
     echo json_encode(['success' => true, 'name' => $name]);
+
+// ==================== GET COMPANY SETTING (letterhead) ====================
+} elseif ($action === 'get_company') {
+    $connect->query("CREATE TABLE IF NOT EXISTS `company_setting` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `business_name` VARCHAR(255) NOT NULL DEFAULT '',
+        `business_register_no` VARCHAR(100) NOT NULL DEFAULT '',
+        `address_line1` VARCHAR(255) NOT NULL DEFAULT '',
+        `address_line2` VARCHAR(255) NOT NULL DEFAULT '',
+        `address_line3` VARCHAR(255) NOT NULL DEFAULT '',
+        `tel_no` VARCHAR(50) NOT NULL DEFAULT '',
+        `email` VARCHAR(150) NOT NULL DEFAULT '',
+        `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $row = $connect->query("SELECT * FROM `company_setting` WHERE `id` = 1 LIMIT 1");
+    $company = $row ? $row->fetch_assoc() : null;
+    echo json_encode(['company' => $company ?: []]);
+
+// ==================== PRODUCT IMAGES TO BASE64 (for PDF embedding) ====================
+} elseif ($action === 'images_base64') {
+    $paths = json_decode($_POST['paths'] ?? '[]', true);
+    if (!is_array($paths)) { echo json_encode([]); exit; }
+    $imgDir = __DIR__ . '/../img/';
+    $result = [];
+    foreach ($paths as $path) {
+        $path = (string)$path;
+        if ($path === '') continue;
+        // Prevent directory traversal
+        if (strpos($path, '..') !== false || strpos($path, '/') === 0 || strpos($path, '\\') !== false) {
+            $result[$path] = '';
+            continue;
+        }
+        $filePath = $imgDir . $path;
+        if (file_exists($filePath)) {
+            $mime = function_exists('mime_content_type') ? mime_content_type($filePath) : 'image/jpeg';
+            $data = base64_encode(file_get_contents($filePath));
+            $result[$path] = 'data:' . $mime . ';base64,' . $data;
+        } else {
+            $result[$path] = '';
+        }
+    }
+    echo json_encode($result);
+
+// ==================== EXPORT EXCEL ====================
+} elseif ($action === 'export_excel') {
+    error_reporting(E_ALL);
+    ini_set('display_errors', 0);
+    set_error_handler(function($errno, $errstr, $errfile, $errline) {
+        throw new Exception("$errstr in $errfile:$errline");
+    });
+    try {
+        require_once __DIR__ . '/../staff/SimpleXlsxWriter.php';
+
+        $id = intval($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Invalid PO id.']);
+            exit;
+        }
+
+        $stmt = $connect->prepare("SELECT po.*, s.name AS supplier_name FROM `purchase_order` po LEFT JOIN `supplier` s ON po.supplier_id = s.id WHERE po.id = ? LIMIT 1");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $po = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$po) {
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'PO not found.']);
+            exit;
+        }
+
+        $itemRes = $connect->query("SELECT poi.*, p.img1 AS product_image FROM `purchase_order_item` poi LEFT JOIN `PRODUCTS` p ON poi.barcode = p.barcode WHERE poi.po_id = " . intval($id) . " ORDER BY poi.id ASC");
+        $items = [];
+        if ($itemRes) { while ($r = $itemRes->fetch_assoc()) $items[] = $r; }
+
+        // Company header
+        $cRow = $connect->query("SELECT * FROM `company_setting` WHERE `id` = 1 LIMIT 1");
+        $company = $cRow ? $cRow->fetch_assoc() : [];
+
+        $xlsx = new SimpleXlsxWriter();
+        $xlsx->setTitle('Purchase Order');
+        $xlsx->setColWidths([5, 14, 18, 38, 8, 10, 10]);
+
+        // Letterhead block
+        $bizName = trim(($company['business_name'] ?? '') . ($company['business_register_no'] ? ' (' . $company['business_register_no'] . ')' : ''));
+        if ($bizName !== '') $xlsx->addRow([$bizName], [1]);
+        foreach (['address_line1','address_line2','address_line3'] as $k) {
+            if (!empty($company[$k])) $xlsx->addRow([$company[$k]]);
+        }
+        $contactBits = [];
+        if (!empty($company['tel_no'])) $contactBits[] = 'TEL NO: ' . $company['tel_no'];
+        if (!empty($company['email'])) $contactBits[] = 'EMAIL: ' . $company['email'];
+        if ($contactBits) $xlsx->addRow([implode('   |   ', $contactBits)]);
+        $xlsx->addRow(['']);
+
+        // PO meta
+        $xlsx->addRow(['PURCHASE ORDER: ' . ($po['po_number'] ?? '')], [1]);
+        $xlsx->addRow(['Status', $po['status'] ?? '', '', 'Created By', $po['created_by'] ?? '']);
+        $xlsx->addRow(['Supplier', $po['supplier_name'] ?? '', '', 'Approved By', $po['approved_by'] ?? '']);
+        $xlsx->addRow(['Order Date', $po['order_date'] ?? '', '', 'Approved Date', $po['approved_date'] ?? '']);
+        $xlsx->addRow(['Expected Date', $po['expected_date'] ?? '', '', 'Remark', $po['remark'] ?? '']);
+        $xlsx->addRow(['']);
+
+        // Item headers
+        $xlsx->addRow(['No', 'Image', 'Barcode', 'Product', 'UOM', 'Ordered', 'Received'], [2,2,2,2,2,2,2]);
+
+        $imgDir = __DIR__ . '/../img/';
+        $totalOrdered = 0;
+        $totalReceived = 0;
+        foreach ($items as $i => $it) {
+            $ordered = floatval($it['qty_ordered'] ?? 0);
+            $received = floatval($it['qty_received'] ?? 0);
+            $totalOrdered += $ordered;
+            $totalReceived += $received;
+            $xlsx->addRow([
+                $i + 1,
+                '',
+                $it['barcode'] ?? '',
+                $it['product_desc'] ?? '',
+                $it['uom'] ?? '',
+                $ordered,
+                $received,
+            ], [3,3,3,3,3,3,3]);
+
+            if (!empty($it['product_image'])) {
+                $imgPath = $imgDir . $it['product_image'];
+                if (file_exists($imgPath)) {
+                    // header rows above the items. Items start after letterhead+meta+separator+header.
+                    // SimpleXlsxWriter addImage uses 0-indexed rows where 0 = first data row,
+                    // and header was added; here count rows added so far before this item:
+                    // count = (rows already added) - 1 (since addImage row 0 means second row in sheet)
+                    // We track by: image row index = current row count - 1
+                    // Easier: figure dynamically
+                }
+            }
+        }
+        $xlsx->addRow(['', '', '', 'Total:', '', $totalOrdered, $totalReceived], [1,1,1,1,1,1,1]);
+
+        // Re-attach images now that we know absolute row indices.
+        // Recompute by counting prior rows.
+        $headerRowsCount = 0; // letterhead block lines
+        if ($bizName !== '') $headerRowsCount++;
+        foreach (['address_line1','address_line2','address_line3'] as $k) {
+            if (!empty($company[$k])) $headerRowsCount++;
+        }
+        if ($contactBits) $headerRowsCount++;
+        // Plus separator + 5 meta rows + separator + table-header = 7
+        $preItemRows = $headerRowsCount + 1 + 5 + 1 + 1; // last 1 = item-header row
+        // SimpleXlsxWriter rows are 0-indexed counting from FIRST row added, but addImage row arg
+        // refers to 0 = FIRST data row (header is row index 0 separately). Looking at stock_loss usage:
+        //   header row added first, then items, image row $i+1 (so item 0 uses row 1).
+        // Here our "item header" is the (preItemRows)th row added. So item i is at addImage row = preItemRows + i.
+        foreach ($items as $i => $it) {
+            if (!empty($it['product_image'])) {
+                $imgPath = $imgDir . $it['product_image'];
+                if (file_exists($imgPath)) {
+                    $xlsx->addImage($preItemRows + $i, 1, $imgPath, 60, 50);
+                }
+            }
+        }
+
+        $tmpFile = $xlsx->generate();
+        if (!$tmpFile) {
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Failed to generate file.']);
+            exit;
+        }
+
+        $title = 'PO_' . preg_replace('/[^A-Za-z0-9_\-]/', '_', $po['po_number'] ?? ('id_' . $id));
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $title . '.xlsx"');
+        header('Content-Length: ' . filesize($tmpFile));
+        readfile($tmpFile);
+        unlink($tmpFile);
+        exit;
+    } catch (Exception $e) {
+        header('Content-Type: text/plain');
+        echo 'Export error: ' . $e->getMessage();
+        exit;
+    }
 
 } else {
     echo json_encode(['error' => 'Invalid action.']);
