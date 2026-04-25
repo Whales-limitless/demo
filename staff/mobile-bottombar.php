@@ -46,6 +46,15 @@
     <div class="inv-modal-handle"></div>
     <div class="inv-modal-title">Inventory</div>
     <div class="inv-modal-buttons">
+      <a href="staff_quotation.php" class="inv-modal-btn">
+        <div class="inv-icon" style="background:#ede9fe;color:#7c3aed;">
+          <svg><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+        </div>
+        <div class="inv-label">
+          Quotations
+          <small>Create and manage quotations</small>
+        </div>
+      </a>
       <a href="staff_po.php" class="inv-modal-btn">
         <div class="inv-icon" style="background:#dbeafe;color:#2563eb;">
           <svg><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -170,6 +179,7 @@
     'all_products.php': 'tabProducts',
     'account.php': 'tabAccount',
     'staff_po.php': 'tabInventory',
+    'staff_quotation.php': 'tabInventory',
     'staff_grn.php': 'tabInventory',
     'staff_stock_take.php': 'tabInventory',
     'staff_stock_loss.php': 'tabInventory',
