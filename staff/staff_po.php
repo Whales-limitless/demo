@@ -1093,12 +1093,43 @@ function buildPOExportHtml(po, items, company, opts) {
     return html;
 }
 
-// ==================== DOWNLOAD PDF ====================
+// ==================== OPEN PRINT WINDOW (used by Download PDF) ====================
+function openPOPrintWindow(po, items, company) {
+    var bodyHtml = buildPOExportHtml(po, items, company, { useBase64: false });
+    var title = (po.po_number || 'PO');
+    var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escHtml(title) + '</title>';
+    html += '<base href="' + escHtml(window.location.href) + '">';
+    html += '<style>@page { size: A4; margin: 15mm; } body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #1a1a1a; margin:0; padding:0; }';
+    html += 'img { max-width: 100%; }';
+    html += '@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style>';
+    html += '<' + 'script>';
+    html += 'function poTriggerPrint(){ if (window.__poPrinted) return; window.__poPrinted = true; window.focus(); window.print(); }';
+    html += 'function poWaitImagesAndPrint(){ var imgs = document.images; if (!imgs || imgs.length === 0) { setTimeout(poTriggerPrint, 200); return; } var pending = 0; for (var i = 0; i < imgs.length; i++) { if (!imgs[i].complete) pending++; } if (pending === 0) { setTimeout(poTriggerPrint, 200); return; } var loaded = 0; for (var i = 0; i < imgs.length; i++) { if (!imgs[i].complete) { var fin = function(){ loaded++; if (loaded >= pending) { setTimeout(poTriggerPrint, 150); } }; imgs[i].addEventListener("load", fin); imgs[i].addEventListener("error", fin); } } setTimeout(poTriggerPrint, 8000); }';
+    html += '<' + '/script>';
+    html += '</head><body onload="poWaitImagesAndPrint()">' + bodyHtml + '</body></html>';
+
+    var printWin = window.open('', '_blank');
+    if (!printWin) {
+        Swal.fire({ icon: 'warning', title: 'Pop-up blocked', text: 'Please allow pop-ups for this site, then click Download PDF again.' });
+        return;
+    }
+    printWin.document.open();
+    printWin.document.write(html);
+    printWin.document.close();
+}
+
+// ==================== DOWNLOAD PDF (opens print dialog → user picks "Save as PDF") ====================
 function downloadCurrentPDF() {
     if (currentViewPOId) downloadPDF(currentViewPOId);
 }
 
 function downloadPDF(id) {
+    Swal.fire({
+        toast: true, position: 'bottom-end', icon: 'info',
+        title: 'Preparing PDF…',
+        text: 'Choose "Save as PDF" in the print dialog. Product images may take a moment to load.',
+        showConfirmButton: false, timer: 3500, timerProgressBar: true
+    });
     Promise.all([
         $.ajax({ type: 'POST', url: 'staff_po_ajax.php', data: { action: 'get_po', id: id }, dataType: 'json' }),
         fetchCompany()
@@ -1106,40 +1137,7 @@ function downloadPDF(id) {
         var data = results[0];
         var company = results[1];
         if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
-        var po = data.po;
-        var items = data.items || [];
-
-        return fetchProductImagesBase64(items).then(function() {
-            var container = document.createElement('div');
-            container.style.width = '210mm';
-            container.style.padding = '15mm';
-            container.style.fontFamily = 'Arial, Helvetica, sans-serif';
-            container.style.fontSize = '12px';
-            container.style.color = '#1a1a1a';
-            container.style.background = '#ffffff';
-            container.style.position = 'fixed';
-            container.style.left = '-9999px';
-            container.style.top = '0';
-            container.innerHTML = buildPOExportHtml(po, items, company, { useBase64: true });
-            document.body.appendChild(container);
-
-            var opt = {
-                margin: 0,
-                filename: (po.po_number || 'PO') + '.pdf',
-                image: { type: 'jpeg', quality: 0.95 },
-                html2canvas: { scale: 2, useCORS: true, allowTaint: true, letterRendering: true },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                pagebreak: { mode: ['css', 'legacy'] }
-            };
-
-            return html2pdf().set(opt).from(container).save().then(function() {
-                if (container.parentNode) container.parentNode.removeChild(container);
-            }).catch(function(err) {
-                if (container.parentNode) container.parentNode.removeChild(container);
-                console.error(err);
-                Swal.fire({ icon: 'error', text: 'PDF generation failed.' });
-            });
-        });
+        openPOPrintWindow(data.po, data.items || [], company);
     });
 }
 
