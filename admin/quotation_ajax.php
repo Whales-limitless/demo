@@ -437,7 +437,7 @@ if ($action === 'list') {
 
         $xlsx = new SimpleXlsxWriter();
         $xlsx->setTitle('Quotation');
-        $xlsx->setColWidths([5, 14, 18, 38, 8, 10, 10]);
+        $xlsx->setColWidths([5, 14, 18, 38, 8, 10]);
 
         // Letterhead block
         $bizName = trim(($company['business_name'] ?? '') . ($company['business_register_no'] ? ' (' . $company['business_register_no'] . ')' : ''));
@@ -460,39 +460,23 @@ if ($action === 'list') {
         $xlsx->addRow(['']);
 
         // Item headers
-        $xlsx->addRow(['No', 'Image', 'Barcode', 'Product', 'UOM', 'Ordered', 'Received'], [2,2,2,2,2,2,2]);
+        $xlsx->addRow(['No', 'Image', 'Barcode', 'Product', 'UOM', 'Qty'], [2,2,2,2,2,2]);
 
         $imgDir = __DIR__ . '/../img/';
-        $totalOrdered = 0;
-        $totalReceived = 0;
+        $totalQty = 0;
         foreach ($items as $i => $it) {
-            $ordered = floatval($it['qty_ordered'] ?? 0);
-            $received = floatval($it['qty_received'] ?? 0);
-            $totalOrdered += $ordered;
-            $totalReceived += $received;
+            $qty = floatval($it['qty_ordered'] ?? 0);
+            $totalQty += $qty;
             $xlsx->addRow([
                 $i + 1,
                 '',
                 $it['barcode'] ?? '',
                 $it['product_desc'] ?? '',
                 $it['uom'] ?? '',
-                $ordered,
-                $received,
-            ], [3,3,3,3,3,3,3]);
-
-            if (!empty($it['product_image'])) {
-                $imgPath = $imgDir . $it['product_image'];
-                if (file_exists($imgPath)) {
-                    // header rows above the items. Items start after letterhead+meta+separator+header.
-                    // SimpleXlsxWriter addImage uses 0-indexed rows where 0 = first data row,
-                    // and header was added; here count rows added so far before this item:
-                    // count = (rows already added) - 1 (since addImage row 0 means second row in sheet)
-                    // We track by: image row index = current row count - 1
-                    // Easier: figure dynamically
-                }
-            }
+                $qty,
+            ], [3,3,3,3,3,3]);
         }
-        $xlsx->addRow(['', '', '', 'Total:', '', $totalOrdered, $totalReceived], [1,1,1,1,1,1,1]);
+        $xlsx->addRow(['', '', '', 'Total:', '', $totalQty], [1,1,1,1,1,1]);
 
         // Re-attach images now that we know absolute row indices.
         // Recompute by counting prior rows.
