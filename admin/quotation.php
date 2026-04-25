@@ -931,7 +931,7 @@ function viewQuotation(id) {
 
             html += '<div style="overflow-x:auto;">';
             html += '<table class="line-items-table">';
-            html += '<thead><tr><th style="width:40px">#</th><th style="width:60px">Image</th><th>Product</th><th>Barcode</th><th>UOM</th><th>Ordered</th><th>Received</th></tr></thead>';
+            html += '<thead><tr><th style="width:40px">#</th><th style="width:60px">Image</th><th>Product</th><th>Barcode</th><th>UOM</th><th>Qty</th></tr></thead>';
             html += '<tbody>';
             items.forEach(function(item, i) {
                 var imgTag;
@@ -947,7 +947,6 @@ function viewQuotation(id) {
                 html += '<td><small class="text-muted">' + escHtml(item.barcode) + '</small></td>';
                 html += '<td>' + escHtml(item.uom || '-') + '</td>';
                 html += '<td>' + parseFloat(item.qty_ordered || 0).toFixed(2) + '</td>';
-                html += '<td>' + parseFloat(item.qty_received || 0).toFixed(2) + '</td>';
                 html += '</tr>';
             });
             html += '</tbody>';
@@ -1053,7 +1052,7 @@ function buildQuotationExportHtml(po, items, company, opts) {
 
     html += '<table style="width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed;">';
     html += '<colgroup>';
-    html += '<col style="width:32px"><col style="width:64px"><col style="width:90px"><col><col style="width:50px"><col style="width:60px"><col style="width:60px">';
+    html += '<col style="width:32px"><col style="width:64px"><col style="width:100px"><col><col style="width:55px"><col style="width:70px">';
     html += '</colgroup>';
     html += '<thead><tr>';
     html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:left;font-size:11px;text-transform:uppercase;">#</th>';
@@ -1061,16 +1060,13 @@ function buildQuotationExportHtml(po, items, company, opts) {
     html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:left;font-size:11px;text-transform:uppercase;">Barcode</th>';
     html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:left;font-size:11px;text-transform:uppercase;">Product</th>';
     html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:left;font-size:11px;text-transform:uppercase;">UOM</th>';
-    html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:right;font-size:11px;text-transform:uppercase;">Ordered</th>';
-    html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:right;font-size:11px;text-transform:uppercase;">Received</th>';
+    html += '<th style="background:#1a1a1a;color:#fff;padding:7px 8px;text-align:right;font-size:11px;text-transform:uppercase;">Qty</th>';
     html += '</tr></thead><tbody>';
 
-    var totalOrdered = 0, totalReceived = 0;
+    var totalQty = 0;
     items.forEach(function(item, i) {
-        var ordered = parseFloat(item.qty_ordered || 0);
-        var received = parseFloat(item.qty_received || 0);
-        totalOrdered += ordered;
-        totalReceived += received;
+        var qty = parseFloat(item.qty_ordered || 0);
+        totalQty += qty;
         var bgColor = (i % 2 === 1) ? '#f9fafb' : '#fff';
 
         var imgTag;
@@ -1089,14 +1085,12 @@ function buildQuotationExportHtml(po, items, company, opts) {
         html += '<td style="' + cellStyle + '">' + escHtml(item.barcode) + '</td>';
         html += '<td style="' + cellStyle + '">' + escHtml(item.product_desc) + '</td>';
         html += '<td style="' + cellStyle + '">' + escHtml(item.uom || '-') + '</td>';
-        html += '<td style="' + cellStyle + 'text-align:right;">' + ordered.toFixed(2) + '</td>';
-        html += '<td style="' + cellStyle + 'text-align:right;">' + received.toFixed(2) + '</td>';
+        html += '<td style="' + cellStyle + 'text-align:right;">' + qty.toFixed(2) + '</td>';
         html += '</tr>';
     });
     html += '<tr>';
     html += '<td colspan="5" style="padding:7px 8px;font-weight:bold;border-top:2px solid #1a1a1a;text-align:right;">Total</td>';
-    html += '<td style="padding:7px 8px;font-weight:bold;border-top:2px solid #1a1a1a;text-align:right;">' + totalOrdered.toFixed(2) + '</td>';
-    html += '<td style="padding:7px 8px;font-weight:bold;border-top:2px solid #1a1a1a;text-align:right;">' + totalReceived.toFixed(2) + '</td>';
+    html += '<td style="padding:7px 8px;font-weight:bold;border-top:2px solid #1a1a1a;text-align:right;">' + totalQty.toFixed(2) + '</td>';
     html += '</tr>';
     html += '</tbody></table>';
 

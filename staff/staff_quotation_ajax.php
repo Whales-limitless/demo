@@ -719,7 +719,7 @@ if ($action === 'search_products') {
 
         $xlsx = new SimpleXlsxWriter();
         $xlsx->setTitle('Quotation');
-        $xlsx->setColWidths([5, 14, 18, 38, 8, 10, 10]);
+        $xlsx->setColWidths([5, 14, 18, 38, 8, 10]);
 
         $bizName = trim(($company['business_name'] ?? '') . ($company['business_register_no'] ? ' (' . $company['business_register_no'] . ')' : ''));
         if ($bizName !== '') $xlsx->addRow([$bizName], [1]);
@@ -739,27 +739,23 @@ if ($action === 'search_products') {
         $xlsx->addRow(['Expected Date', $po['expected_date'] ?? '', '', 'Remark', $po['remark'] ?? '']);
         $xlsx->addRow(['']);
 
-        $xlsx->addRow(['No', 'Image', 'Barcode', 'Product', 'UOM', 'Ordered', 'Received'], [2,2,2,2,2,2,2]);
+        $xlsx->addRow(['No', 'Image', 'Barcode', 'Product', 'UOM', 'Qty'], [2,2,2,2,2,2]);
 
         $imgDir = __DIR__ . '/../img/';
-        $totalOrdered = 0;
-        $totalReceived = 0;
+        $totalQty = 0;
         foreach ($items as $i => $it) {
-            $ordered = floatval($it['qty_ordered'] ?? 0);
-            $received = floatval($it['qty_received'] ?? 0);
-            $totalOrdered += $ordered;
-            $totalReceived += $received;
+            $qty = floatval($it['qty_ordered'] ?? 0);
+            $totalQty += $qty;
             $xlsx->addRow([
                 $i + 1,
                 '',
                 $it['barcode'] ?? '',
                 $it['product_desc'] ?? '',
                 $it['uom'] ?? '',
-                $ordered,
-                $received,
-            ], [3,3,3,3,3,3,3]);
+                $qty,
+            ], [3,3,3,3,3,3]);
         }
-        $xlsx->addRow(['', '', '', 'Total:', '', $totalOrdered, $totalReceived], [1,1,1,1,1,1,1]);
+        $xlsx->addRow(['', '', '', 'Total:', '', $totalQty], [1,1,1,1,1,1]);
 
         $headerRowsCount = 0;
         if ($bizName !== '') $headerRowsCount++;
