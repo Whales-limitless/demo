@@ -1,27 +1,26 @@
 <?php
-require_once __DIR__ . '/session_security.php';
+require_once __DIR__ . '/../staff/session_security.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true) {
-    header("Location: login.php");
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header("Location: index.php");
     exit;
 }
 
-include('dbconnection.php');
+include('../staff/dbconnection.php');
 $connect->set_charset("utf8mb4");
 
-$currentPage = 'staff_po';
+$currentPage = 'quotation';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Purchase Orders</title>
+<title>Quotations</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="components.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; }
 :root {
@@ -29,17 +28,18 @@ $currentPage = 'staff_po';
     --text: #1a1a1a; --text-muted: #6b7280; --radius: 12px;
     --shadow-md: 0 4px 16px rgba(0,0,0,0.08); --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.po-page-content { max-width: 1400px; margin: 0 auto; padding: 20px 24px 160px; }
-.po-page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
-.po-page-header h1 { font-family: 'Outfit', sans-serif; font-size: 22px; font-weight: 700; margin: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; margin: 0; }
+.page-content { max-width: 1400px; margin: 0 auto; padding: 20px 24px 40px; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+.page-header h1 { font-family: 'Outfit', sans-serif; font-size: 22px; font-weight: 700; margin: 0; }
 .btn-add { background: var(--primary); color: #fff; border: none; padding: 9px 20px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: background var(--transition); display: inline-flex; align-items: center; gap: 6px; }
 .btn-add:hover { background: var(--primary-dark); }
 .table-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-md); padding: 20px; overflow: hidden; }
 .table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-.po-search-box { position: relative; flex: 1; max-width: 320px; }
-.po-search-box input { width: 100%; padding: 9px 14px 9px 36px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color var(--transition); }
-.po-search-box input:focus { border-color: var(--primary); }
-.po-search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; }
+.search-box { position: relative; flex: 1; max-width: 320px; }
+.search-box input { width: 100%; padding: 9px 14px 9px 36px; border: 1px solid #d1d5db; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color var(--transition); }
+.search-box input:focus { border-color: var(--primary); }
+.search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; }
 .item-count { font-size: 13px; color: var(--text-muted); }
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .data-table thead th { background: var(--text); color: #fff; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; padding: 10px 12px; white-space: nowrap; text-align: left; }
@@ -58,6 +58,7 @@ $currentPage = 'staff_po';
 .btn-action { padding: 5px 12px; border: none; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); display: inline-block; margin: 1px; color: #fff; }
 .btn-edit { background: #3b82f6; } .btn-edit:hover { background: #2563eb; }
 .btn-view { background: #6366f1; } .btn-view:hover { background: #4f46e5; }
+.btn-print { background: #0ea5e9; } .btn-print:hover { background: #0284c7; }
 .btn-approve { background: #16a34a; } .btn-approve:hover { background: #15803d; }
 .btn-cancel-po { background: #ef4444; } .btn-cancel-po:hover { background: #dc2626; }
 .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
@@ -109,6 +110,11 @@ $currentPage = 'staff_po';
 .li-conv-indicator.no-conv { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
 .li-conv-indicator.same-uom { background: #f3f4f6; color: #6b7280; }
 
+/* Detail view */
+.detail-section { background: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+.detail-row { display: flex; gap: 16px; margin-bottom: 6px; font-size: 13px; }
+.detail-label { font-weight: 600; min-width: 130px; color: var(--text-muted); }
+
 /* New product image upload */
 .np-img-upload-area { border: 2px dashed #d1d5db; border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all var(--transition); background: #fafbfc; position: relative; }
 .np-img-upload-area:hover { border-color: var(--primary); background: #fff5f5; }
@@ -116,15 +122,10 @@ $currentPage = 'staff_po';
 .np-upload-placeholder { color: var(--text-muted); font-size: 13px; }
 .np-btn-remove-img { position: absolute; top: 4px; right: 4px; background: #ef4444; color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
 
-/* Detail view */
-.detail-section { background: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
-.detail-row { display: flex; gap: 16px; margin-bottom: 6px; font-size: 13px; }
-.detail-label { font-weight: 600; min-width: 130px; color: var(--text-muted); }
-
 @media (max-width: 768px) {
-    .po-page-content { padding: 16px; }
+    .page-content { padding: 16px; }
     .table-card { padding: 12px; }
-    .po-search-box { max-width: 100%; }
+    .search-box { max-width: 100%; }
     .btn-action { padding: 4px 8px; font-size: 11px; }
 }
 .edit-name-modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center; padding: 16px; }
@@ -144,13 +145,13 @@ $currentPage = 'staff_po';
 </head>
 <body>
 
-<?php include('navbar.php'); ?>
+<?php include('nav.php'); ?>
 
-<div class="po-page-content">
-    <div class="po-page-header">
-        <h1><i class="fas fa-file-invoice" style="color:var(--primary);margin-right:8px;"></i>Purchase Orders</h1>
+<div class="page-content">
+    <div class="page-header">
+        <h1><i class="fas fa-file-invoice" style="color:var(--primary);margin-right:8px;"></i>Quotations</h1>
         <button class="btn-add" onclick="openCreateModal();">
-            <i class="fas fa-plus"></i> New PO
+            <i class="fas fa-plus"></i> New Quotation
         </button>
     </div>
 
@@ -166,11 +167,11 @@ $currentPage = 'staff_po';
         </div>
 
         <div class="table-toolbar">
-            <div class="po-search-box">
+            <div class="search-box">
                 <i class="fas fa-search"></i>
-                <input type="text" id="poSearchInput" placeholder="Search PO number, supplier...">
+                <input type="text" id="searchInput" placeholder="Search quotation number, supplier...">
             </div>
-            <div class="item-count" id="poItemCount">0 PO(s)</div>
+            <div class="item-count" id="itemCount">0 Quotation(s)</div>
         </div>
 
         <div style="overflow-x:auto;">
@@ -178,7 +179,7 @@ $currentPage = 'staff_po';
                 <thead>
                     <tr>
                         <th style="width:40px">No</th>
-                        <th>PO Number</th>
+                        <th>Quotation Number</th>
                         <th>Supplier</th>
                         <th>Order Date</th>
                         <th>Expected Date</th>
@@ -188,7 +189,7 @@ $currentPage = 'staff_po';
                         <th style="width:1%">Action</th>
                     </tr>
                 </thead>
-                <tbody id="poDataBody">
+                <tbody id="dataBody">
                     <tr class="no-results"><td colspan="9"><i class="fas fa-spinner fa-spin" style="font-size:24px;margin-bottom:8px;display:block;"></i>Loading...</td></tr>
                 </tbody>
             </table>
@@ -197,11 +198,11 @@ $currentPage = 'staff_po';
 </div>
 
 <!-- Create/Edit PO Modal -->
-<div class="modal fade" id="poModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="quotationModalObj" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalTitle"><i class="fas fa-file-invoice"></i> New Purchase Order</h5>
+                <h5 class="modal-title" id="modalTitle"><i class="fas fa-file-invoice"></i> New Quotation</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -250,7 +251,7 @@ $currentPage = 'staff_po';
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success w-50" onclick="savePO();"><i class="fas fa-check"></i> Save PO</button>
+                <button type="button" class="btn btn-success w-50" onclick="saveQuotation();"><i class="fas fa-check"></i> Save PO</button>
             </div>
             <!-- Edit Product Name overlay inside PO modal -->
             <div class="edit-name-modal-overlay" id="poEditNameModalOverlay" onclick="if(event.target===this)closePoEditNameModal();">
@@ -268,18 +269,19 @@ $currentPage = 'staff_po';
     </div>
 </div>
 
-<!-- View PO Detail Modal -->
+<!-- View Quotation Detail Modal -->
 <div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="viewTitle"><i class="fas fa-file-invoice"></i> PO Detail</h5>
+                <h5 class="modal-title" id="viewTitle"><i class="fas fa-file-invoice"></i> Quotation Detail</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="viewBody">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-danger text-white" onclick="downloadCurrentPDF();" style="margin-right:auto;"><i class="fas fa-file-pdf"></i> Download PDF</button>
+                <button type="button" class="btn btn-info text-white" id="viewPrintBtn" onclick="printCurrentQuotation();" style="margin-right:auto;"><i class="fas fa-print"></i> Print</button>
+                <button type="button" class="btn btn-danger text-white" onclick="downloadCurrentPDF();"><i class="fas fa-file-pdf"></i> Download PDF</button>
                 <button type="button" class="btn btn-success text-white" onclick="downloadCurrentExcel();"><i class="fas fa-file-excel"></i> Export Excel</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
@@ -385,20 +387,18 @@ $currentPage = 'staff_po';
     </div>
 </div>
 
-<?php include('mobile-bottombar.php'); ?>
-
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
-var poModal = null, viewModalObj = null, productSearchModal = null, newProductModal = null;
+var quotationModalObj = null, viewModal = null, productSearchModal = null, newProductModal = null;
 var currentStatus = '';
 var lineItemIndex = 0;
 
 document.addEventListener('DOMContentLoaded', function() {
-    poModal = new bootstrap.Modal(document.getElementById('poModal'));
-    viewModalObj = new bootstrap.Modal(document.getElementById('viewModal'));
+    quotationModalObj = new bootstrap.Modal(document.getElementById('quotationModalObj'));
+    viewModal = new bootstrap.Modal(document.getElementById('viewModal'));
     productSearchModal = new bootstrap.Modal(document.getElementById('productSearchModal'));
     newProductModal = new bootstrap.Modal(document.getElementById('newProductModal'));
     // Auto-focus search input when product search modal opens
@@ -410,13 +410,13 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('psmSearchInput').value = '';
         document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Enter a search term and click Search</div>';
     });
-    loadPOs();
+    loadQuotations();
 });
 
 // ==================== LOAD PO LIST ====================
-function loadPOs() {
+function loadQuotations() {
     $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: { action: 'list_po', status: currentStatus }, dataType: 'json',
+        type: 'POST', url: 'quotation_ajax.php', data: { action: 'list', status: currentStatus }, dataType: 'json',
         success: function(data) {
             if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
             renderPOTable(data.pos || []);
@@ -425,20 +425,20 @@ function loadPOs() {
 }
 
 function renderPOTable(pos) {
-    var body = document.getElementById('poDataBody');
+    var body = document.getElementById('dataBody');
     if (pos.length === 0) {
-        body.innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-file-invoice" style="font-size:24px;margin-bottom:8px;display:block;"></i>No purchase orders found</td></tr>';
-        document.getElementById('poItemCount').textContent = '0 PO(s)';
+        body.innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-file-invoice" style="font-size:24px;margin-bottom:8px;display:block;"></i>No quotations found</td></tr>';
+        document.getElementById('itemCount').textContent = '0 Quotation(s)';
         return;
     }
 
     var html = '';
     pos.forEach(function(po, i) {
         var statusClass = 'badge-' + (po.status || '').toLowerCase();
-        var search = ((po.po_number || '') + ' ' + (po.supplier_name || '') + ' ' + (po.created_by || '')).toLowerCase();
+        var search = ((po.quotation_number || '') + ' ' + (po.supplier_name || '') + ' ' + (po.created_by || '')).toLowerCase();
         html += '<tr data-search="' + escHtml(search) + '">';
         html += '<td>' + (i + 1) + '</td>';
-        html += '<td><strong>' + escHtml(po.po_number) + '</strong></td>';
+        html += '<td><strong>' + escHtml(po.quotation_number) + '</strong></td>';
         html += '<td>' + escHtml(po.supplier_name || '-') + '</td>';
         html += '<td>' + escHtml(po.order_date || '-') + '</td>';
         html += '<td>' + escHtml(po.expected_date || '-') + '</td>';
@@ -446,22 +446,23 @@ function renderPOTable(pos) {
         html += '<td><span class="badge-status ' + statusClass + '">' + escHtml(po.status) + '</span></td>';
         html += '<td>' + escHtml(po.created_by || '-') + '</td>';
         html += '<td style="white-space:nowrap">';
-        html += '<button class="btn-action btn-view" onclick="viewPO(' + po.id + ');"><i class="fas fa-eye"></i></button> ';
+        html += '<button class="btn-action btn-view" onclick="viewQuotation(' + po.id + ');"><i class="fas fa-eye"></i></button> ';
+        html += '<button class="btn-action btn-print" onclick="printQuotation(' + po.id + ');"><i class="fas fa-print"></i></button> ';
         if (po.status === 'DRAFT') {
-            html += '<button class="btn-action btn-edit" onclick="editPO(' + po.id + ');"><i class="fas fa-pen"></i></button> ';
-            html += '<button class="btn-action btn-approve" onclick="approvePO(' + po.id + ', \'' + escHtml(po.po_number) + '\');"><i class="fas fa-check"></i></button> ';
-            html += '<button class="btn-action btn-cancel-po" onclick="cancelPO(' + po.id + ', \'' + escHtml(po.po_number) + '\');"><i class="fas fa-ban"></i></button>';
+            html += '<button class="btn-action btn-edit" onclick="editQuotation(' + po.id + ');"><i class="fas fa-pen"></i></button> ';
+            html += '<button class="btn-action btn-approve" onclick="approveQuotation(' + po.id + ', \'' + escHtml(po.quotation_number) + '\');"><i class="fas fa-check"></i></button> ';
+            html += '<button class="btn-action btn-cancel-po" onclick="cancelQuotation(' + po.id + ', \'' + escHtml(po.quotation_number) + '\');"><i class="fas fa-ban"></i></button>';
         } else if (po.status === 'APPROVED') {
-            html += '<button class="btn-action btn-cancel-po" onclick="cancelPO(' + po.id + ', \'' + escHtml(po.po_number) + '\');"><i class="fas fa-ban"></i></button>';
+            html += '<button class="btn-action btn-cancel-po" onclick="cancelQuotation(' + po.id + ', \'' + escHtml(po.quotation_number) + '\');"><i class="fas fa-ban"></i></button>';
         }
         if (po.status !== 'DONE') {
-            html += ' <button class="btn-action btn-done" onclick="donePO(' + po.id + ', \'' + escHtml(po.po_number) + '\');" title="Mark as Done"><i class="fas fa-check-double"></i></button>';
+            html += ' <button class="btn-action btn-done" onclick="doneQuotation(' + po.id + ', \'' + escHtml(po.quotation_number) + '\');" title="Mark as Done"><i class="fas fa-check-double"></i></button>';
         }
         html += '</td>';
         html += '</tr>';
     });
     body.innerHTML = html;
-    document.getElementById('poItemCount').textContent = pos.length + ' PO(s)';
+    document.getElementById('itemCount').textContent = pos.length + ' Quotation(s)';
 }
 
 function escHtml(str) {
@@ -474,20 +475,20 @@ function filterStatus(el) {
     document.querySelectorAll('.status-tab').forEach(function(t) { t.classList.remove('active'); });
     el.classList.add('active');
     currentStatus = el.getAttribute('data-status');
-    loadPOs();
+    loadQuotations();
 }
 
 // ==================== SEARCH ====================
-document.getElementById('poSearchInput').addEventListener('input', function() {
+document.getElementById('searchInput').addEventListener('input', function() {
     var q = this.value.toLowerCase();
-    var rows = document.querySelectorAll('#poDataBody tr:not(.no-results)');
+    var rows = document.querySelectorAll('#dataBody tr:not(.no-results)');
     var count = 0;
     rows.forEach(function(row) {
         var d = row.getAttribute('data-search') || '';
         if (d.indexOf(q) > -1) { row.style.display = ''; count++; }
         else { row.style.display = 'none'; }
     });
-    document.getElementById('poItemCount').textContent = count + ' PO(s)';
+    document.getElementById('itemCount').textContent = count + ' Quotation(s)';
     var num = 1;
     rows.forEach(function(row) { if (row.style.display !== 'none') row.cells[0].textContent = num++; });
 });
@@ -495,7 +496,7 @@ document.getElementById('poSearchInput').addEventListener('input', function() {
 // ==================== CREATE / EDIT MODAL ====================
 function loadSuppliers(callback) {
     $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: { action: 'list_suppliers' }, dataType: 'json',
+        type: 'POST', url: 'quotation_ajax.php', data: { action: 'list_suppliers' }, dataType: 'json',
         success: function(data) {
             var sel = document.getElementById('fSupplier');
             sel.innerHTML = '<option value="">-- Select Supplier --</option>';
@@ -519,22 +520,22 @@ function clearForm() {
 
 function openCreateModal() {
     clearForm();
-    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-invoice"></i> New Purchase Order';
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-invoice"></i> New Quotation';
     loadPoUomCache();
     loadSuppliers(function() {
-        poModal.show();
+        quotationModalObj.show();
     });
 }
 
-function editPO(id) {
+function editQuotation(id) {
     clearForm();
-    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-invoice"></i> Edit Purchase Order';
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-invoice"></i> Edit Quotation';
     document.getElementById('editId').value = id;
 
     loadPoUomCache();
     loadSuppliers(function() {
         $.ajax({
-            type: 'POST', url: 'staff_po_ajax.php', data: { action: 'get_po', id: id }, dataType: 'json',
+            type: 'POST', url: 'quotation_ajax.php', data: { action: 'get', id: id }, dataType: 'json',
             success: function(data) {
                 if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
                 var po = data.po;
@@ -546,7 +547,7 @@ function editPO(id) {
                 (data.items || []).forEach(function(item) {
                     addLineItem(item.barcode, item.product_desc, item.uom, item.qty_ordered);
                 });
-                poModal.show();
+                quotationModalObj.show();
             }
         });
     });
@@ -558,7 +559,7 @@ var poUomLoaded = false;
 
 function loadPoUomCache(callback) {
     if (poUomLoaded) { if (callback) callback(); return; }
-    $.post('staff_po_ajax.php', { action: 'uom_list' }, function(uoms) {
+    $.post('product_ajax.php', { action: 'uom_list' }, function(uoms) {
         poUomCache = (uoms || []).filter(function(u) { return u.status === 'ACTIVE'; });
         poUomLoaded = true;
         if (callback) callback();
@@ -573,6 +574,7 @@ function buildUomSelect(idx, selectedUom) {
         if (u.name === selectedUom) found = true;
         html += '<option value="' + escHtml(u.name) + '"' + sel + '>' + escHtml(u.name) + '</option>';
     });
+    // If the current UOM isn't in cache (e.g. from old data), add it
     if (selectedUom && !found) {
         html += '<option value="' + escHtml(selectedUom) + '" selected>' + escHtml(selectedUom) + '</option>';
     }
@@ -631,7 +633,7 @@ function savePoEditName() {
     btn.disabled = true;
     btn.textContent = 'Saving...';
     var xhr = new XMLHttpRequest();
-    xhr.open('POST', 'staff_po_ajax.php', true);
+    xhr.open('POST', 'quotation_ajax.php', true);
     xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
@@ -672,6 +674,7 @@ function onLineUomChange(idx) {
     if (!row) return;
     var sel = row.querySelector('.li-uom');
     if (sel.value === '__add_new__') {
+        // Prompt for new UOM name
         Swal.fire({
             title: 'Add New UOM',
             input: 'text',
@@ -682,13 +685,15 @@ function onLineUomChange(idx) {
         }).then(function(result) {
             if (result.isConfirmed) {
                 var newName = result.value.trim().toUpperCase();
-                $.post('staff_po_ajax.php', { action: 'uom_create', name: newName }, function(r) {
+                $.post('product_ajax.php', { action: 'uom_create', name: newName }, function(r) {
                     if (r.success) {
                         poUomCache.push({ id: r.id, name: newName, status: 'ACTIVE' });
+                        // Rebuild this select with new UOM selected
                         var td = sel.parentElement;
                         td.innerHTML = buildUomSelect(idx, newName);
                         updateConversionIndicator(idx);
                     } else if (r.error && r.error.indexOf('already exists') > -1) {
+                        // UOM exists, just select it
                         var exists = poUomCache.find(function(u) { return u.name === newName; });
                         if (!exists) poUomCache.push({ id: 0, name: newName, status: 'ACTIVE' });
                         var td = sel.parentElement;
@@ -700,6 +705,7 @@ function onLineUomChange(idx) {
                     }
                 }, 'json');
             } else {
+                // Cancelled - revert to base UOM
                 sel.value = row.getAttribute('data-base-uom') || '';
             }
         });
@@ -726,13 +732,15 @@ function updateConversionIndicator(idx) {
         return;
     }
 
+    // Same UOM or no base UOM — direct 1:1
     if (!baseUom || selectedUom === baseUom) {
         cell.innerHTML = '<span class="li-conv-indicator same-uom">+' + qty + ' ' + escHtml(baseUom || selectedUom) + ' QOH</span>';
         return;
     }
 
+    // Different UOM — look up conversion
     cell.innerHTML = '<span class="li-conv-indicator no-conv"><i class="fas fa-spinner fa-spin"></i></span>';
-    $.post('staff_po_ajax.php', { action: 'uom_conversion_lookup', barcode: barcode, from_uom: selectedUom }, function(data) {
+    $.post('product_ajax.php', { action: 'uom_conversion_lookup', barcode: barcode, from_uom: selectedUom }, function(data) {
         if (data.found) {
             var converted = qty * data.conversion_factor;
             cell.innerHTML = '<span class="li-conv-indicator converted">' +
@@ -789,7 +797,7 @@ function loadProducts(append) {
     }
 
     psmSearchXhr = $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: { action: 'search_products', q: psmCurrentQuery, offset: psmCurrentOffset }, dataType: 'json',
+        type: 'POST', url: 'quotation_ajax.php', data: { action: 'search_products', q: psmCurrentQuery, offset: psmCurrentOffset }, dataType: 'json',
         success: function(data) {
             psmSearchXhr = null;
             var products = data.products || [];
@@ -848,7 +856,7 @@ function selectProductFromCard(el) {
 }
 
 // ==================== SAVE PO ====================
-function savePO() {
+function saveQuotation() {
     var editId = document.getElementById('editId').value;
     var supplierId = document.getElementById('fSupplier').value;
     var orderDate = document.getElementById('fOrderDate').value;
@@ -880,11 +888,11 @@ function savePO() {
     if (editId) postData.id = editId;
 
     $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: postData, dataType: 'json',
+        type: 'POST', url: 'quotation_ajax.php', data: postData, dataType: 'json',
         success: function(data) {
             if (data.success) {
-                poModal.hide();
-                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadPOs(); });
+                quotationModalObj.hide();
+                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadQuotations(); });
             } else {
                 Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
             }
@@ -893,11 +901,11 @@ function savePO() {
 }
 
 // ==================== VIEW PO ====================
-var currentViewPOId = null;
-function viewPO(id) {
-    currentViewPOId = id;
+var currentViewQuotationId = null;
+function viewQuotation(id) {
+    currentViewQuotationId = id;
     $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: { action: 'get_po', id: id }, dataType: 'json',
+        type: 'POST', url: 'quotation_ajax.php', data: { action: 'get', id: id }, dataType: 'json',
         success: function(data) {
             if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
             var po = data.po;
@@ -905,7 +913,7 @@ function viewPO(id) {
             var statusClass = 'badge-' + (po.status || '').toLowerCase();
 
             var html = '<div class="detail-section">';
-            html += '<div class="detail-row"><span class="detail-label">PO Number:</span><strong>' + escHtml(po.po_number) + '</strong></div>';
+            html += '<div class="detail-row"><span class="detail-label">Quotation Number:</span><strong>' + escHtml(po.quotation_number) + '</strong></div>';
             html += '<div class="detail-row"><span class="detail-label">Status:</span><span class="badge-status ' + statusClass + '">' + escHtml(po.status) + '</span></div>';
             html += '<div class="detail-row"><span class="detail-label">Supplier:</span>' + escHtml(po.supplier_name || '-') + '</div>';
             html += '<div class="detail-row"><span class="detail-label">Order Date:</span>' + escHtml(po.order_date || '-') + '</div>';
@@ -946,9 +954,9 @@ function viewPO(id) {
             html += '</table>';
             html += '</div>';
 
-            document.getElementById('viewTitle').innerHTML = '<i class="fas fa-file-invoice"></i> ' + escHtml(po.po_number);
+            document.getElementById('viewTitle').innerHTML = '<i class="fas fa-file-invoice"></i> ' + escHtml(po.quotation_number);
             document.getElementById('viewBody').innerHTML = html;
-            viewModalObj.show();
+            viewModal.show();
         }
     });
 }
@@ -978,7 +986,7 @@ function buildLetterheadHtml(company) {
 function fetchCompany() {
     return new Promise(function(resolve) {
         $.ajax({
-            type: 'POST', url: 'staff_po_ajax.php', data: { action: 'get_company' }, dataType: 'json',
+            type: 'POST', url: 'quotation_ajax.php', data: { action: 'get_company' }, dataType: 'json',
             success: function(d) { resolve((d && d.company) || {}); },
             error: function() { resolve({}); }
         });
@@ -996,7 +1004,7 @@ function fetchProductImagesBase64(items) {
     }
     return new Promise(function(resolve) {
         $.ajax({
-            type: 'POST', url: 'staff_po_ajax.php',
+            type: 'POST', url: 'quotation_ajax.php',
             data: { action: 'images_base64', paths: JSON.stringify(paths) },
             dataType: 'json',
             success: function(map) {
@@ -1013,14 +1021,14 @@ function fetchProductImagesBase64(items) {
     });
 }
 
-function buildPOExportHtml(po, items, company, opts) {
+function buildQuotationExportHtml(po, items, company, opts) {
     opts = opts || {};
     var useBase64 = !!opts.useBase64;
     var html = buildLetterheadHtml(company);
 
     html += '<div style="text-align:center;margin-bottom:18px;border-top:1px solid #1a1a1a;border-bottom:1px solid #1a1a1a;padding:8px 0;">';
-    html += '<h1 style="font-size:20px;margin:0 0 4px;letter-spacing:0.05em;">PURCHASE ORDER</h1>';
-    html += '<div style="font-size:14px;font-weight:bold;">' + escHtml(po.po_number) + '</div>';
+    html += '<h1 style="font-size:20px;margin:0 0 4px;letter-spacing:0.05em;">QUOTATION</h1>';
+    html += '<div style="font-size:14px;font-weight:bold;">' + escHtml(po.quotation_number) + '</div>';
     html += '</div>';
 
     var statusLower = (po.status || '').toLowerCase();
@@ -1100,10 +1108,10 @@ function buildPOExportHtml(po, items, company, opts) {
     return html;
 }
 
-// ==================== OPEN PRINT WINDOW (used by Download PDF) ====================
-function openPOPrintWindow(po, items, company) {
-    var bodyHtml = buildPOExportHtml(po, items, company, { useBase64: false });
-    var title = (po.po_number || 'PO');
+// ==================== OPEN PRINT WINDOW (used by Print + Download PDF) ====================
+function openQuotationPrintWindow(po, items, company) {
+    var bodyHtml = buildQuotationExportHtml(po, items, company, { useBase64: false });
+    var title = (po.quotation_number || 'QT');
     var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escHtml(title) + '</title>';
     html += '<base href="' + escHtml(window.location.href) + '">';
     html += '<style>@page { size: A4; margin: 15mm; } body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #1a1a1a; margin:0; padding:0; }';
@@ -1125,9 +1133,26 @@ function openPOPrintWindow(po, items, company) {
     printWin.document.close();
 }
 
+// ==================== PRINT PO ====================
+function printCurrentQuotation() {
+    if (currentViewQuotationId) printQuotation(currentViewQuotationId);
+}
+
+function printQuotation(id) {
+    Promise.all([
+        $.ajax({ type: 'POST', url: 'quotation_ajax.php', data: { action: 'get', id: id }, dataType: 'json' }),
+        fetchCompany()
+    ]).then(function(results) {
+        var data = results[0];
+        var company = results[1];
+        if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
+        openQuotationPrintWindow(data.po, data.items || [], company);
+    });
+}
+
 // ==================== DOWNLOAD PDF (opens print dialog → user picks "Save as PDF") ====================
 function downloadCurrentPDF() {
-    if (currentViewPOId) downloadPDF(currentViewPOId);
+    if (currentViewQuotationId) downloadPDF(currentViewQuotationId);
 }
 
 function downloadPDF(id) {
@@ -1138,31 +1163,31 @@ function downloadPDF(id) {
         showConfirmButton: false, timer: 3500, timerProgressBar: true
     });
     Promise.all([
-        $.ajax({ type: 'POST', url: 'staff_po_ajax.php', data: { action: 'get_po', id: id }, dataType: 'json' }),
+        $.ajax({ type: 'POST', url: 'quotation_ajax.php', data: { action: 'get', id: id }, dataType: 'json' }),
         fetchCompany()
     ]).then(function(results) {
         var data = results[0];
         var company = results[1];
         if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
-        openPOPrintWindow(data.po, data.items || [], company);
+        openQuotationPrintWindow(data.po, data.items || [], company);
     });
 }
 
 // ==================== EXPORT EXCEL ====================
 function downloadCurrentExcel() {
-    if (!currentViewPOId) return;
+    if (!currentViewQuotationId) return;
     var form = document.createElement('form');
     form.method = 'POST';
-    form.action = 'staff_po_ajax.php';
+    form.action = 'quotation_ajax.php';
     form.style.display = 'none';
-    form.innerHTML = '<input type="hidden" name="action" value="export_excel"><input type="hidden" name="id" value="' + escHtml(String(currentViewPOId)) + '">';
+    form.innerHTML = '<input type="hidden" name="action" value="export_excel"><input type="hidden" name="id" value="' + escHtml(String(currentViewQuotationId)) + '">';
     document.body.appendChild(form);
     form.submit();
     setTimeout(function() { document.body.removeChild(form); }, 1000);
 }
 
 // ==================== APPROVE / CANCEL ====================
-function approvePO(id, poNumber) {
+function approveQuotation(id, poNumber) {
     Swal.fire({
         title: 'Approve PO?',
         text: 'Approve "' + poNumber + '"?',
@@ -1173,10 +1198,10 @@ function approvePO(id, poNumber) {
     }).then(function(result) {
         if (result.isConfirmed) {
             $.ajax({
-                type: 'POST', url: 'staff_po_ajax.php', data: { action: 'approve', id: id }, dataType: 'json',
+                type: 'POST', url: 'quotation_ajax.php', data: { action: 'approve', id: id }, dataType: 'json',
                 success: function(data) {
                     if (data.success) {
-                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadPOs(); });
+                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadQuotations(); });
                     } else {
                         Swal.fire({ icon: 'error', text: data.error });
                     }
@@ -1186,7 +1211,7 @@ function approvePO(id, poNumber) {
     });
 }
 
-function cancelPO(id, poNumber) {
+function cancelQuotation(id, poNumber) {
     Swal.fire({
         title: 'Cancel PO?',
         text: 'Cancel "' + poNumber + '"? This cannot be undone.',
@@ -1197,10 +1222,10 @@ function cancelPO(id, poNumber) {
     }).then(function(result) {
         if (result.isConfirmed) {
             $.ajax({
-                type: 'POST', url: 'staff_po_ajax.php', data: { action: 'cancel', id: id }, dataType: 'json',
+                type: 'POST', url: 'quotation_ajax.php', data: { action: 'cancel', id: id }, dataType: 'json',
                 success: function(data) {
                     if (data.success) {
-                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadPOs(); });
+                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadQuotations(); });
                     } else {
                         Swal.fire({ icon: 'error', text: data.error });
                     }
@@ -1211,7 +1236,7 @@ function cancelPO(id, poNumber) {
 }
 
 // ==================== MARK PO AS DONE ====================
-function donePO(id, poNumber) {
+function doneQuotation(id, poNumber) {
     Swal.fire({
         title: 'Mark PO as Done?',
         text: 'Mark "' + poNumber + '" as done? It will be hidden from the main list and goods receiving. You can view it in History.',
@@ -1222,10 +1247,10 @@ function donePO(id, poNumber) {
     }).then(function(result) {
         if (result.isConfirmed) {
             $.ajax({
-                type: 'POST', url: 'staff_po_ajax.php', data: { action: 'mark_done', id: id }, dataType: 'json',
+                type: 'POST', url: 'quotation_ajax.php', data: { action: 'mark_done', id: id }, dataType: 'json',
                 success: function(data) {
                     if (data.success) {
-                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadPOs(); });
+                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadQuotations(); });
                     } else {
                         Swal.fire({ icon: 'error', text: data.error });
                     }
@@ -1242,6 +1267,7 @@ var npRacksCache = [];
 var npDropdownsLoaded = false;
 
 function openNewProductModal() {
+    // Clear form
     document.getElementById('npBarcode').value = '';
     document.getElementById('npCode').value = '';
     document.getElementById('npName').value = '';
@@ -1270,19 +1296,19 @@ function npLoadDropdowns(callback) {
     var pending = 3;
     function done() { pending--; if (pending === 0) { npDropdownsLoaded = true; if (callback) callback(); } }
 
-    $.post('staff_po_ajax.php', { action: 'cat_list' }, function(cats) {
+    $.post('product_ajax.php', { action: 'cat_list' }, function(cats) {
         npCategoriesCache = (cats || []).filter(function(c) { return c.status === 'ACTIVE'; });
         npRefreshCatSelect();
         done();
     }, 'json');
 
-    $.post('staff_po_ajax.php', { action: 'uom_list' }, function(uoms) {
+    $.post('product_ajax.php', { action: 'uom_list' }, function(uoms) {
         npUomCache = (uoms || []).filter(function(u) { return u.status === 'ACTIVE'; });
         npRefreshUomSelect();
         done();
     }, 'json');
 
-    $.post('staff_po_ajax.php', { action: 'rack_list' }, function(racks) {
+    $.post('product_ajax.php', { action: 'rack_list' }, function(racks) {
         npRacksCache = racks || [];
         npRefreshRackSelect();
         done();
@@ -1328,7 +1354,7 @@ function npLoadSubCatOptions() {
     var catObj = npCategoriesCache.find(function(c) { return c.ccode === catCode; });
     if (!catObj) return;
 
-    $.post('staff_po_ajax.php', { action: 'subcat_list', category_id: catObj.id }, function(subs) {
+    $.post('product_ajax.php', { action: 'subcat_list', category_id: catObj.id }, function(subs) {
         (subs || []).forEach(function(s) {
             sel.innerHTML += '<option value="' + escHtml(s.sub_code) + '" data-name="' + escHtml(s.name) + '">' + escHtml(s.name) + '</option>';
         });
@@ -1384,7 +1410,7 @@ function saveNewProduct() {
     if (subSel.value === '') { subName = ''; subCode = ''; }
 
     var formData = new FormData();
-    formData.append('action', 'create_product');
+    formData.append('action', 'create');
     formData.append('barcode', barcode);
     formData.append('code', document.getElementById('npCode').value.trim());
     formData.append('name', name);
@@ -1398,6 +1424,8 @@ function saveNewProduct() {
     formData.append('rack', document.getElementById('npRackSelect').value.trim());
     formData.append('rack_remark', document.getElementById('npRackRemark').value.trim());
     formData.append('checked', 'Y');
+    formData.append('existing_image', '');
+    formData.append('remove_image', '0');
 
     var imageFile = document.getElementById('npImage').files[0];
     if (imageFile) {
@@ -1405,12 +1433,13 @@ function saveNewProduct() {
     }
 
     $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: formData, dataType: 'json',
+        type: 'POST', url: 'product_ajax.php', data: formData, dataType: 'json',
         processData: false, contentType: false,
         success: function(data) {
             if (data.success) {
                 var uom = document.getElementById('npUom').value.trim();
                 newProductModal.hide();
+                // Auto-add the new product as a line item
                 addLineItem(barcode, name, uom, 1);
                 Swal.fire({ icon: 'success', text: 'Product created and added to PO.', timer: 1500, showConfirmButton: false });
             } else {

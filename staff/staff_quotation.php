@@ -10,14 +10,14 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 include('dbconnection.php');
 $connect->set_charset("utf8mb4");
 
-$currentPage = 'staff_po';
+$currentPage = 'staff_quotation';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Purchase Orders</title>
+<title>Quotations</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -148,9 +148,9 @@ $currentPage = 'staff_po';
 
 <div class="po-page-content">
     <div class="po-page-header">
-        <h1><i class="fas fa-file-invoice" style="color:var(--primary);margin-right:8px;"></i>Purchase Orders</h1>
+        <h1><i class="fas fa-file-invoice" style="color:var(--primary);margin-right:8px;"></i>Quotations</h1>
         <button class="btn-add" onclick="openCreateModal();">
-            <i class="fas fa-plus"></i> New PO
+            <i class="fas fa-plus"></i> New Quotation
         </button>
     </div>
 
@@ -168,9 +168,9 @@ $currentPage = 'staff_po';
         <div class="table-toolbar">
             <div class="po-search-box">
                 <i class="fas fa-search"></i>
-                <input type="text" id="poSearchInput" placeholder="Search PO number, supplier...">
+                <input type="text" id="poSearchInput" placeholder="Search quotation number, supplier...">
             </div>
-            <div class="item-count" id="poItemCount">0 PO(s)</div>
+            <div class="item-count" id="poItemCount">0 Quotation(s)</div>
         </div>
 
         <div style="overflow-x:auto;">
@@ -178,7 +178,7 @@ $currentPage = 'staff_po';
                 <thead>
                     <tr>
                         <th style="width:40px">No</th>
-                        <th>PO Number</th>
+                        <th>Quotation Number</th>
                         <th>Supplier</th>
                         <th>Order Date</th>
                         <th>Expected Date</th>
@@ -197,11 +197,11 @@ $currentPage = 'staff_po';
 </div>
 
 <!-- Create/Edit PO Modal -->
-<div class="modal fade" id="poModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="quotationModalObj" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalTitle"><i class="fas fa-file-invoice"></i> New Purchase Order</h5>
+                <h5 class="modal-title" id="modalTitle"><i class="fas fa-file-invoice"></i> New Quotation</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -250,7 +250,7 @@ $currentPage = 'staff_po';
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success w-50" onclick="savePO();"><i class="fas fa-check"></i> Save PO</button>
+                <button type="button" class="btn btn-success w-50" onclick="saveQuotation();"><i class="fas fa-check"></i> Save PO</button>
             </div>
             <!-- Edit Product Name overlay inside PO modal -->
             <div class="edit-name-modal-overlay" id="poEditNameModalOverlay" onclick="if(event.target===this)closePoEditNameModal();">
@@ -268,12 +268,12 @@ $currentPage = 'staff_po';
     </div>
 </div>
 
-<!-- View PO Detail Modal -->
+<!-- View Quotation Detail Modal -->
 <div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="viewTitle"><i class="fas fa-file-invoice"></i> PO Detail</h5>
+                <h5 class="modal-title" id="viewTitle"><i class="fas fa-file-invoice"></i> Quotation Detail</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="viewBody">
@@ -392,12 +392,12 @@ $currentPage = 'staff_po';
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
-var poModal = null, viewModalObj = null, productSearchModal = null, newProductModal = null;
+var quotationModalObj = null, viewModalObj = null, productSearchModal = null, newProductModal = null;
 var currentStatus = '';
 var lineItemIndex = 0;
 
 document.addEventListener('DOMContentLoaded', function() {
-    poModal = new bootstrap.Modal(document.getElementById('poModal'));
+    quotationModalObj = new bootstrap.Modal(document.getElementById('quotationModalObj'));
     viewModalObj = new bootstrap.Modal(document.getElementById('viewModal'));
     productSearchModal = new bootstrap.Modal(document.getElementById('productSearchModal'));
     newProductModal = new bootstrap.Modal(document.getElementById('newProductModal'));
@@ -410,13 +410,13 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('psmSearchInput').value = '';
         document.getElementById('psmResultsContainer').innerHTML = '<div class="psm-empty"><i class="fas fa-box-open" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.3;"></i>Enter a search term and click Search</div>';
     });
-    loadPOs();
+    loadQuotations();
 });
 
 // ==================== LOAD PO LIST ====================
-function loadPOs() {
+function loadQuotations() {
     $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: { action: 'list_po', status: currentStatus }, dataType: 'json',
+        type: 'POST', url: 'staff_quotation_ajax.php', data: { action: 'list_po', status: currentStatus }, dataType: 'json',
         success: function(data) {
             if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
             renderPOTable(data.pos || []);
@@ -427,18 +427,18 @@ function loadPOs() {
 function renderPOTable(pos) {
     var body = document.getElementById('poDataBody');
     if (pos.length === 0) {
-        body.innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-file-invoice" style="font-size:24px;margin-bottom:8px;display:block;"></i>No purchase orders found</td></tr>';
-        document.getElementById('poItemCount').textContent = '0 PO(s)';
+        body.innerHTML = '<tr class="no-results"><td colspan="9"><i class="fas fa-file-invoice" style="font-size:24px;margin-bottom:8px;display:block;"></i>No quotations found</td></tr>';
+        document.getElementById('poItemCount').textContent = '0 Quotation(s)';
         return;
     }
 
     var html = '';
     pos.forEach(function(po, i) {
         var statusClass = 'badge-' + (po.status || '').toLowerCase();
-        var search = ((po.po_number || '') + ' ' + (po.supplier_name || '') + ' ' + (po.created_by || '')).toLowerCase();
+        var search = ((po.quotation_number || '') + ' ' + (po.supplier_name || '') + ' ' + (po.created_by || '')).toLowerCase();
         html += '<tr data-search="' + escHtml(search) + '">';
         html += '<td>' + (i + 1) + '</td>';
-        html += '<td><strong>' + escHtml(po.po_number) + '</strong></td>';
+        html += '<td><strong>' + escHtml(po.quotation_number) + '</strong></td>';
         html += '<td>' + escHtml(po.supplier_name || '-') + '</td>';
         html += '<td>' + escHtml(po.order_date || '-') + '</td>';
         html += '<td>' + escHtml(po.expected_date || '-') + '</td>';
@@ -446,22 +446,22 @@ function renderPOTable(pos) {
         html += '<td><span class="badge-status ' + statusClass + '">' + escHtml(po.status) + '</span></td>';
         html += '<td>' + escHtml(po.created_by || '-') + '</td>';
         html += '<td style="white-space:nowrap">';
-        html += '<button class="btn-action btn-view" onclick="viewPO(' + po.id + ');"><i class="fas fa-eye"></i></button> ';
+        html += '<button class="btn-action btn-view" onclick="viewQuotation(' + po.id + ');"><i class="fas fa-eye"></i></button> ';
         if (po.status === 'DRAFT') {
-            html += '<button class="btn-action btn-edit" onclick="editPO(' + po.id + ');"><i class="fas fa-pen"></i></button> ';
-            html += '<button class="btn-action btn-approve" onclick="approvePO(' + po.id + ', \'' + escHtml(po.po_number) + '\');"><i class="fas fa-check"></i></button> ';
-            html += '<button class="btn-action btn-cancel-po" onclick="cancelPO(' + po.id + ', \'' + escHtml(po.po_number) + '\');"><i class="fas fa-ban"></i></button>';
+            html += '<button class="btn-action btn-edit" onclick="editQuotation(' + po.id + ');"><i class="fas fa-pen"></i></button> ';
+            html += '<button class="btn-action btn-approve" onclick="approveQuotation(' + po.id + ', \'' + escHtml(po.quotation_number) + '\');"><i class="fas fa-check"></i></button> ';
+            html += '<button class="btn-action btn-cancel-po" onclick="cancelQuotation(' + po.id + ', \'' + escHtml(po.quotation_number) + '\');"><i class="fas fa-ban"></i></button>';
         } else if (po.status === 'APPROVED') {
-            html += '<button class="btn-action btn-cancel-po" onclick="cancelPO(' + po.id + ', \'' + escHtml(po.po_number) + '\');"><i class="fas fa-ban"></i></button>';
+            html += '<button class="btn-action btn-cancel-po" onclick="cancelQuotation(' + po.id + ', \'' + escHtml(po.quotation_number) + '\');"><i class="fas fa-ban"></i></button>';
         }
         if (po.status !== 'DONE') {
-            html += ' <button class="btn-action btn-done" onclick="donePO(' + po.id + ', \'' + escHtml(po.po_number) + '\');" title="Mark as Done"><i class="fas fa-check-double"></i></button>';
+            html += ' <button class="btn-action btn-done" onclick="doneQuotation(' + po.id + ', \'' + escHtml(po.quotation_number) + '\');" title="Mark as Done"><i class="fas fa-check-double"></i></button>';
         }
         html += '</td>';
         html += '</tr>';
     });
     body.innerHTML = html;
-    document.getElementById('poItemCount').textContent = pos.length + ' PO(s)';
+    document.getElementById('poItemCount').textContent = pos.length + ' Quotation(s)';
 }
 
 function escHtml(str) {
@@ -474,7 +474,7 @@ function filterStatus(el) {
     document.querySelectorAll('.status-tab').forEach(function(t) { t.classList.remove('active'); });
     el.classList.add('active');
     currentStatus = el.getAttribute('data-status');
-    loadPOs();
+    loadQuotations();
 }
 
 // ==================== SEARCH ====================
@@ -487,7 +487,7 @@ document.getElementById('poSearchInput').addEventListener('input', function() {
         if (d.indexOf(q) > -1) { row.style.display = ''; count++; }
         else { row.style.display = 'none'; }
     });
-    document.getElementById('poItemCount').textContent = count + ' PO(s)';
+    document.getElementById('poItemCount').textContent = count + ' Quotation(s)';
     var num = 1;
     rows.forEach(function(row) { if (row.style.display !== 'none') row.cells[0].textContent = num++; });
 });
@@ -495,7 +495,7 @@ document.getElementById('poSearchInput').addEventListener('input', function() {
 // ==================== CREATE / EDIT MODAL ====================
 function loadSuppliers(callback) {
     $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: { action: 'list_suppliers' }, dataType: 'json',
+        type: 'POST', url: 'staff_quotation_ajax.php', data: { action: 'list_suppliers' }, dataType: 'json',
         success: function(data) {
             var sel = document.getElementById('fSupplier');
             sel.innerHTML = '<option value="">-- Select Supplier --</option>';
@@ -519,22 +519,22 @@ function clearForm() {
 
 function openCreateModal() {
     clearForm();
-    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-invoice"></i> New Purchase Order';
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-invoice"></i> New Quotation';
     loadPoUomCache();
     loadSuppliers(function() {
-        poModal.show();
+        quotationModalObj.show();
     });
 }
 
-function editPO(id) {
+function editQuotation(id) {
     clearForm();
-    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-invoice"></i> Edit Purchase Order';
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-file-invoice"></i> Edit Quotation';
     document.getElementById('editId').value = id;
 
     loadPoUomCache();
     loadSuppliers(function() {
         $.ajax({
-            type: 'POST', url: 'staff_po_ajax.php', data: { action: 'get_po', id: id }, dataType: 'json',
+            type: 'POST', url: 'staff_quotation_ajax.php', data: { action: 'get_po', id: id }, dataType: 'json',
             success: function(data) {
                 if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
                 var po = data.po;
@@ -546,7 +546,7 @@ function editPO(id) {
                 (data.items || []).forEach(function(item) {
                     addLineItem(item.barcode, item.product_desc, item.uom, item.qty_ordered);
                 });
-                poModal.show();
+                quotationModalObj.show();
             }
         });
     });
@@ -558,7 +558,7 @@ var poUomLoaded = false;
 
 function loadPoUomCache(callback) {
     if (poUomLoaded) { if (callback) callback(); return; }
-    $.post('staff_po_ajax.php', { action: 'uom_list' }, function(uoms) {
+    $.post('staff_quotation_ajax.php', { action: 'uom_list' }, function(uoms) {
         poUomCache = (uoms || []).filter(function(u) { return u.status === 'ACTIVE'; });
         poUomLoaded = true;
         if (callback) callback();
@@ -631,7 +631,7 @@ function savePoEditName() {
     btn.disabled = true;
     btn.textContent = 'Saving...';
     var xhr = new XMLHttpRequest();
-    xhr.open('POST', 'staff_po_ajax.php', true);
+    xhr.open('POST', 'staff_quotation_ajax.php', true);
     xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
@@ -682,7 +682,7 @@ function onLineUomChange(idx) {
         }).then(function(result) {
             if (result.isConfirmed) {
                 var newName = result.value.trim().toUpperCase();
-                $.post('staff_po_ajax.php', { action: 'uom_create', name: newName }, function(r) {
+                $.post('staff_quotation_ajax.php', { action: 'uom_create', name: newName }, function(r) {
                     if (r.success) {
                         poUomCache.push({ id: r.id, name: newName, status: 'ACTIVE' });
                         var td = sel.parentElement;
@@ -732,7 +732,7 @@ function updateConversionIndicator(idx) {
     }
 
     cell.innerHTML = '<span class="li-conv-indicator no-conv"><i class="fas fa-spinner fa-spin"></i></span>';
-    $.post('staff_po_ajax.php', { action: 'uom_conversion_lookup', barcode: barcode, from_uom: selectedUom }, function(data) {
+    $.post('staff_quotation_ajax.php', { action: 'uom_conversion_lookup', barcode: barcode, from_uom: selectedUom }, function(data) {
         if (data.found) {
             var converted = qty * data.conversion_factor;
             cell.innerHTML = '<span class="li-conv-indicator converted">' +
@@ -789,7 +789,7 @@ function loadProducts(append) {
     }
 
     psmSearchXhr = $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: { action: 'search_products', q: psmCurrentQuery, offset: psmCurrentOffset }, dataType: 'json',
+        type: 'POST', url: 'staff_quotation_ajax.php', data: { action: 'search_products', q: psmCurrentQuery, offset: psmCurrentOffset }, dataType: 'json',
         success: function(data) {
             psmSearchXhr = null;
             var products = data.products || [];
@@ -848,7 +848,7 @@ function selectProductFromCard(el) {
 }
 
 // ==================== SAVE PO ====================
-function savePO() {
+function saveQuotation() {
     var editId = document.getElementById('editId').value;
     var supplierId = document.getElementById('fSupplier').value;
     var orderDate = document.getElementById('fOrderDate').value;
@@ -880,11 +880,11 @@ function savePO() {
     if (editId) postData.id = editId;
 
     $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: postData, dataType: 'json',
+        type: 'POST', url: 'staff_quotation_ajax.php', data: postData, dataType: 'json',
         success: function(data) {
             if (data.success) {
-                poModal.hide();
-                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadPOs(); });
+                quotationModalObj.hide();
+                Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadQuotations(); });
             } else {
                 Swal.fire({ icon: 'error', text: data.error || 'Something went wrong.' });
             }
@@ -893,11 +893,11 @@ function savePO() {
 }
 
 // ==================== VIEW PO ====================
-var currentViewPOId = null;
-function viewPO(id) {
-    currentViewPOId = id;
+var currentViewQuotationId = null;
+function viewQuotation(id) {
+    currentViewQuotationId = id;
     $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: { action: 'get_po', id: id }, dataType: 'json',
+        type: 'POST', url: 'staff_quotation_ajax.php', data: { action: 'get_po', id: id }, dataType: 'json',
         success: function(data) {
             if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
             var po = data.po;
@@ -905,7 +905,7 @@ function viewPO(id) {
             var statusClass = 'badge-' + (po.status || '').toLowerCase();
 
             var html = '<div class="detail-section">';
-            html += '<div class="detail-row"><span class="detail-label">PO Number:</span><strong>' + escHtml(po.po_number) + '</strong></div>';
+            html += '<div class="detail-row"><span class="detail-label">Quotation Number:</span><strong>' + escHtml(po.quotation_number) + '</strong></div>';
             html += '<div class="detail-row"><span class="detail-label">Status:</span><span class="badge-status ' + statusClass + '">' + escHtml(po.status) + '</span></div>';
             html += '<div class="detail-row"><span class="detail-label">Supplier:</span>' + escHtml(po.supplier_name || '-') + '</div>';
             html += '<div class="detail-row"><span class="detail-label">Order Date:</span>' + escHtml(po.order_date || '-') + '</div>';
@@ -946,7 +946,7 @@ function viewPO(id) {
             html += '</table>';
             html += '</div>';
 
-            document.getElementById('viewTitle').innerHTML = '<i class="fas fa-file-invoice"></i> ' + escHtml(po.po_number);
+            document.getElementById('viewTitle').innerHTML = '<i class="fas fa-file-invoice"></i> ' + escHtml(po.quotation_number);
             document.getElementById('viewBody').innerHTML = html;
             viewModalObj.show();
         }
@@ -978,7 +978,7 @@ function buildLetterheadHtml(company) {
 function fetchCompany() {
     return new Promise(function(resolve) {
         $.ajax({
-            type: 'POST', url: 'staff_po_ajax.php', data: { action: 'get_company' }, dataType: 'json',
+            type: 'POST', url: 'staff_quotation_ajax.php', data: { action: 'get_company' }, dataType: 'json',
             success: function(d) { resolve((d && d.company) || {}); },
             error: function() { resolve({}); }
         });
@@ -996,7 +996,7 @@ function fetchProductImagesBase64(items) {
     }
     return new Promise(function(resolve) {
         $.ajax({
-            type: 'POST', url: 'staff_po_ajax.php',
+            type: 'POST', url: 'staff_quotation_ajax.php',
             data: { action: 'images_base64', paths: JSON.stringify(paths) },
             dataType: 'json',
             success: function(map) {
@@ -1013,14 +1013,14 @@ function fetchProductImagesBase64(items) {
     });
 }
 
-function buildPOExportHtml(po, items, company, opts) {
+function buildQuotationExportHtml(po, items, company, opts) {
     opts = opts || {};
     var useBase64 = !!opts.useBase64;
     var html = buildLetterheadHtml(company);
 
     html += '<div style="text-align:center;margin-bottom:18px;border-top:1px solid #1a1a1a;border-bottom:1px solid #1a1a1a;padding:8px 0;">';
-    html += '<h1 style="font-size:20px;margin:0 0 4px;letter-spacing:0.05em;">PURCHASE ORDER</h1>';
-    html += '<div style="font-size:14px;font-weight:bold;">' + escHtml(po.po_number) + '</div>';
+    html += '<h1 style="font-size:20px;margin:0 0 4px;letter-spacing:0.05em;">QUOTATION</h1>';
+    html += '<div style="font-size:14px;font-weight:bold;">' + escHtml(po.quotation_number) + '</div>';
     html += '</div>';
 
     var statusLower = (po.status || '').toLowerCase();
@@ -1101,9 +1101,9 @@ function buildPOExportHtml(po, items, company, opts) {
 }
 
 // ==================== OPEN PRINT WINDOW (used by Download PDF) ====================
-function openPOPrintWindow(po, items, company) {
-    var bodyHtml = buildPOExportHtml(po, items, company, { useBase64: false });
-    var title = (po.po_number || 'PO');
+function openQuotationPrintWindow(po, items, company) {
+    var bodyHtml = buildQuotationExportHtml(po, items, company, { useBase64: false });
+    var title = (po.quotation_number || 'QT');
     var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escHtml(title) + '</title>';
     html += '<base href="' + escHtml(window.location.href) + '">';
     html += '<style>@page { size: A4; margin: 15mm; } body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #1a1a1a; margin:0; padding:0; }';
@@ -1127,7 +1127,7 @@ function openPOPrintWindow(po, items, company) {
 
 // ==================== DOWNLOAD PDF (opens print dialog → user picks "Save as PDF") ====================
 function downloadCurrentPDF() {
-    if (currentViewPOId) downloadPDF(currentViewPOId);
+    if (currentViewQuotationId) downloadPDF(currentViewQuotationId);
 }
 
 function downloadPDF(id) {
@@ -1138,31 +1138,31 @@ function downloadPDF(id) {
         showConfirmButton: false, timer: 3500, timerProgressBar: true
     });
     Promise.all([
-        $.ajax({ type: 'POST', url: 'staff_po_ajax.php', data: { action: 'get_po', id: id }, dataType: 'json' }),
+        $.ajax({ type: 'POST', url: 'staff_quotation_ajax.php', data: { action: 'get_po', id: id }, dataType: 'json' }),
         fetchCompany()
     ]).then(function(results) {
         var data = results[0];
         var company = results[1];
         if (data.error) { Swal.fire({ icon: 'error', text: data.error }); return; }
-        openPOPrintWindow(data.po, data.items || [], company);
+        openQuotationPrintWindow(data.po, data.items || [], company);
     });
 }
 
 // ==================== EXPORT EXCEL ====================
 function downloadCurrentExcel() {
-    if (!currentViewPOId) return;
+    if (!currentViewQuotationId) return;
     var form = document.createElement('form');
     form.method = 'POST';
-    form.action = 'staff_po_ajax.php';
+    form.action = 'staff_quotation_ajax.php';
     form.style.display = 'none';
-    form.innerHTML = '<input type="hidden" name="action" value="export_excel"><input type="hidden" name="id" value="' + escHtml(String(currentViewPOId)) + '">';
+    form.innerHTML = '<input type="hidden" name="action" value="export_excel"><input type="hidden" name="id" value="' + escHtml(String(currentViewQuotationId)) + '">';
     document.body.appendChild(form);
     form.submit();
     setTimeout(function() { document.body.removeChild(form); }, 1000);
 }
 
 // ==================== APPROVE / CANCEL ====================
-function approvePO(id, poNumber) {
+function approveQuotation(id, poNumber) {
     Swal.fire({
         title: 'Approve PO?',
         text: 'Approve "' + poNumber + '"?',
@@ -1173,10 +1173,10 @@ function approvePO(id, poNumber) {
     }).then(function(result) {
         if (result.isConfirmed) {
             $.ajax({
-                type: 'POST', url: 'staff_po_ajax.php', data: { action: 'approve', id: id }, dataType: 'json',
+                type: 'POST', url: 'staff_quotation_ajax.php', data: { action: 'approve', id: id }, dataType: 'json',
                 success: function(data) {
                     if (data.success) {
-                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadPOs(); });
+                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadQuotations(); });
                     } else {
                         Swal.fire({ icon: 'error', text: data.error });
                     }
@@ -1186,7 +1186,7 @@ function approvePO(id, poNumber) {
     });
 }
 
-function cancelPO(id, poNumber) {
+function cancelQuotation(id, poNumber) {
     Swal.fire({
         title: 'Cancel PO?',
         text: 'Cancel "' + poNumber + '"? This cannot be undone.',
@@ -1197,10 +1197,10 @@ function cancelPO(id, poNumber) {
     }).then(function(result) {
         if (result.isConfirmed) {
             $.ajax({
-                type: 'POST', url: 'staff_po_ajax.php', data: { action: 'cancel', id: id }, dataType: 'json',
+                type: 'POST', url: 'staff_quotation_ajax.php', data: { action: 'cancel', id: id }, dataType: 'json',
                 success: function(data) {
                     if (data.success) {
-                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadPOs(); });
+                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadQuotations(); });
                     } else {
                         Swal.fire({ icon: 'error', text: data.error });
                     }
@@ -1211,7 +1211,7 @@ function cancelPO(id, poNumber) {
 }
 
 // ==================== MARK PO AS DONE ====================
-function donePO(id, poNumber) {
+function doneQuotation(id, poNumber) {
     Swal.fire({
         title: 'Mark PO as Done?',
         text: 'Mark "' + poNumber + '" as done? It will be hidden from the main list and goods receiving. You can view it in History.',
@@ -1222,10 +1222,10 @@ function donePO(id, poNumber) {
     }).then(function(result) {
         if (result.isConfirmed) {
             $.ajax({
-                type: 'POST', url: 'staff_po_ajax.php', data: { action: 'mark_done', id: id }, dataType: 'json',
+                type: 'POST', url: 'staff_quotation_ajax.php', data: { action: 'mark_done', id: id }, dataType: 'json',
                 success: function(data) {
                     if (data.success) {
-                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadPOs(); });
+                        Swal.fire({ icon: 'success', text: data.success, timer: 1500, showConfirmButton: false }).then(function() { loadQuotations(); });
                     } else {
                         Swal.fire({ icon: 'error', text: data.error });
                     }
@@ -1270,19 +1270,19 @@ function npLoadDropdowns(callback) {
     var pending = 3;
     function done() { pending--; if (pending === 0) { npDropdownsLoaded = true; if (callback) callback(); } }
 
-    $.post('staff_po_ajax.php', { action: 'cat_list' }, function(cats) {
+    $.post('staff_quotation_ajax.php', { action: 'cat_list' }, function(cats) {
         npCategoriesCache = (cats || []).filter(function(c) { return c.status === 'ACTIVE'; });
         npRefreshCatSelect();
         done();
     }, 'json');
 
-    $.post('staff_po_ajax.php', { action: 'uom_list' }, function(uoms) {
+    $.post('staff_quotation_ajax.php', { action: 'uom_list' }, function(uoms) {
         npUomCache = (uoms || []).filter(function(u) { return u.status === 'ACTIVE'; });
         npRefreshUomSelect();
         done();
     }, 'json');
 
-    $.post('staff_po_ajax.php', { action: 'rack_list' }, function(racks) {
+    $.post('staff_quotation_ajax.php', { action: 'rack_list' }, function(racks) {
         npRacksCache = racks || [];
         npRefreshRackSelect();
         done();
@@ -1328,7 +1328,7 @@ function npLoadSubCatOptions() {
     var catObj = npCategoriesCache.find(function(c) { return c.ccode === catCode; });
     if (!catObj) return;
 
-    $.post('staff_po_ajax.php', { action: 'subcat_list', category_id: catObj.id }, function(subs) {
+    $.post('staff_quotation_ajax.php', { action: 'subcat_list', category_id: catObj.id }, function(subs) {
         (subs || []).forEach(function(s) {
             sel.innerHTML += '<option value="' + escHtml(s.sub_code) + '" data-name="' + escHtml(s.name) + '">' + escHtml(s.name) + '</option>';
         });
@@ -1405,7 +1405,7 @@ function saveNewProduct() {
     }
 
     $.ajax({
-        type: 'POST', url: 'staff_po_ajax.php', data: formData, dataType: 'json',
+        type: 'POST', url: 'staff_quotation_ajax.php', data: formData, dataType: 'json',
         processData: false, contentType: false,
         success: function(data) {
             if (data.success) {

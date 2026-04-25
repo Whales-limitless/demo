@@ -11,6 +11,7 @@ $sidebarSections = [
     ],
     'PROCUREMENT' => [
         ['page' => 'supplier',    'href' => 'supplier.php',         'icon' => 'fas fa-truck',                'label' => 'Suppliers'],
+        ['page' => 'quotation',   'href' => 'quotation.php',        'icon' => 'fas fa-file-signature',       'label' => 'Quotations'],
         ['page' => 'po',          'href' => 'po.php',               'icon' => 'fas fa-file-invoice',         'label' => 'Purchase Orders'],
         ['page' => 'grn',         'href' => 'grn.php',              'icon' => 'fas fa-dolly',                'label' => 'Goods Receiving'],
     ],
