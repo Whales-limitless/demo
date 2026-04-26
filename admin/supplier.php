@@ -26,7 +26,7 @@ $currentPage = 'supplier';
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Supplier Management</title>
+<title>Supplier / Customer Management</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -79,9 +79,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 <div class="page-content">
     <div class="page-header">
-        <h1><i class="fas fa-truck" style="color:var(--primary);margin-right:8px;"></i>Supplier Management</h1>
+        <h1><i class="fas fa-truck" style="color:var(--primary);margin-right:8px;"></i>Supplier / Customer Management</h1>
         <button class="btn-add" onclick="openCreateModal();">
-            <i class="fas fa-plus"></i> Add Supplier
+            <i class="fas fa-plus"></i> Add Supplier / Customer
         </button>
     </div>
 
@@ -89,9 +89,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <div class="table-toolbar">
             <div class="search-box">
                 <i class="fas fa-search"></i>
-                <input type="text" id="searchInput" placeholder="Search suppliers...">
+                <input type="text" id="searchInput" placeholder="Search suppliers / customers...">
             </div>
-            <div class="item-count" id="itemCount"><?php echo count($suppliers); ?> supplier(s)</div>
+            <div class="item-count" id="itemCount"><?php echo count($suppliers); ?> supplier(s) / customer(s)</div>
         </div>
 
         <div style="overflow-x:auto;">
@@ -112,7 +112,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 </thead>
                 <tbody id="dataBody">
                     <?php if (count($suppliers) === 0): ?>
-                    <tr class="no-results"><td colspan="10"><i class="fas fa-truck" style="font-size:24px;margin-bottom:8px;display:block;"></i>No suppliers found</td></tr>
+                    <tr class="no-results"><td colspan="10"><i class="fas fa-truck" style="font-size:24px;margin-bottom:8px;display:block;"></i>No suppliers / customers found</td></tr>
                     <?php else: ?>
                     <?php foreach ($suppliers as $i => $s): ?>
                     <tr data-search="<?php echo htmlspecialchars(strtolower(
@@ -145,18 +145,18 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalTitle"><i class="fas fa-truck"></i> Add Supplier</h5>
+                <h5 class="modal-title" id="modalTitle"><i class="fas fa-truck"></i> Add Supplier / Customer</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="editId" value="">
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label class="form-label fw-semibold">Supplier Code <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">Supplier / Customer Code <span class="text-danger">*</span></label>
                         <input type="text" id="fCode" class="form-control" placeholder="e.g. SUP001">
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="form-label fw-semibold">Supplier Name <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">Supplier / Customer Name <span class="text-danger">*</span></label>
                         <input type="text" id="fName" class="form-control" placeholder="Company name">
                     </div>
                 </div>
@@ -225,7 +225,7 @@ document.getElementById('searchInput').addEventListener('input', function() {
         if (d.indexOf(q) > -1) { row.style.display = ''; count++; }
         else { row.style.display = 'none'; }
     });
-    document.getElementById('itemCount').textContent = count + ' supplier(s)';
+    document.getElementById('itemCount').textContent = count + ' supplier(s) / customer(s)';
     var num = 1;
     rows.forEach(function(row) { if (row.style.display !== 'none') row.cells[0].textContent = num++; });
 });
@@ -246,13 +246,13 @@ function clearForm() {
 
 function openCreateModal() {
     clearForm();
-    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-truck"></i> Add Supplier';
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-truck"></i> Add Supplier / Customer';
     modal.show();
 }
 
 function openEditModal(id) {
     clearForm();
-    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-truck"></i> Edit Supplier';
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-truck"></i> Edit Supplier / Customer';
     document.getElementById('editId').value = id;
     document.getElementById('fCode').disabled = true;
 
@@ -280,7 +280,7 @@ function saveSupplier() {
     var name = document.getElementById('fName').value.trim();
 
     if (code === '' || name === '') {
-        Swal.fire({ icon: 'warning', text: 'Supplier code and name are required.' });
+        Swal.fire({ icon: 'warning', text: 'Code and name are required.' });
         return;
     }
 
@@ -312,7 +312,7 @@ function saveSupplier() {
 
 function deleteSupplier(id, name) {
     Swal.fire({
-        title: 'Delete supplier?',
+        title: 'Delete?',
         text: 'Deactivate "' + name + '"?',
         icon: 'warning',
         showCancelButton: true,
