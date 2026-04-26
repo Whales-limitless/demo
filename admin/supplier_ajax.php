@@ -23,7 +23,7 @@ if ($action === 'get') {
     if ($result->num_rows > 0) {
         echo json_encode($result->fetch_assoc());
     } else {
-        echo json_encode(['error' => 'Supplier not found.']);
+        echo json_encode(['error' => 'Record not found.']);
     }
     $stmt->close();
 
@@ -62,7 +62,7 @@ if ($action === 'get') {
     $chk->bind_param("s", $code);
     $chk->execute();
     if ($chk->get_result()->num_rows > 0) {
-        echo json_encode(['error' => 'Supplier code already exists.']);
+        echo json_encode(['error' => 'Code already exists.']);
         $chk->close();
         exit;
     }
@@ -72,9 +72,9 @@ if ($action === 'get') {
     $stmt->bind_param("sssssssis", $code, $name, $contact, $phone, $email, $address, $payment, $lead, $status);
 
     if ($stmt->execute()) {
-        echo json_encode(['success' => 'Supplier created successfully.']);
+        echo json_encode(['success' => 'Created successfully.']);
     } else {
-        echo json_encode(['error' => 'Failed to create supplier: ' . $connect->error]);
+        echo json_encode(['error' => 'Failed to create: ' . $connect->error]);
     }
     $stmt->close();
 
@@ -98,9 +98,9 @@ if ($action === 'get') {
     $stmt->bind_param("ssssssisi", $name, $contact, $phone, $email, $address, $payment, $lead, $status, $id);
 
     if ($stmt->execute()) {
-        echo json_encode(['success' => 'Supplier updated successfully.']);
+        echo json_encode(['success' => 'Updated successfully.']);
     } else {
-        echo json_encode(['error' => 'Failed to update supplier: ' . $connect->error]);
+        echo json_encode(['error' => 'Failed to update: ' . $connect->error]);
     }
     $stmt->close();
 
@@ -108,7 +108,7 @@ if ($action === 'get') {
     // Soft delete: set status to INACTIVE
     $id = intval($_POST['id'] ?? 0);
     if ($id <= 0) {
-        echo json_encode(['error' => 'Invalid supplier ID.']);
+        echo json_encode(['error' => 'Invalid ID.']);
         exit;
     }
 
@@ -116,7 +116,7 @@ if ($action === 'get') {
     $stmt->bind_param("i", $id);
 
     if ($stmt->execute()) {
-        echo json_encode(['success' => 'Supplier deactivated.']);
+        echo json_encode(['success' => 'Deactivated.']);
     } else {
         echo json_encode(['error' => 'Failed: ' . $connect->error]);
     }
