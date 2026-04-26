@@ -101,8 +101,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 
     <div class="status-tabs">
-        <button class="status-tab active" data-status="" onclick="switchTab(this, '')">All</button>
-        <button class="status-tab" data-status="P" onclick="switchTab(this, 'P')">Pending <span class="tab-count" id="countPending">0</span></button>
+        <button class="status-tab" data-status="" onclick="switchTab(this, '')">All</button>
+        <button class="status-tab active" data-status="P" onclick="switchTab(this, 'P')">Pending <span class="tab-count" id="countPending">0</span></button>
         <button class="status-tab" data-status="A" onclick="switchTab(this, 'A')">Approved <span class="tab-count" id="countApproved">0</span></button>
         <button class="status-tab" data-status="R" onclick="switchTab(this, 'R')">Rejected <span class="tab-count" id="countRejected">0</span></button>
     </div>
@@ -208,7 +208,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-var currentStatus = '';
+var currentStatus = 'P';
 var viewModal = null, approveModal = null, rejectModal = null;
 var allRows = [];
 

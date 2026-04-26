@@ -168,7 +168,7 @@ $currentPage = 'staff_quotation';
         <div class="table-toolbar">
             <div class="po-search-box">
                 <i class="fas fa-search"></i>
-                <input type="text" id="poSearchInput" placeholder="Search quotation number, supplier...">
+                <input type="text" id="poSearchInput" placeholder="Search quotation number, customer...">
             </div>
             <div class="item-count" id="poItemCount">0 Quotation(s)</div>
         </div>
@@ -179,7 +179,7 @@ $currentPage = 'staff_quotation';
                     <tr>
                         <th style="width:40px">No</th>
                         <th>Quotation Number</th>
-                        <th>Supplier</th>
+                        <th>Customer</th>
                         <th>Order Date</th>
                         <th>Expected Date</th>
                         <th>Total (RM)</th>
@@ -208,7 +208,7 @@ $currentPage = 'staff_quotation';
                 <input type="hidden" id="editId" value="">
                 <div class="row">
                     <div class="col-md-4 mb-3">
-                        <label class="form-label fw-semibold">Supplier <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">Customer <span class="text-danger">*</span></label>
                         <select id="fSupplier" class="form-select"></select>
                     </div>
                     <div class="col-md-4 mb-3">
@@ -498,7 +498,7 @@ function loadSuppliers(callback) {
         type: 'POST', url: 'staff_quotation_ajax.php', data: { action: 'list_suppliers' }, dataType: 'json',
         success: function(data) {
             var sel = document.getElementById('fSupplier');
-            sel.innerHTML = '<option value="">-- Select Supplier --</option>';
+            sel.innerHTML = '<option value="">-- Select Customer --</option>';
             (data.suppliers || []).forEach(function(s) {
                 sel.innerHTML += '<option value="' + s.id + '">' + escHtml(s.code + ' - ' + s.name) + '</option>';
             });
@@ -853,7 +853,7 @@ function saveQuotation() {
     var supplierId = document.getElementById('fSupplier').value;
     var orderDate = document.getElementById('fOrderDate').value;
 
-    if (!supplierId) { Swal.fire({ icon: 'warning', text: 'Please select a supplier.' }); return; }
+    if (!supplierId) { Swal.fire({ icon: 'warning', text: 'Please select a customer.' }); return; }
     if (!orderDate) { Swal.fire({ icon: 'warning', text: 'Please enter order date.' }); return; }
 
     var items = [];
@@ -907,7 +907,7 @@ function viewQuotation(id) {
             var html = '<div class="detail-section">';
             html += '<div class="detail-row"><span class="detail-label">Quotation Number:</span><strong>' + escHtml(po.quotation_number) + '</strong></div>';
             html += '<div class="detail-row"><span class="detail-label">Status:</span><span class="badge-status ' + statusClass + '">' + escHtml(po.status) + '</span></div>';
-            html += '<div class="detail-row"><span class="detail-label">Supplier:</span>' + escHtml(po.supplier_name || '-') + '</div>';
+            html += '<div class="detail-row"><span class="detail-label">Customer:</span>' + escHtml(po.supplier_name || '-') + '</div>';
             html += '<div class="detail-row"><span class="detail-label">Order Date:</span>' + escHtml(po.order_date || '-') + '</div>';
             html += '<div class="detail-row"><span class="detail-label">Expected Date:</span>' + escHtml(po.expected_date || '-') + '</div>';
             html += '<div class="detail-row"><span class="detail-label">Total Amount:</span>RM ' + parseFloat(po.total_amount || 0).toFixed(2) + '</div>';
@@ -1028,7 +1028,7 @@ function buildQuotationExportHtml(po, items, company, opts) {
 
     html += '<table style="width:100%;margin-bottom:16px;border-collapse:collapse;font-size:12px;"><tr><td style="width:50%;vertical-align:top;padding:0;">';
     html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Status:</span><span style="display:inline-block;padding:2px 10px;border-radius:4px;font-weight:bold;font-size:11px;text-transform:uppercase;background:' + (statusBgs[statusLower]||'#e5e7eb') + ';color:' + (statusColors[statusLower]||'#374151') + ';">' + escHtml(po.status) + '</span></div>';
-    html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Supplier:</span>' + escHtml(po.supplier_name || '-') + '</div>';
+    html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Customer:</span>' + escHtml(po.supplier_name || '-') + '</div>';
     html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Order Date:</span>' + escHtml(po.order_date || '-') + '</div>';
     html += '<div style="margin-bottom:5px;"><span style="font-weight:bold;display:inline-block;width:120px;">Expected Date:</span>' + escHtml(po.expected_date || '-') + '</div>';
     html += '</td><td style="width:50%;vertical-align:top;padding:0;">';

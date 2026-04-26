@@ -220,7 +220,7 @@ if ($action === 'search_products') {
     $createdBy = $_SESSION['user_name'] ?? 'Staff';
 
     if ($supplierId <= 0 || $orderDate === '') {
-        echo json_encode(['error' => 'Supplier and order date are required.']);
+        echo json_encode(['error' => 'Customer and order date are required.']);
         exit;
     }
     if (empty($items)) {
@@ -734,7 +734,7 @@ if ($action === 'search_products') {
 
         $xlsx->addRow(['QUOTATION: ' . ($po['quotation_number'] ?? '')], [1]);
         $xlsx->addRow(['Status', $po['status'] ?? '', '', 'Created By', $po['created_by'] ?? '']);
-        $xlsx->addRow(['Supplier', $po['supplier_name'] ?? '', '', 'Approved By', $po['approved_by'] ?? '']);
+        $xlsx->addRow(['Customer', $po['supplier_name'] ?? '', '', 'Approved By', $po['approved_by'] ?? '']);
         $xlsx->addRow(['Order Date', $po['order_date'] ?? '', '', 'Approved Date', $po['approved_date'] ?? '']);
         $xlsx->addRow(['Expected Date', $po['expected_date'] ?? '', '', 'Remark', $po['remark'] ?? '']);
         $xlsx->addRow(['']);
