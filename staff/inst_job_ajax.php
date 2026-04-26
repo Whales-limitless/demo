@@ -96,12 +96,44 @@ function getImageBinary($fileKey, $base64Key) {
     return null;
 }
 
+function uploadErrorMessage($code) {
+    switch ($code) {
+        case UPLOAD_ERR_INI_SIZE:
+        case UPLOAD_ERR_FORM_SIZE:
+            return 'Photo is too large for the server. Please retry.';
+        case UPLOAD_ERR_PARTIAL:
+            return 'Upload was interrupted. Please check your connection and retry.';
+        case UPLOAD_ERR_NO_TMP_DIR:
+            return 'Server temporary folder is missing. Please contact support.';
+        case UPLOAD_ERR_CANT_WRITE:
+            return 'Server could not save the photo. Please contact support.';
+        case UPLOAD_ERR_EXTENSION:
+            return 'Upload was blocked by the server. Please contact support.';
+        default:
+            return 'Photo upload failed. Please retry.';
+    }
+}
+
+// Detect post_max_size overflow: when the request body exceeded php.ini's
+// post_max_size, PHP discards both $_POST and $_FILES entirely. The form-data
+// "action" field is therefore missing even though Content-Length is non-zero.
+$contentLength = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+if (empty($_POST) && empty($_FILES) && $contentLength > 0) {
+    echo json_encode(['error' => 'Photo is too large for the server. Please retry — the app will compress it automatically.']);
+    exit;
+}
+
 $action = $_POST['action'] ?? '';
 
 if ($action === 'submit') {
     $remark = trim($_POST['remark'] ?? '');
     if ($userCode === '') {
         echo json_encode(['error' => 'Your account is not linked to a user code.']);
+        exit;
+    }
+
+    if (isset($_FILES['image']) && $_FILES['image']['error'] !== UPLOAD_ERR_OK && $_FILES['image']['error'] !== UPLOAD_ERR_NO_FILE) {
+        echo json_encode(['error' => uploadErrorMessage($_FILES['image']['error'])]);
         exit;
     }
 

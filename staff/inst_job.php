@@ -150,7 +150,10 @@ $userName = $_SESSION['user_name'] ?? '';
     <?php include 'mobile-bottombar.php'; ?>
 
     <script>
-    var selectedFile = null;
+    var selectedBlob = null;
+    var preparingPhoto = null;
+    var SUBMIT_LABEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Submit Installation Job';
+    var SPIN_SVG = '<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/></svg>';
 
     function choosePhotoSource() {
         document.getElementById('sourceOverlay').classList.add('active');
@@ -160,13 +163,13 @@ $userName = $_SESSION['user_name'] ?? '';
     }
     function pickSource(type) {
         closeSource();
-        if (type === 'camera') document.getElementById('fileCamera').click();
-        else document.getElementById('fileGallery').click();
+        var el = document.getElementById(type === 'camera' ? 'fileCamera' : 'fileGallery');
+        // Reset value so selecting the same file again still fires onchange
+        try { el.value = ''; } catch (e) {}
+        el.click();
     }
 
-    function onFileSelected(input) {
-        if (!input.files || !input.files[0]) return;
-        selectedFile = input.files[0];
+    function showPreview(file) {
         var reader = new FileReader();
         reader.onload = function(e) {
             var img = document.getElementById('photoImg');
@@ -174,33 +177,100 @@ $userName = $_SESSION['user_name'] ?? '';
             img.style.display = 'block';
             document.getElementById('photoPlaceholder').style.display = 'none';
         };
-        reader.readAsDataURL(selectedFile);
+        reader.readAsDataURL(file);
+    }
+
+    // Decode + downscale + re-encode to JPEG via canvas. Keeps photos under ~500KB
+    // regardless of source device, avoiding PHP post_max_size / upload_max_filesize
+    // failures and slow uploads on weak mobile networks.
+    function compressImage(file, maxDim, quality) {
+        return new Promise(function(resolve) {
+            if (!file || !file.type || file.type.indexOf('image/') !== 0) return resolve(null);
+            if (typeof URL === 'undefined' || !URL.createObjectURL) return resolve(null);
+            var url = URL.createObjectURL(file);
+            var img = new Image();
+            img.onload = function() {
+                try {
+                    var w = img.naturalWidth || img.width;
+                    var h = img.naturalHeight || img.height;
+                    if (!w || !h) { URL.revokeObjectURL(url); return resolve(null); }
+                    var scale = Math.min(1, maxDim / Math.max(w, h));
+                    var tw = Math.max(1, Math.round(w * scale));
+                    var th = Math.max(1, Math.round(h * scale));
+                    var canvas = document.createElement('canvas');
+                    canvas.width = tw;
+                    canvas.height = th;
+                    var ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(0, 0, tw, th);
+                    ctx.drawImage(img, 0, 0, tw, th);
+                    URL.revokeObjectURL(url);
+                    if (!canvas.toBlob) return resolve(null);
+                    canvas.toBlob(function(blob) {
+                        if (!blob) return resolve(null);
+                        // Use original if compression somehow makes it larger and no resize happened
+                        if (scale === 1 && blob.size >= file.size) return resolve(null);
+                        resolve(blob);
+                    }, 'image/jpeg', quality);
+                } catch (e) {
+                    try { URL.revokeObjectURL(url); } catch (_) {}
+                    resolve(null);
+                }
+            };
+            img.onerror = function() {
+                try { URL.revokeObjectURL(url); } catch (_) {}
+                resolve(null);
+            };
+            img.src = url;
+        });
+    }
+
+    function onFileSelected(input) {
+        if (!input.files || !input.files[0]) return;
+        var raw = input.files[0];
+        showPreview(raw);
+        selectedBlob = null;
+        preparingPhoto = compressImage(raw, 1600, 0.82).then(function(blob) {
+            selectedBlob = blob || raw;
+            return selectedBlob;
+        });
+    }
+
+    function resetSubmitButton(btn) {
+        btn.disabled = false;
+        btn.innerHTML = SUBMIT_LABEL;
     }
 
     function submitJob() {
-        if (!selectedFile) {
+        if (!selectedBlob && !preparingPhoto) {
             Swal.fire({ icon: 'warning', text: 'Please attach an installation photo first.', confirmButtonColor: '#C8102E' });
             return;
         }
 
         var btn = document.getElementById('btnSubmit');
         btn.disabled = true;
-        btn.innerHTML = '<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/></svg> Submitting...';
+        btn.innerHTML = SPIN_SVG + ' Submitting...';
 
-        var formData = new FormData();
-        formData.append('action', 'submit');
-        formData.append('image', selectedFile);
-        formData.append('remark', document.getElementById('remarkInput').value);
-
-        fetch('inst_job_ajax.php', {
-            method: 'POST',
-            credentials: 'same-origin',
-            body: formData
+        Promise.resolve(preparingPhoto).then(function() {
+            if (!selectedBlob) throw new Error('no_photo');
+            var formData = new FormData();
+            formData.append('action', 'submit');
+            formData.append('image', selectedBlob, 'inst.jpg');
+            formData.append('remark', document.getElementById('remarkInput').value);
+            return fetch('inst_job_ajax.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                body: formData
+            });
         })
-        .then(function(r) { return r.json(); })
+        .then(function(r) {
+            return r.text().then(function(t) {
+                try { return JSON.parse(t); }
+                catch (e) { throw new Error('bad_response:' + r.status); }
+            });
+        })
         .then(function(data) {
-            btn.disabled = false;
-            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Submit Installation Job';
+            resetSubmitButton(btn);
             if (data.error) {
                 Swal.fire({ icon: 'error', text: data.error, confirmButtonColor: '#C8102E' });
                 return;
@@ -215,10 +285,11 @@ $userName = $_SESSION['user_name'] ?? '';
                 window.location.href = 'inst_history.php';
             });
         })
-        .catch(function() {
-            btn.disabled = false;
-            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Submit Installation Job';
-            Swal.fire({ icon: 'error', text: 'Network error. Please try again.', confirmButtonColor: '#C8102E' });
+        .catch(function(err) {
+            resetSubmitButton(btn);
+            var msg = 'Network error. Please try again.';
+            if (err && err.message === 'no_photo') msg = 'Please attach an installation photo first.';
+            Swal.fire({ icon: 'error', text: msg, confirmButtonColor: '#C8102E' });
         });
     }
     </script>
