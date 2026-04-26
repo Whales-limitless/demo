@@ -119,12 +119,30 @@
           <small>View completed deliveries</small>
         </div>
       </a>
+      <a href="inst_job.php" class="inv-modal-btn">
+        <div class="inv-icon" style="background:#fef3c7;color:#d97706;">
+          <svg><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        </div>
+        <div class="inv-label">
+          Installation Job
+          <small>Submit installation job</small>
+        </div>
+      </a>
+      <a href="inst_history.php" class="inv-modal-btn">
+        <div class="inv-icon" style="background:#ede9fe;color:#7c3aed;">
+          <svg><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        </div>
+        <div class="inv-label">
+          Installation History
+          <small>View past submissions</small>
+        </div>
+      </a>
       <a href="del_report.php" class="inv-modal-btn">
         <div class="inv-icon" style="background:#dbeafe;color:#2563eb;">
           <svg><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         </div>
         <div class="inv-label">
-          Delivery Reports
+          Delivery User Reports
           <small>View your delivery reports</small>
         </div>
       </a>
@@ -188,7 +206,9 @@
     'del_report.php': 'tabDelivery',
     'del_work.php': 'tabDelivery',
     'del_vieworder.php': 'tabDelivery',
-    'del_sign.php': 'tabDelivery'
+    'del_sign.php': 'tabDelivery',
+    'inst_job.php': 'tabDelivery',
+    'inst_history.php': 'tabDelivery'
   };
   var activeTab = tabMap[path];
   if (activeTab) {

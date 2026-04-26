@@ -25,7 +25,7 @@ if ($lr) { while ($r = $lr->fetch_assoc()) { $locations[] = $r; } }
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Delivery Reports</title>
+    <title>Delivery User Reports</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
@@ -76,7 +76,7 @@ if ($lr) { while ($r = $lr->fetch_assoc()) { $locations[] = $r; } }
     <?php include 'navbar.php'; ?>
 
     <header class="page-header">
-        <span class="page-title">Delivery Reports</span>
+        <span class="page-title">Delivery User Reports</span>
     </header>
 
     <div class="main-content">
@@ -174,15 +174,20 @@ if ($lr) { while ($r = $lr->fetch_assoc()) { $locations[] = $r; } }
 
     function renderSummary(rows) {
         var html = '<table id="reportTable" class="display" style="width:100%;font-size:13px;">' +
-            '<thead><tr><th>No</th><th>Total Orders</th><th>Total Distance (km)</th><th>Total Commission (RM)</th></tr></thead><tbody>';
-        var totalOrders = 0, totalDist = 0, totalComm = 0;
+            '<thead><tr><th>No</th><th>Total Orders</th><th>Total Distance (km)</th><th>Distance Commission (RM)</th><th>Installation Commission (RM)</th><th>Total Commission (RM)</th></tr></thead><tbody>';
+        var totalOrders = 0, totalDist = 0, totalDistComm = 0, totalInstComm = 0, totalComm = 0;
         rows.forEach(function(r, i) {
+            var distComm = parseFloat(r.total_distance_commission) || 0;
+            var instComm = parseFloat(r.total_install_commission) || 0;
+            var rowTotal = parseFloat(r.total_commission) || (distComm + instComm);
             totalOrders += parseInt(r.total_orders) || 0;
             totalDist += parseFloat(r.total_distance) || 0;
-            totalComm += parseFloat(r.total_commission) || 0;
-            html += '<tr><td>' + (i + 1) + '</td><td>' + r.total_orders + '</td><td>' + (parseFloat(r.total_distance) || 0).toFixed(2) + '</td><td>' + (parseFloat(r.total_commission) || 0).toFixed(2) + '</td></tr>';
+            totalDistComm += distComm;
+            totalInstComm += instComm;
+            totalComm += rowTotal;
+            html += '<tr><td>' + (i + 1) + '</td><td>' + (r.total_orders || 0) + '</td><td>' + (parseFloat(r.total_distance) || 0).toFixed(2) + '</td><td>' + distComm.toFixed(2) + '</td><td>' + instComm.toFixed(2) + '</td><td>' + rowTotal.toFixed(2) + '</td></tr>';
         });
-        html += '</tbody><tfoot><tr style="font-weight:700;"><td>TOTAL</td><td>' + totalOrders + '</td><td>' + totalDist.toFixed(2) + '</td><td>' + totalComm.toFixed(2) + '</td></tr></tfoot></table>';
+        html += '</tbody><tfoot><tr style="font-weight:700;"><td>TOTAL</td><td>' + totalOrders + '</td><td>' + totalDist.toFixed(2) + '</td><td>' + totalDistComm.toFixed(2) + '</td><td>' + totalInstComm.toFixed(2) + '</td><td>' + totalComm.toFixed(2) + '</td></tr></tfoot></table>';
         document.getElementById('reportContent').innerHTML = html;
         initDataTable();
     }
