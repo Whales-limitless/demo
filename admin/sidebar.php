@@ -26,7 +26,8 @@ $sidebarSections = [
         ['page' => 'del_assign',    'href' => 'del_assign.php',    'icon' => 'fas fa-user-check',        'label' => 'Assign Driver'],
         ['page' => 'del_customer',  'href' => 'del_customer.php',  'icon' => 'fas fa-address-book',      'label' => 'Customers'],
         ['page' => 'del_location',  'href' => 'del_location.php',  'icon' => 'fas fa-map-marker-alt',    'label' => 'Locations'],
-        ['page' => 'del_report',    'href' => 'del_report.php',    'icon' => 'fas fa-chart-bar',         'label' => 'Delivery Reports'],
+        ['page' => 'inst_approval', 'href' => 'inst_approval.php', 'icon' => 'fas fa-clipboard-check',   'label' => 'Installation Approval'],
+        ['page' => 'del_report',    'href' => 'del_report.php',    'icon' => 'fas fa-chart-bar',         'label' => 'Delivery User Reports'],
     ],
     'REPORTS' => [
         ['page' => 'report_stock_take',     'href' => 'report_stock_take.php',     'icon' => 'fas fa-clipboard-list', 'label' => 'Stock Take Report'],
