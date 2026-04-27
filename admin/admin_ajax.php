@@ -90,21 +90,50 @@ if ($action === "done") {
 } elseif ($action === "delete") {
     $delid = $connect->real_escape_string($_POST['id'] ?? '');
 
-    $sqlord = $connect->query("SELECT SDATE, ACCODE FROM `orderlist` WHERE SALNUM = '$delid' LIMIT 1");
+    // Fetch items with their pre-delete STATUS so we know what to reverse:
+    //  - STOCKIN rows: qoh was incremented at INSERT time (any status) → decrement on delete
+    //  - Non-STOCKIN rows: qoh was decremented at "Done" (STATUS in DONE/PAYMENT) → re-increment
+    //  - Already-DELETED rows: nothing to reverse
+    $itemsResult = $connect->query("SELECT BARCODE, QTY, PTYPE, STATUS FROM `orderlist` WHERE SALNUM = '$delid' AND BARCODE <> 'PT'");
 
-    if ($sqlord && $sqlord->num_rows > 0) {
-        $row = $sqlord->fetch_assoc();
-        $status = 'DELETED';
+    if ($itemsResult && $itemsResult->num_rows > 0) {
+        $items = [];
+        $hasReversible = false;
+        while ($item = $itemsResult->fetch_assoc()) {
+            $items[] = $item;
+            if (($item['STATUS'] ?? '') !== 'DELETED') {
+                $hasReversible = true;
+            }
+        }
 
-        $result1 = $connect->query("UPDATE `orderlist` SET STATUS = '$status' WHERE SALNUM = '$delid'");
-        $affected1 = $connect->affected_rows;
-
-        if ($result1 && $affected1 > 0) {
-            echo "Deleted.";
-        } elseif ($result1 && $affected1 == 0) {
+        if (!$hasReversible) {
             echo "Error: No rows updated. Order may already be DELETED.";
         } else {
-            echo "Error: " . $connect->error;
+            foreach ($items as $item) {
+                $prevStatus = $item['STATUS'] ?? '';
+                if ($prevStatus === 'DELETED') continue;
+                $itemQty = intval($item['QTY']);
+                if ($itemQty <= 0) continue;
+                $itemBarcode = $connect->real_escape_string($item['BARCODE']);
+                $isStockin = (($item['PTYPE'] ?? '') === 'STOCKIN');
+
+                if ($isStockin) {
+                    $connect->query("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) - $itemQty WHERE `barcode` = '$itemBarcode'");
+                } elseif ($prevStatus === 'DONE' || $prevStatus === 'PAYMENT') {
+                    $connect->query("UPDATE `PRODUCTS` SET `qoh` = COALESCE(`qoh`, 0) + $itemQty WHERE `barcode` = '$itemBarcode'");
+                }
+            }
+
+            $result1 = $connect->query("UPDATE `orderlist` SET STATUS = 'DELETED' WHERE SALNUM = '$delid'");
+
+            if ($result1) {
+                $cacheDir = sys_get_temp_dir() . '/pw_product_cache';
+                @unlink($cacheDir . '/all_products.json');
+                @unlink($cacheDir . '/pending_qty.json');
+                echo "Deleted.";
+            } else {
+                echo "Error: " . $connect->error;
+            }
         }
     } else {
         echo "Error: Order not found.";

@@ -146,6 +146,10 @@ if ('serviceWorker' in navigator) {
     <div class="sidebar-divider"></div>
     <div class="sidebar-section-label">Procurement</div>
 
+    <li><a href="staff_quotation.php" data-page="staff_quotation.php">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+      Quotations
+    </a></li>
     <li><a href="staff_po.php" data-page="staff_po.php">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
       Purchase Orders
@@ -184,9 +188,17 @@ if ('serviceWorker' in navigator) {
       <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       Delivery History
     </a></li>
+    <li><a href="inst_job.php" data-page="inst_job.php">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+      Installation Job
+    </a></li>
+    <li><a href="inst_history.php" data-page="inst_history.php">
+      <svg class="nav-icon" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Installation History
+    </a></li>
     <li><a href="del_report.php" data-page="del_report.php">
       <svg class="nav-icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Delivery Reports
+      Delivery User Reports
     </a></li>
     <?php endif; ?>
 
